@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Starwake</title>
+<style>
+/*CSS*/
+</style>
+</head>
+<body>
+<div id="title"><canvas id="titlebg"></canvas><div class="tbox" id="tcontent"></div></div>
+<div id="app" style="display:none">
+  <div id="topbar">
+    <div class="brand">STAR<b>WAKE</b></div>
+    <div id="res"></div>
+    <div class="tbtns">
+      <button class="btn" data-a="openColonies" title="Planets (P)">Planets</button>
+      <button class="btn" data-a="openResearch" title="Research (R)">Research</button>
+      <button class="btn" data-a="openDesign" title="Ship Design (D)">Ship Design</button>
+      <button class="btn" data-a="openEmpires" title="Empires (E)">Empires</button>
+      <button class="btn" data-a="openMenu">Menu</button>
+      <button class="btn primary" id="endturn" data-a="endTurn" title="End turn (Enter)">End Turn ▸</button>
+    </div>
+  </div>
+  <div id="main">
+    <canvas id="map"></canvas>
+    <div id="side"></div>
+    <div class="zoom"><button class="btn" data-a="zoom" data-v="1" title="Zoom in">+</button><button class="btn" data-a="zoom" data-v="-1" title="Zoom out">−</button><button class="btn" data-a="fit" title="Show whole galaxy">⤢</button></div>
+    <div id="hint"></div>
+    <div id="toast"></div>
+  </div>
+</div>
+<div id="modal"></div>
+<script>
+/*JS*/
+</script>
+</body>
+</html>
