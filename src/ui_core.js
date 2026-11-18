@@ -26,6 +26,13 @@ function bodyColor(b) {
   if (b.temp === 'scorching' && b.cls !== 'molten') return ['#e0a070', '#7a3a1a'];
   return m;
 }
+function habSeen(b) { // before life is known, the rating ignores hidden native life
+  if (lifeKnown(b) || !b.toxicLife) return hab(b);
+  b.toxicLife = false; const h = hab(b); b.toxicLife = true; return h;
+}
+const SETTINGS = (() => { try { return Object.assign({near: 3}, JSON.parse(localStorage.getItem('starwake.settings') || '{}')); } catch (e) { return {near: 3}; } })();
+function saveSettings() { try { localStorage.setItem('starwake.settings', JSON.stringify(SETTINGS)); } catch (e) {} }
+function nearest3(sid) { const s0 = ST(sid); return S.stars.filter(s => s.id !== sid && S.known[s.id]).map(s => ({s, d: d3(s0, s)})).sort((a, b) => a.d - b.d).slice(0, SETTINGS.near); }
 function lifeKnown(b) { return b.star === 0 || b.owner === 0 || S.surveyed[b.star] || has('biosignatures') || inGreatScope(ST(b.star)); }
 function planetBall(b, px) {
   px = px || 30; const [c1, c2] = bodyColor(b);
@@ -121,6 +128,18 @@ function drawMap() {
     if (mk) { x.font = '12px Segoe UI, sans-serif'; x.textAlign = 'left'; x.fillStyle = s.guardKnown ? '#ff5d5d' : '#ffb84a'; x.fillText(mk, p[0] + rr + 3, p[1] - rr - 1); }
     if (lifeVisible(s)) { const lf = s.bodies.map(B).some(b => b.life === 'ecosystem' && b.star !== 0) ? '#5be08a' : s.bodies.map(B).some(b => b.life === 'microbial' && b.star !== 0) ? '#2ee6d6' : null; if (lf) { x.fillStyle = lf; x.beginPath(); x.arc(p[0] - rr - 4, p[1] - rr - 2, 2.6, 0, TAU); x.fill(); } }
     LABELS.push({s, p, rr, pri: s.id === 0 ? 4 : ours ? 3 : UI.selStar === s.id ? 3.5 : vis ? 2 : 1});
+  }
+  // the 3 nearest systems to the selected star
+  if (UI.selStar != null && S.known[UI.selStar]) {
+    const s0 = ST(UI.selStar), p0 = proj(s0.x, s0.y, s0.z);
+    nearest3(UI.selStar).forEach(({s, d}, i) => {
+      const p = proj(s.x, s.y, s.z);
+      x.strokeStyle = 'rgba(255,214,120,.45)'; x.lineWidth = 1.2; x.setLineDash([3, 5]); x.beginPath(); x.moveTo(p0[0], p0[1]); x.lineTo(p[0], p[1]); x.stroke(); x.setLineDash([]);
+      x.strokeStyle = '#ffd678'; x.lineWidth = 1.5; x.beginPath(); x.arc(p[0], p[1], 11, 0, TAU); x.stroke();
+      x.fillStyle = '#ffd678'; x.beginPath(); x.arc(p[0] - 13, p[1] - 11, 7.5, 0, TAU); x.fill();
+      x.fillStyle = '#1a1206'; x.font = 'bold 10.5px Segoe UI, sans-serif'; x.textAlign = 'center'; x.fillText(String(i + 1), p[0] - 13, p[1] - 7.3);
+      const mx = (p0[0] + p[0]) / 2, my = (p0[1] + p[1]) / 2; x.fillStyle = '#ffd678cc'; x.font = '10px Segoe UI, sans-serif'; x.fillText(d.toFixed(1) + ' ly', mx, my - 3);
+    });
   }
   // labels with de-cluttering
   const boxes = []; x.textAlign = 'center';
@@ -228,6 +247,7 @@ function updateHint() {
   else el.textContent = 'Drag to rotate · right-drag or Shift-drag to pan · scroll to zoom · Enter ends the year';
 }
 function sendFleet(f, sid) {
+  f.auto = false;
   const err = orderMove(f, sid); if (err) { toast(err); return; }
   toast('Heading to ' + ST(sid).name + ': ' + etaTo(f, sid) + ' year' + (etaTo(f, sid) > 1 ? 's' : ''));
   UI.dirty = true; renderSide();

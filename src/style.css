@@ -170,3 +170,4 @@ table.list tr.click{cursor:pointer}table.list tr.click:hover td{background:#121d
 @media (max-width:1440px){.tbtns .btn{padding:5px 8px;font-size:12.5px}.tbtns{gap:4px}#topbar{gap:8px}.chip .ell{max-width:110px}}
 @media (max-width:1300px){.chip .k{display:none}.chip{padding:3px 6px}#res{gap:4px}}
 .sdesc{font-size:13px;line-height:1.5;color:#c4cfe2;margin:8px 0 10px}
+.nnum{display:inline-block;width:16px;height:16px;line-height:16px;border-radius:50%;background:#ffd678;color:#1a1206;font-weight:700;font-size:10.5px;text-align:center;margin-right:6px}

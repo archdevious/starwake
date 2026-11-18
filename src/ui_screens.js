@@ -16,7 +16,7 @@ ACT.mres = v => { if (UI.modalRes) UI.modalRes(v); };
 function confirmBox(title, text, yes) { modal({title, w: 460, body: `<div>${text}</div>`, foot: `<button class="btn" data-a="mres" data-v="no">Cancel</button><button class="btn danger" data-a="mres" data-v="yes">Confirm</button>`}).then(v => { if (v === 'yes') yes(); }); }
 
 // ---------- news feed ----------
-const NEWS_ICON = {info: 'ℹ️', tech: '🔬', build: '🏗️', ship: '🚀', colony: '🪐', warn: '⚠️', arrive: '🔭', spot: '✧', survey: '🧪', lost: '💥', stage: '🏙️'};
+const NEWS_ICON = {info: 'ℹ️', tech: '🔬', build: '🏗️', ship: '🚀', colony: '🪐', warn: '⚠️', arrive: '🔭', spot: '✧', survey: '🧪', lost: '💥', stage: '🏙️', idle: '💤'};
 function showNews() {
   const el = $('#news'); if (!S) return;
   const list = S.msgs.slice(-14);
@@ -85,9 +85,9 @@ ACT.saveDesign = () => { const d = UI.designEdit; const n = $('#dname'); const n
 
 // ---------- colonies list ----------
 function coloniesHTML() {
-  const cols = colonies(true).sort((a, b) => (b.col.home ? 1 : 0) - (a.col.home ? 1 : 0) || b.col.pop - a.col.pop);
+  const cols = colonies(true).sort((a, b) => (a.col.outpost ? 1 : 0) - (b.col.outpost ? 1 : 0)).sort((a, b) => (b.col.home ? 1 : 0) - (a.col.home ? 1 : 0) || b.col.pop - a.col.pop);
   return `<table class="list"><tr><th>World</th><th>Stage</th><th>Population</th><th>Focus</th><th>Prod</th><th>Research</th><th>Credits</th><th>Food</th><th>Building</th></tr>${cols.map(b => { const o = colOut(b), q = b.col.queue[0];
-    return `<tr class="click" data-a="colGo" data-v="${b.id}"><td>${esc(b.name)} <span class="dim tiny">${esc(ST(b.star).name)}</span></td><td>${STAGES[o.stage].name}</td><td>${b.col.outpost ? '—' : people(b.col.pop)}</td><td>${b.col.outpost ? '—' : FOCUS[b.col.focus].name}</td><td>${o.prod}</td><td>${o.rp}</td><td>${o.bc}</td><td class="${o.food - o.eat >= 0 ? 'good' : 'bad'}">${sgn(r1(o.food - o.eat))}</td><td>${q ? esc(itemName(q)) : '<span class="dim">—</span>'}</td></tr>`; }).join('')}</table>`;
+    return `<tr class="click" data-a="colGo" data-v="${b.id}"><td>${esc(b.name)} <span class="dim tiny">${esc(ST(b.star).name)}</span></td><td>${STAGES[o.stage].name}</td><td>${b.col.outpost ? '—' : people(b.col.pop)}</td><td>${b.col.outpost ? (supplyTarget(b) ? 'Supplying ' + esc(supplyTarget(b).name) : 'Outpost') : FOCUS[b.col.focus].name}</td><td>${o.prod}</td><td>${o.rp}</td><td>${o.bc}</td><td class="${o.food - o.eat >= 0 ? 'good' : 'bad'}">${sgn(r1(o.food - o.eat))}</td><td>${q ? esc(itemName(q)) : supplyTarget(b) ? '<span class="dim">—</span>' : b.col.outpost ? '<span class="dim">Nothing (selling)</span>' : '<span class="warn">Nothing: idle</span>'}</td></tr>`; }).join('')}</table>`;
 }
 ACT.openColonies = () => modal({title: 'Colonies', w: 1050, body: coloniesHTML(), foot: `<button class="btn primary" data-a="mclose">Close</button>`});
 ACT.colGo = v => { ACT.mclose(); const b = B(+v); if (b.col.outpost) selectStar(b.star); else selectColony(b.id); centerOn(b.star); };
@@ -105,7 +105,7 @@ function saveTo(slot) {
   } catch (e) { console.warn('save failed', e); return false; }
 }
 function autosave() { if (S && !S.over) saveTo('auto'); }
-function migrateSave(d) { d.version = GAME_VERSION; for (const x of d.designs || []) if (x.id === 'probe') x.name = 'Pathfinder Probe'; d.msgs = d.msgs || []; d.journal = d.journal || []; d.hist = d.hist || []; return d; }
+function migrateSave(d) { d.version = GAME_VERSION; for (const x of d.designs || []) if (x.id === 'scout' && x.mods.length === 1 && x.mods[0] === 'tel_m') x.mods.push('booster'); for (const b of d.bodies || []) if (b.col && b.col.outpost && !b.col.mode) b.col.mode = 'build'; for (const x of d.designs || []) if (x.id === 'probe') x.name = 'Pathfinder Probe'; d.msgs = d.msgs || []; d.journal = d.journal || []; d.hist = d.hist || []; return d; }
 function loadFrom(slot) { const r = readSlot(slot); if (!r) return false; try { S = migrateSave(JSON.parse(r.data)); } catch (e) { toast('That save could not be read.'); return false; } startPlaying(false); return true; }
 function savesHTML(canSave) {
   let h = `<table class="list"><tr><th>Slot</th><th>Civilisation</th><th>Year</th><th>Saved</th><th></th></tr>`;
@@ -121,11 +121,11 @@ ACT.delSave = v => confirmBox('Delete this save?', 'This cannot be undone.', () 
 
 // ---------- menu & help ----------
 ACT.openMenu = () => modal({title: 'Menu', w: 420, body: `<div style="display:flex;flex-direction:column;gap:8px">
-  <button class="btn" data-a="menuGo" data-v="saves">Save / Load</button><button class="btn" data-a="menuGo" data-v="help">How to play</button>
+  <button class="btn" data-a="menuGo" data-v="saves">Save / Load</button><button class="btn" data-a="menuGo" data-v="settings">Settings</button><button class="btn" data-a="menuGo" data-v="help">How to play</button>
   <button class="btn" data-a="menuGo" data-v="retire">Retire (end this game and see your score)</button><button class="btn" data-a="menuGo" data-v="title">Exit to main menu</button></div>`});
 ACT.menuGo = v => {
   ACT.mclose();
-  if (v === 'saves') ACT.openSaves(); else if (v === 'help') ACT.openHelp();
+  if (v === 'saves') ACT.openSaves(); else if (v === 'help') ACT.openHelp(); else if (v === 'settings') ACT.openSettings();
   else if (v === 'retire') confirmBox('Retire from this game?', 'The game ends now and your score goes into the Hall of Fame.', () => { S.over = {result: 'retired', why: 'You chose to end your story in the year ' + S.year + '.'}; showEnd(); });
   else if (v === 'title') { autosave(); showTitle(); }
 };
@@ -215,3 +215,12 @@ ACT.ngPick = v => { NG.story['e' + NG.step] = v; NG.step++; renderNewGame(); };
 ACT.ngColor = v => { ngKeepName(); NG.color = v; renderNewGame(); };
 ACT.ngLen = v => { ngKeepName(); NG.len = v; renderNewGame(); };
 ACT.tStart = () => { ngKeepName(); newGame({len: NG.len, story: NG.story, name: NG.name.trim() || 'United Earth', color: NG.color}); FAR = null; startPlaying(true); };
+
+// ---------- settings ----------
+function settingsHTML() {
+  return `<div class="row sb"><div><b>Nearest systems</b><div class="tiny dim">When you select a star, number its closest systems on the map and list them.</div></div>
+    <select data-c="setNear">${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => `<option value="${n}" ${SETTINGS.near === n ? 'selected' : ''}>${n ? n : 'Off'}</option>`).join('')}</select></div>
+    <div class="tiny dim" style="margin-top:12px">Settings are kept in this browser and apply to every game.</div>`;
+}
+ACT.openSettings = () => modal({title: 'Settings', w: 520, body: settingsHTML(), foot: `<button class="btn primary" data-a="mclose">Done</button>`});
+ACT.setNear = v => { SETTINGS.near = +v; saveSettings(); UI.dirty = true; if (S) renderSide(); };

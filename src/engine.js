@@ -179,7 +179,9 @@ function designCost(d) { let c = HULLS[d.hull].cost; for (const k of d.mods) c +
 function massFactor(m) { return clamp(1.1 - 0.04 * m + (has('bt_alloys') ? 0.1 : 0), 0.5, 1); }
 function driveLevel() { let l = 0; DRIVE_TECH.forEach((t, i) => { if (t && has(t)) l = Math.max(l, i); }); return l; }
 function topSpeed() { return DRIVE_SPEEDS[driveLevel()]; }
-function designSpeed(d) { return topSpeed() * massFactor(designMass(d)); }
+function designSpeed(d) { return Math.min(0.9999, topSpeed() * massFactor(designMass(d)) + (d.mods.includes('booster') ? 0.1 : 0)); }
+function isProbeDesign(d) { return d.mods.length > 0 && d.mods.every(m => m === 'tel_m' || m === 'tel_l' || m === 'booster'); }
+function canProbeSurvey(f) { return !!(f && f.star != null && f.dest == null && !S.surveyed[f.star] && !(f.task && f.task.type === 'survey') && f.ships.some(sh => isProbeDesign(design(sh.d)))); }
 function telBonus(r) { return r * (has('interferometry') ? 1.5 : 1) + (has('bt_lensing') ? 4 : 0); }
 function designTel(d) { return telBonus(d.mods.includes('tel_l') ? 16 : d.mods.includes('tel_m') ? 8 : SHIP_TEL); }
 function designHas(d, m) { return d.mods.includes(m); }
@@ -224,9 +226,9 @@ function hab(b) {
   if (b.tf) h = HAB_ORDER[Math.min(5, HAB_ORDER.indexOf(h) + b.tf)];
   return h;
 }
-function popCap(b) {
+function popCap(b, hOver) {
   if (b.star === 0 && b.name === 'Earth') return 12000 * (has('arcologies') ? 1.25 : 1);
-  const h = hab(b);
+  const h = hOver || hab(b);
   let c = b.clouds ? 40 : HAB[h].cap * b.size;
   if (h === 'harsh' && has('gene_adaptation')) c *= 1.5;
   if (has('arcologies')) c *= 1.25;
@@ -251,8 +253,8 @@ function colOut(b) {
   if (c.focus === 'farming') { fm.food = 2; fm.prod = fm.rp = fm.bc = 0.8; }
   const p = c.proj;
   let prod = st.prod * MIN_MULT[b.min] * fm.prod * (p.mines ? 1.5 : 1) * S.mods.prod * (has('autofactories') ? 1.2 : 1) * (has('antimatter_production') ? 1.1 : 1) * (has('bt_fusion') ? 1.15 : 1);
-  let rp = st.rp * fm.rp * (p.campus ? 1.5 : 1) * S.mods.rp * (has('quantum_computing') ? 1.15 : 1) * (has('unified_science') ? 1.2 : 1) * (has('bt_signal') ? 1.15 : 1);
-  let bc = st.bc * fm.bc * (p.tradeport ? 1.5 : 1) * S.mods.bc * (has('interstellar_commerce') ? 1.2 : 1);
+  let rp = (st.rp + (p.rstation ? (b.life !== 'none' || b.traits.some(t => t === 'rings' || t === 'subocean' || t === 'volcanic') ? 3 : 1) : 0)) * fm.rp * (p.campus ? 1.5 : 1) * S.mods.rp * (has('quantum_computing') ? 1.15 : 1) * (has('unified_science') ? 1.2 : 1) * (has('bt_signal') ? 1.15 : 1);
+  let bc = stg === 'outpost' ? st.bc : st.bc * fm.bc * (p.tradeport ? 1.5 : 1) * S.mods.bc * (has('interstellar_commerce') ? 1.2 : 1);
   let fert = HAB[h].fert * ((h === 'harsh' || h === 'hostile') && has('closed_ecology') ? 1.5 : 1);
   const lvl = Math.max(0, STAGE_ORDER.indexOf(stg) - 1);
   let food = st.food * fert * fm.food + (p.agridomes ? (3 + 3 * Math.max(0, lvl - 0)) * (has('bt_seeds') ? 2 : 1) : 0) + (c.home ? S.mods.earthFood : 0);
@@ -277,20 +279,23 @@ function growthRate(b) {
 }
 function shipCost(d, b) { return Math.round(designCost(d) * (b && b.col.proj.elevator ? 0.75 : 1)); }
 function projCost(id) { return Math.round(PROJECTS[id].cost * (has('megastructures') ? 0.75 : 1)); }
-function itemCost(b, it) { return it.kind === 'proj' ? projCost(it.id) : shipCost(design(it.id), b); }
-function itemName(it) { return it.kind === 'proj' ? PROJECTS[it.id].name : design(it.id).name; }
+const OUTPOST_PROJ_COST = 40;
+function itemCost(b, it) { return it.kind === 'proj' ? projCost(it.id) : it.kind === 'outpost' ? Math.round(OUTPOST_PROJ_COST * (has('megastructures') ? 0.75 : 1)) : shipCost(design(it.id), b); }
+function itemName(it) { return it.kind === 'proj' ? PROJECTS[it.id].name : it.kind === 'outpost' ? 'Outpost on ' + B(it.id).name : design(it.id).name; }
+function outpostTargets(b) { return ST(b.star).bodies.map(B).filter(x => x.owner == null && hab(x) !== 'none'); }
 function projReason(b, id) {
   const P = PROJECTS[id], c = b.col;
   if (P.unique) return 'Unique';
-  if (c.outpost) return 'Outposts cannot build';
+  if (c.outpost && !P.outpost) return 'Needs people';
+  if (!c.outpost && P.outpostOnly) return 'Outposts only';
   if (P.tech && !has(P.tech)) return 'Needs ' + TECH[P.tech].name;
   if (c.proj[id] && !P.repeat) return 'Already built';
   if (c.queue.some(q => q.kind === 'proj' && q.id === id)) return 'Already queued';
-  if (STAGE_ORDER.indexOf(stageOf(b)) < STAGE_ORDER.indexOf(P.stage)) return 'Needs a ' + STAGES[P.stage].name;
+  if (!c.outpost && STAGE_ORDER.indexOf(stageOf(b)) < STAGE_ORDER.indexOf(P.stage)) return 'Needs a ' + STAGES[P.stage].name;
   if (id === 'terraform' && (hab(b) === 'garden' || hab(b) === 'none' || hab(b) === 'outpost' || c.home)) return 'Cannot be improved further';
   return null;
 }
-function shipReason(b) { if (b.col.outpost) return 'Outposts cannot build'; if (!b.col.proj.shipyard) return 'Needs an Orbital Shipyard'; return null; }
+function shipReason(b) { if (!b.col.proj.shipyard) return 'Needs an Orbital Shipyard'; return null; }
 function buyCost(b) { const c = b.col; if (!c.queue.length) return 0; const cost = itemCost(b, c.queue[0]); return Math.ceil(Math.max(0, cost - c.prog) * (c.prog > 0 ? 2 : 3)); }
 function buyItem(b) { const k = buyCost(b); if (k <= 0 || S.bc < k) return false; S.bc = r1(S.bc - k); b.col.prog = itemCost(b, b.col.queue[0]); return true; }
 function completeItem(b, it) {
@@ -300,6 +305,9 @@ function completeItem(b, it) {
       if (b.life === 'ecosystem') { b.life = 'microbial'; msg('Terraforming on ' + b.name + ' has wiped out most of its native ecosystem.', b.star, 'warn'); }
       msg(b.name + ' is now ' + HAB[hab(b)].name + ' after a terraforming stage.', b.star, 'build');
     } else { b.col.proj[it.id] = 1; msg(b.name + ' completed ' + PROJECTS[it.id].name + '.', b.star, 'build'); }
+  } else if (it.kind === 'outpost') {
+    const t = B(it.id); t.owner = 0; t.col = {pop: 0, outpost: true, mode: 'build', focus: 'balanced', proj: {}, queue: [], prog: 0, founded: S.year};
+    msg(b.name + ' established an outpost on ' + t.name + '.', b.star, 'colony');
   } else {
     newFleetAt(b.star, it.id);
     msg(b.name + ' launched a ' + design(it.id).name + '.', b.star, 'ship');
@@ -331,7 +339,7 @@ function colonize(f, b, kind) {
     const add = settlerCount() * pods;
     if (b.owner === 0 && b.col && !b.col.outpost) { b.col.pop += add; msg(Math.round(add * 1e6).toLocaleString() + ' new settlers arrived on ' + b.name + '.', b.star, 'colony'); }
     else { const old = b.col; b.owner = 0; b.col = {pop: add, focus: 'balanced', proj: old ? old.proj : {}, queue: [], prog: 0, founded: S.year}; msg('A new colony is founded on ' + b.name + ' with ' + Math.round(add * 1e6).toLocaleString() + ' settlers.', b.star, 'colony'); journal('Founded a colony on ' + b.name + '.', b.star); }
-  } else { b.owner = 0; b.col = {pop: 0, outpost: true, focus: 'balanced', proj: {}, queue: [], prog: 0, founded: S.year}; msg('A mining outpost is established on ' + b.name + '.', b.star, 'colony'); }
+  } else { b.owner = 0; b.col = {pop: 0, outpost: true, mode: 'build', focus: 'balanced', proj: {}, queue: [], prog: 0, founded: S.year}; msg('A mining outpost is established on ' + b.name + '.', b.star, 'colony'); }
   cleanupFleets();
   return true;
 }
@@ -429,10 +437,12 @@ function routeArrive(f) {
   }
 }
 function processSurveys() {
-  for (const f of S.fleets) {
+  for (const f of S.fleets.slice()) {
     if (!f.task || f.task.type !== 'survey' || f.star == null || f.dest != null) continue;
     if (--f.task.left <= 0) {
-      const s = ST(f.star); f.task = null; if (S.surveyed[s.id]) continue; S.surveyed[s.id] = 1;
+      const s = ST(f.star), probe = f.task.probe; f.task = null;
+      if (probe) { const i = f.ships.findIndex(sh => isProbeDesign(design(sh.d))); if (i >= 0) { msg('Our ' + design(f.ships[i].d).name + ' at ' + s.name + ' broke itself apart into probes and landers to complete the survey.', s.id, 'survey'); f.ships.splice(i, 1); cleanupFleets(); } }
+      if (S.surveyed[s.id]) continue; S.surveyed[s.id] = 1;
       const life = s.bodies.map(B).filter(b => b.life !== 'none');
       msg('Survey of ' + s.name + ' complete' + (life.length ? ': ' + life.map(b => LIFE[b.life].toLowerCase() + ' on ' + b.name).join(', ') + '!' : '. No life found.'), s.id, 'survey');
       if (life.length) journal('Found ' + life.map(b => LIFE[b.life].toLowerCase() + ' on ' + b.name).join(', ') + '.', s.id);
@@ -442,16 +452,22 @@ function processSurveys() {
 function processEconomy() {
   let rp = 0, bc = 0;
   const broke = S.bc < 0;
+  const supplied = {}; // outposts feeding a colony in the same system
+  for (const b of colonies(true)) { const t = supplyTarget(b); if (t) supplied[t.id] = (supplied[t.id] || 0) + colOut(b).prod * supplyRate(); }
   for (const b of colonies(true)) {
     const o = colOut(b), c = b.col;
     rp += o.rp; bc += o.bc;
-    if (c.outpost) { bc += o.prod; continue; }
-    let prod = o.prod * (broke ? 0.5 : 1);
+    if (supplyTarget(b)) continue;
+    let prod = (o.prod + (supplied[b.id] || 0)) * (broke ? 0.5 : 1);
     while (c.queue.length && !itemValid(b, c.queue[0])) c.queue.shift();
     if (!c.queue.length) { bc += prod * 0.5; c.prog = 0; continue; }
     c.prog += prod;
     const it = c.queue[0], cost = itemCost(b, it);
-    if (c.prog >= cost) { completeItem(b, it); c.prog = Math.min(c.prog - cost, cost); if (it.n > 1) it.n--; else c.queue.shift(); }
+    if (c.prog >= cost) {
+      completeItem(b, it); c.prog = Math.min(c.prog - cost, cost); if (it.n > 1) it.n--; else c.queue.shift();
+      while (c.queue.length && !itemValid(b, c.queue[0])) c.queue.shift();
+      if (!c.queue.length && !c.outpost) msg(b.name + ' has nothing to build.', b.star, 'idle');
+    }
   }
   // food per system
   const stars = colonyStars();
@@ -483,10 +499,16 @@ function processEconomy() {
   S.bc = r1(S.bc + bc - up);
   if (S.bc < 0) msg('The treasury is empty. Production is halved until credits recover: scrap idle ships or set a colony to Trade.', null, 'warn');
 }
+function supplyRate() { return has('orbital_logistics') ? 1 : 0.8; }
+function supplyTarget(b) {
+  const c = b.col; if (!c || !c.outpost || c.mode !== 'supply') return null;
+  const t = B(c.supplyTo); return t && t.star === b.star && t.owner === 0 && t.col && !t.col.outpost ? t : null;
+}
 function itemValid(b, it) {
   if (it.kind === 'ship') return !!design(it.id) && !shipReason(b);
+  if (it.kind === 'outpost') { const t = B(it.id); return !!t && t.star === b.star && t.owner == null && hab(t) !== 'none' && !b.col.outpost; }
   const P = PROJECTS[it.id], c = b.col;
-  if (c.outpost || (P.tech && !has(P.tech))) return false;
+  if ((c.outpost && !P.outpost) || (!c.outpost && P.outpostOnly) || (P.tech && !has(P.tech))) return false;
   if (c.proj[it.id] && !P.repeat) return false;
   if (it.id === 'terraform' && (hab(b) === 'garden' || hab(b) === 'none' || hab(b) === 'outpost' || c.home)) return false;
   return true;
@@ -504,10 +526,26 @@ function endTurn() {
   updateKnowledge();
   processSurveys();
   processEconomy();
+  autoExplore();
   S.turn++; S.year++;
   recordHistory();
   if (S.turn > S.maxTurns && !S.over) S.over = {result: 'complete', why: 'The age of exploration draws to a close in the year ' + S.year + '.'};
 }
+function exploreTarget(f) {
+  const taken = new Set(S.fleets.filter(x => x !== f && x.dest != null).map(x => x.dest));
+  let best = null, bd = 1e9;
+  for (const s of S.stars) { if (!S.known[s.id] || worldsKnown(s) || s.guardKnown || taken.has(s.id)) continue; const d = d3(f, s); if (d < bd) { bd = d; best = s; } }
+  return best;
+}
+function autoExplore() {
+  for (const f of S.fleets) {
+    if (!f.auto || f.dest != null || f.task) continue;
+    const t = exploreTarget(f);
+    if (t) orderMove(f, t.id);
+    else { f.auto = false; msg('Our ' + fleetName0(f) + ' has no unexplored stars left on our charts and is waiting for orders.', f.star, 'info'); }
+  }
+}
+function fleetName0(f) { return design(f.ships[0].d).name; }
 function recordHistory() { S.hist.push({t: S.turn, y: S.year, pop: Math.round(totals().pop), exp: Object.keys(S.visited).length, score: score().total}); }
 function score() {
   let micro = 0, eco = 0, settle = 0, city = 0, core = 0;

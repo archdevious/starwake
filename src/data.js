@@ -1,6 +1,6 @@
 'use strict';
 // ===================== STARWAKE v2 — STATIC DATA =====================
-const GAME_VERSION = 4;
+const GAME_VERSION = 5;
 const SAVE_FORMAT = 2;
 const START_YEAR = 2326;
 const LENGTHS = {
@@ -48,7 +48,7 @@ const HAB = {
 const HAB_ORDER = ['none', 'outpost', 'hostile', 'harsh', 'livable', 'garden'];
 // colony stages
 const STAGES = {
-  outpost:    {name: 'Outpost',    prod: 1,  rp: 0.5, bc: 0.5, food: 0,  eat: 0},
+  outpost:    {name: 'Outpost',    prod: 2,  rp: 0,   bc: -1,  food: 0,  eat: 0},
   settlement: {name: 'Settlement', prod: 2,  rp: 1,   bc: 1,   food: 1,  eat: 1},
   city:       {name: 'City',       prod: 6,  rp: 4,   bc: 4,   food: 4,  eat: 4},
   core:       {name: 'Core World', prod: 15, rp: 10,  bc: 10,  food: 10, eat: 10},
@@ -63,15 +63,16 @@ const FOCUS = {
   farming:  {name: 'Farming',  desc: 'Double food, -20% production, research and credits'},
 };
 const PROJECTS = {
-  shipyard:    {name: 'Orbital Shipyard',     cost: 150, stage: 'settlement', desc: 'This colony can build ships.'},
-  mines:       {name: 'Deep Mines',           cost: 180, stage: 'settlement', desc: '+50% production here.'},
+  shipyard:    {name: 'Orbital Shipyard',     cost: 150, stage: 'settlement', outpost: true, desc: 'This colony can build ships.'},
+  mines:       {name: 'Deep Mines',           cost: 180, stage: 'settlement', outpost: true, desc: '+50% production here.'},
   campus:      {name: 'Research Campus',      cost: 180, stage: 'settlement', desc: '+50% research here.'},
   tradeport:   {name: 'Trade Port',           cost: 180, stage: 'settlement', desc: '+50% credits here.'},
   agridomes:   {name: 'Agri-Domes',           cost: 120, stage: 'settlement', desc: '+3 food, plus 3 more for each stage above Settlement.'},
   habitat:     {name: 'Habitat Expansion',    cost: 250, stage: 'settlement', desc: '+50% population capacity here.'},
   elevator:    {name: 'Space Elevator',       cost: 400, stage: 'city', tech: 'space_elevator', desc: 'Ships built here cost 25% less.'},
   greatscope:  {name: 'The Great Telescope',  cost: 0, stage: 'settlement', unique: true, desc: 'Unique. Earth\'s telescope sees 24 light-years away, and knows worlds within 8.6 light-years of Earth and any signs of life on them.'},
-  observatory: {name: 'Deep Sky Observatory', cost: 300, stage: 'settlement', tech: 'deep_sky', desc: 'Telescopes here see 24 light-years instead of 16.'},
+  rstation:    {name: 'Robotic Research Station', cost: 60, stage: 'settlement', outpost: true, outpostOnly: true, tech: 'survey_drones', desc: '+1 research a year, or +3 if this world has life, rings, an ocean under its ice or volcanoes.'},
+  observatory: {name: 'Deep Sky Observatory', cost: 300, stage: 'settlement', outpost: true, tech: 'deep_sky', desc: 'Telescopes here see 24 light-years instead of 16.'},
   terraform:   {name: 'Terraforming',         cost: 600, stage: 'settlement', tech: 'terraforming', repeat: true, desc: 'Improves habitability one step (Hostile → Harsh → Livable → Garden). Destroys any native ecosystem.'},
 };
 
@@ -86,11 +87,12 @@ const MODULES = {
   tel_l:   {name: 'Large Telescope',  mass: 3, cost: 90,  desc: 'Telescope range 16 light-years.'},
   lab:     {name: 'Science Lab',      mass: 1, cost: 40,  desc: 'Surveys systems and investigates anomalies.'},
   colony:  {name: 'Colony Pod',       mass: 4, cost: 120, desc: 'Carries 20,000 settlers to found or grow a colony (twice as many with Hibernation).'},
-  outpost: {name: 'Outpost Kit',      mass: 2, cost: 50,  desc: 'Builds a robotic mining outpost on any world, even gas giants.'},
+  outpost: {name: 'Outpost Kit',      mass: 2, cost: 80,  desc: 'Builds a robotic outpost on almost any world, for star systems where we have no colony. Where we already have a colony, order an outpost from that colony instead: it costs far less.'},
+  booster: {name: 'Booster',          mass: 0, cost: 20,  desc: '+10% of light speed (30% becomes 40%). Only one Booster counts.'},
   cargo:   {name: 'Cargo Bay',        mass: 2, cost: 40,  desc: 'Carries 4 food or 2,000 settlers per trip on a trade route.'},
 };
 const DEFAULT_DESIGNS = [
-  {id: 'scout',    name: 'Scout',          hull: 'light',  mods: ['tel_m']},
+  {id: 'scout',    name: 'Scout',          hull: 'light',  mods: ['tel_m', 'booster']},
   {id: 'science',  name: 'Science Vessel', hull: 'light',  mods: ['lab', 'tel_m']},
   {id: 'colony',   name: 'Colony Ship',    hull: 'medium', mods: ['colony']},
   {id: 'outposter',name: 'Outpost Ship',   hull: 'light',  mods: ['outpost']},
@@ -109,7 +111,7 @@ const TECHS = [
   {id: 'antimatter_drive', f: 'prop', cost: 2000, req: ['laser_sails', 'antimatter_production'], name: 'Antimatter Drive', desc: 'Top speed 85% of light speed.'},
   {id: 'relativistic', f: 'prop', cost: 3400, req: ['antimatter_drive'], name: 'Relativistic Flight', desc: 'Top speed 95% of light speed.'},
   {id: 'near_light', f: 'prop', cost: 5600, req: ['relativistic', 'exotic_matter'], name: 'Near-Light Drive', desc: 'Top speed 99.99% of light speed.'},
-  {id: 'survey_drones', f: 'sens', cost: 250, req: [], name: 'Survey Drones', desc: 'System surveys take 1 year instead of 3.'},
+  {id: 'survey_drones', f: 'sens', cost: 250, req: [], name: 'Survey Drones', desc: 'Science surveys take 1 year instead of 3. Unlocks the Robotic Research Station for outposts.'},
   {id: 'biosignatures', f: 'sens', cost: 650, req: ['survey_drones'], name: 'Biosignature Spectroscopy', desc: 'Your telescopes show whether a known system holds life, without visiting it.'},
   {id: 'deep_sky', f: 'sens', cost: 950, req: ['biosignatures'], name: 'Deep Sky Surveys', desc: 'Unlocks the Deep Sky Observatory project (a colony\'s telescopes reach 24 light-years).'},
   {id: 'interferometry', f: 'sens', cost: 1700, req: ['deep_sky'], name: 'Interferometry', desc: 'Every ship and colony telescope reaches 50% farther.'},
@@ -120,6 +122,7 @@ const TECHS = [
   {id: 'terraforming', f: 'bio', cost: 2300, req: ['gene_adaptation', 'space_elevator'], name: 'Terraforming', desc: 'Unlocks the Terraforming project.'},
   {id: 'longevity', f: 'bio', cost: 3000, req: ['gene_adaptation'], name: 'Longevity Treatments', desc: 'Population grows 25% faster everywhere.'},
   {id: 'orbital_construction', f: 'eng', cost: 300, req: [], name: 'Orbital Construction', desc: 'Ships cost 15% less.'},
+  {id: 'orbital_logistics', f: 'eng', cost: 700, req: ['orbital_construction'], name: 'Orbital Logistics', desc: 'Outposts supplying a colony lose nothing in transport (instead of 20%).'},
   {id: 'autofactories', f: 'eng', cost: 650, req: [], name: 'Autofactories', desc: '+20% production everywhere.'},
   {id: 'space_elevator', f: 'eng', cost: 1100, req: ['orbital_construction'], name: 'Space Elevators', desc: 'Unlocks the Space Elevator project (ships built there cost 25% less).'},
   {id: 'arcologies', f: 'eng', cost: 1600, req: ['autofactories'], name: 'Arcologies', desc: '+25% population capacity everywhere.'},
