@@ -179,3 +179,10 @@ table.list tr.click{cursor:pointer}table.list tr.click:hover td{background:#121d
 .x.ren:hover{opacity:1}
 #modal .ni{padding:5px 6px;font-size:13px;border-bottom:1px solid var(--line)}
 #modal .ni.click{cursor:pointer}#modal .ni.click:hover{background:#13203a}
+.iconbox{position:relative;border:1px solid var(--line);border-radius:10px;height:170px;background:radial-gradient(circle at 50% 45%,#13234a,#060a16);display:flex;align-items:center;justify-content:center}
+.iconbox .lbl{position:absolute;left:10px;top:8px;font-size:11px;color:var(--dim);letter-spacing:.1em;text-transform:uppercase}
+.iconbox .arr{position:absolute;top:62px;width:32px;height:32px;border-radius:50%;border:1px solid var(--line2);background:#13203a;color:#dfe7f5;cursor:pointer;font-size:12px}
+.iconbox .arr:hover{border-color:var(--acc)}
+.iconbox .inm{position:absolute;bottom:8px;width:100%;text-align:center;font-size:12.5px}
+.sw{display:flex;flex-wrap:wrap;gap:6px}.sw i{width:22px;height:22px;border-radius:5px;display:block;border:2px solid #2c3d63;cursor:pointer}.sw i.sel{border-color:#fff}
+.colors{flex-wrap:wrap;max-width:330px}

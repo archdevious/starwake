@@ -139,8 +139,9 @@ function newGame(o) {
   let k = 0;
   for (const s of shuffle(S.stars.filter(s => s.id !== 0 && !s.guard))) { if (rnd() < 0.38) { s.anom = ev[k % ev.length]; k++; } }
   // designs
-  for (const d of DEFAULT_DESIGNS) S.designs.push(Object.assign({}, d, {mods: d.mods.slice(), std: true}));
-  S.designs.push({id: 'probe', name: 'Pathfinder Probe', hull: 'light', mods: ['tel_m'], std: true, hidden: true});
+  const looks = typeof loadLooks === 'function' ? loadLooks() : {};
+  for (const d of DEFAULT_DESIGNS) S.designs.push(Object.assign({}, d, {mods: d.mods.slice(), std: true}, looks[d.id] && SHIP_ICONS_OK(looks[d.id].icon) ? {icon: looks[d.id].icon, acc: looks[d.id].acc} : {}));
+  fixDesignIcons(S.designs);
   // backstory
   const st = o.story || {};
   const sun = S.stars[0];
@@ -163,7 +164,7 @@ function newGame(o) {
   if (st.e3 === 'ark') home('colony');
   if (st.e3 === 'telescope') { earth.col.proj.greatscope = 1; S.mods.greatScope = 1; S.mods.earthTel = 24; }
   if (st.e3 === 'probes') {
-    for (const n of ['Alpha Centauri', "Barnard's Star"]) { const t = S.stars.find(x => x.name === n); if (t) newFleetAt(t.id, 'probe'); }
+    for (const n of ['Alpha Centauri', "Barnard's Star"]) { const t = S.stars.find(x => x.name === n); if (t) newFleetAt(t.id, 'scout'); }
     home('science');
   }
   for (const s of sun.bodies.map(B)) S.visited[0] = S.surveyed[0] = S.known[0] = 1;
@@ -174,6 +175,25 @@ function newGame(o) {
 }
 
 // ---------- ships & designs ----------
+function SHIP_ICONS_OK(k) { return typeof SHIP_ICONS === 'undefined' || !!SHIP_ICONS[k]; }
+const ICON_IDS = ['dart', 'needle', 'disc', 'ring', 'capsule', 'hauler', 'drill', 'arrow', 'crescent', 'trident', 'kite', 'hexcore', 'rocket', 'bastion'];
+function fixDesignIcons(list) { // every design gets its own icon and a secondary colour
+  const used = new Set();
+  list.forEach((d, i) => {
+    if (!d.icon || used.has(d.icon)) { const def = DEFAULT_DESIGNS.find(x => x.id === d.id); d.icon = def && !used.has(def.icon) ? def.icon : ICON_IDS.find(k => !used.has(k)) || 'dart'; }
+    if (!d.acc) { const def = DEFAULT_DESIGNS.find(x => x.id === d.id); d.acc = def ? def.acc : SHIP_COLORS[i % SHIP_COLORS.length][1]; }
+    used.add(d.icon);
+  });
+}
+function shipsOfDesign(id) { let n = 0; for (const f of S.fleets) for (const sh of f.ships) if (sh.d === id) n++; return n; }
+function scrapDesign(id) {
+  const d = design(id); if (!d) return 0;
+  let n = 0; for (const f of S.fleets) { const keep = f.ships.filter(sh => sh.d !== id); n += f.ships.length - keep.length; f.ships = keep; }
+  for (const b of colonies(true)) b.col.queue = b.col.queue.filter(q => !(q.kind === 'ship' && q.id === id));
+  const back = Math.round(designCost(d) * 0.25 * n);
+  S.bc = r1(S.bc + back); S.designs = S.designs.filter(x => x.id !== id); cleanupFleets();
+  return back;
+}
 function design(id) { return S.designs.find(d => d.id === id); }
 function designMass(d) { let m = HULLS[d.hull].mass; for (const k of d.mods) m += MODULES[k].mass; return m; }
 function designCost(d) { let c = HULLS[d.hull].cost; for (const k of d.mods) c += MODULES[k].cost; return Math.round(c * (has('orbital_construction') ? 0.85 : 1)); }

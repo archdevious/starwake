@@ -22,6 +22,7 @@ function audioInit() {
   }
   SND.music = c.createGain(); SND.music.connect(SND.master); SND.music.connect(SND.verb);
   SND.sfx = c.createGain(); SND.sfx.connect(SND.master); SND.sfx.connect(SND.verb);
+  SND.dry = c.createGain(); SND.dry.connect(SND.master); // no echo: for interface clicks
   audioVolumes();
   musicStart();
 }
@@ -30,6 +31,7 @@ function audioVolumes() {
   const t = SND.ctx.currentTime;
   SND.music.gain.setTargetAtTime(Math.pow(SETTINGS.music / 100, 1.5) * 2.5, t, 0.3);
   SND.sfx.gain.setTargetAtTime(Math.pow(SETTINGS.sfx / 100, 1.5) * 1.6, t, 0.05);
+  SND.dry.gain.setTargetAtTime(Math.pow(SETTINGS.sfx / 100, 1.5) * 1.6, t, 0.05);
 }
 // ---------- music ----------
 function padVoice(midi, t0, len, vol) {
@@ -63,11 +65,11 @@ function bells() {
 }
 function musicStart() { if (SND.started) return; SND.started = true; playChord(); SND.bellTimer = setTimeout(bells, 3000); }
 // ---------- sound effects ----------
-function tone(midi, t0, len, vol, type) {
+function tone(midi, t0, len, vol, type, dest) {
   const c = SND.ctx, o = c.createOscillator(), g = c.createGain();
   o.type = type || 'sine'; o.frequency.value = mtof(midi);
   g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(vol, t0 + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t0 + len);
-  o.connect(g); g.connect(SND.sfx); o.start(t0); o.stop(t0 + len + 0.05);
+  o.connect(g); g.connect(dest || SND.sfx); o.start(t0); o.stop(t0 + len + 0.05);
 }
 function whoosh(t0) {
   const c = SND.ctx, len = 0.7, buf = c.createBuffer(1, c.sampleRate * len, c.sampleRate), d = buf.getChannelData(0);
@@ -78,7 +80,7 @@ function whoosh(t0) {
   src.connect(bp); bp.connect(g); g.connect(SND.sfx); src.start(t0);
 }
 const SFX = {
-  click: t => tone(88, t, 0.06, 0.06, 'triangle'),
+  click: t => tone(84, t, 0.045, 0.07, 'sine', SND.dry),
   turn: t => whoosh(t),
   arrive: t => { tone(76, t, 0.6, 0.12); tone(83, t + 0.12, 0.9, 0.11); },
   discover: t => { [69, 74, 78, 81].forEach((n, i) => bell(n + 12, t + i * 0.13, 0.1, SND.sfx)); },

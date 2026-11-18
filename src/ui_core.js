@@ -161,36 +161,37 @@ function drawMap() {
     const ang = Math.atan2(q[1] - p[1], q[0] - p[0]);
     let px = p[0], py = p[1];
     // keep icons clear of nearby stars so stars stay easy to click
-    for (const sp of UI.pts) { const dx = px - sp.x, dy = py - sp.y, dd = Math.hypot(dx, dy); if (dd < 22) { const ux = dd > 0.5 ? dx / dd : -Math.sin(ang), uy = dd > 0.5 ? dy / dd : Math.cos(ang); px = sp.x + ux * 22; py = sp.y + uy * 22; } }
+    for (const sp of UI.pts) { const dx = px - sp.x, dy = py - sp.y, dd = Math.hypot(dx, dy); if (dd < 38) { const ux = dd > 0.5 ? dx / dd : -Math.sin(ang), uy = dd > 0.5 ? dy / dd : Math.cos(ang); px = sp.x + ux * 38; py = sp.y + uy * 38; } }
     moving.push({f, px, py, ang});
   }
   // spread ships that would sit on top of each other
   const groups = [];
-  for (const m of moving) { const g = groups.find(g => Math.hypot(g[0].px - m.px, g[0].py - m.py) < 12); if (g) g.push(m); else groups.push([m]); }
+  for (const m of moving) { const g = groups.find(g => Math.hypot(g[0].px - m.px, g[0].py - m.py) < 20); if (g) g.push(m); else groups.push([m]); }
   for (const g of groups) {
     if (g.length > 3) {
       const m = g[0]; drawShipIcon(x, m.px, m.py, m.f, m.ang, g.some(z => UI.selFleet === z.f.id));
-      x.fillStyle = '#ffd678'; x.font = 'bold 10px Segoe UI, sans-serif'; x.textAlign = 'left'; x.fillText('×' + g.length, m.px + 9, m.py + 4);
-      UI.fleetBoxes.push({x: m.px - 10, y: m.py - 10, w: 34, h: 20, group: g.map(z => z.f.id)});
+      x.fillStyle = '#ffd678'; x.font = 'bold 10px Segoe UI, sans-serif'; x.textAlign = 'left'; x.fillText('×' + g.length, m.px + 13, m.py + 4);
+      UI.fleetBoxes.push({x: m.px - 13, y: m.py - 12, w: 40, h: 24, group: g.map(z => z.f.id)});
       continue;
     }
     g.forEach((m, i) => {
-      const off = i === 0 ? 0 : (i % 2 ? 1 : -1) * Math.ceil(i / 2) * 13;
+      const off = i === 0 ? 0 : (i % 2 ? 1 : -1) * Math.ceil(i / 2) * 24;
       m.px += -Math.sin(m.ang) * off; m.py += Math.cos(m.ang) * off;
       const f = m.f;
       drawShipIcon(x, m.px, m.py, f, m.ang, UI.selFleet === f.id);
       if (!(f.task && f.task.type === 'route')) {
         x.font = '10.5px Segoe UI, sans-serif'; const t = etaTo(f, f.dest) + ' yr', tw = x.measureText(t).width + 4;
-        const cands = [[9, -15], [9, 3], [-9 - tw, -15], [-9 - tw, 3]].map(([dx, dy]) => ({x: m.px + dx, y: m.py + dy, w: tw, h: 12}));
+        const cands = [[15, -19], [15, 7], [-15 - tw, -19], [-15 - tw, 7]].map(([dx, dy]) => ({x: m.px + dx, y: m.py + dy, w: tw, h: 12}));
         const free = cands.find(b => !boxes.some(o => b.x < o.x + o.w && b.x + b.w > o.x && b.y < o.y + o.h && b.y + b.h > o.y)) || (UI.selFleet === f.id ? cands[0] : null);
         if (free) { boxes.push(free); x.fillStyle = '#a8dcff'; x.textAlign = 'left'; x.fillText(t, free.x + 2, free.y + 10); }
       }
-      UI.fleetBoxes.push({x: m.px - 9, y: m.py - 9, w: 18, h: 18, f: f.id});
+      UI.fleetBoxes.push({x: m.px - 15, y: m.py - 13, w: 30, h: 26, f: f.id});
     });
   }
   for (const sid in byStar) {
     const s = ST(+sid); const p = proj(s.x, s.y, s.z);
-    byStar[sid].forEach((f, i) => { const fx = p[0] + 26, fy = p[1] - 16 + i * 17; drawShipIcon(x, fx, fy, f, 0, UI.selFleet === f.id); x.fillStyle = '#d8e6f8'; x.font = '10px Segoe UI, sans-serif'; x.textAlign = 'left'; if (f.ships.length > 1) x.fillText(f.ships.length, fx + 8, fy + 3.5); UI.fleetBoxes.push({x: fx - 9, y: fy - 7, w: 24, h: 14, f: f.id}); });
+    const list = byStar[sid], top = p[1] - (list.length - 1) * 13.5;
+    list.forEach((f, i) => { const fx = p[0] + 42, fy = top + i * 27; drawShipIcon(x, fx, fy, f, 0, UI.selFleet === f.id); UI.fleetBoxes.push({x: fx - 16, y: fy - 13, w: 32, h: 26, f: f.id}); });
   }
   // move preview
   const sf = UI.selFleet != null ? S.fleets.find(f => f.id === UI.selFleet) : null;
@@ -203,13 +204,14 @@ function drawMap() {
   }
   UI.dirty = false;
 }
+function fleetLook(f) { const d = design(f.ships[0].d) || {}; return d; }
 function drawShipIcon(x, px, py, f, ang, sel) {
-  const route = f.task && f.task.type === 'route';
-  const col = route ? '#ffcf6a' : fleetHas(f, 'colony') ? '#9cff9c' : fleetHas(f, 'lab') ? '#d0a8ff' : '#7fe0ff';
+  const d = fleetLook(f);
   x.save(); x.translate(px, py); x.rotate(ang);
-  x.fillStyle = col; x.beginPath(); x.moveTo(7, 0); x.lineTo(-5, -4.5); x.lineTo(-3, 0); x.lineTo(-5, 4.5); x.closePath(); x.fill();
-  if (sel) { x.strokeStyle = '#fff'; x.lineWidth = 1.2; x.beginPath(); x.arc(0, 0, 9, 0, TAU); x.stroke(); }
+  iconCanvas(x, d.icon || 'dart', S.empire.color, d.acc || '#eef2f8', 0.72);
   x.restore();
+  if (f.ships.length > 1) { x.fillStyle = '#ffffff'; x.font = 'bold 9.5px Segoe UI, sans-serif'; x.textAlign = 'left'; x.fillText(f.ships.length, px + 12, py + 12); }
+  if (sel) { x.strokeStyle = '#fff'; x.lineWidth = 1.3; x.beginPath(); x.arc(px, py, 16, 0, TAU); x.stroke(); }
 }
 function mapLoop() { if (S && UI.dirty && $('#app').style.display !== 'none') drawMap(); requestAnimationFrame(mapLoop); }
 function hitStar(sx, sy) { let best = null, bd = 16; for (const p of UI.pts) { const d = Math.hypot(p.x - sx, p.y - sy); if (d < bd) { bd = d; best = p.id; } } return best; }

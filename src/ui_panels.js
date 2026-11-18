@@ -143,9 +143,9 @@ function shipListHTML(b, o) {
   let h = '';
   const base = shipReason(b);
   if (base) h += `<div class="small dim" style="padding:6px">${base}. Build one first (Projects tab).</div>`;
-  for (const d of S.designs.filter(d => !d.hidden && !d.obsolete)) {
+  for (const d of S.designs) {
     const why = base || shipReason(b, d), cost = shipCost(d, b);
-    h += `<div class="opt" ${why ? 'style="opacity:.45;cursor:default"' : `data-a="qadd" data-v="${b.id}:ship:${d.id}"`}><span class="nm">${esc(d.name)}<div class="tiny dim">${!base && why ? esc(why) : designSummary(d)}</div></span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`;
+    h += `<div class="opt" ${why ? 'style="opacity:.45;cursor:default"' : `data-a="qadd" data-v="${b.id}:ship:${d.id}"`}>${designIcon(d, 30)}<span class="nm">${esc(d.name)}<div class="tiny dim">${!base && why ? esc(why) : designSummary(d)}</div></span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`;
   }
   return h;
 }
@@ -190,7 +190,7 @@ function fleetPanel(f) {
   const groups = {}; for (const sh of f.ships) (groups[sh.d] = groups[sh.d] || []).push(sh);
   for (const did in groups) {
     const d = design(did), list = groups[did], selN = list.filter(sh => UI.fleetSel[sh.id]).length;
-    h += `<div class="card"><div class="row"><div style="flex:1"><b>${esc(d.name)}</b> <span class="dim">×${list.length}</span><div class="tiny dim">${designSummary(d)}</div></div>${f.ships.length > 1 ? `<div class="row" style="gap:3px"><button class="btn sm" data-a="fsel" data-v="${did}:-1">−</button><span class="small">${selN}</span><button class="btn sm" data-a="fsel" data-v="${did}:1">+</button></div>` : ''}</div></div>`;
+    h += `<div class="card"><div class="row">${designIcon(d, 32)}<div style="flex:1;margin-left:6px"><b>${esc(d.name)}</b> <span class="dim">×${list.length}</span><div class="tiny dim">${designSummary(d)}</div></div>${f.ships.length > 1 ? `<div class="row" style="gap:3px"><button class="btn sm" data-a="fsel" data-v="${did}:-1">−</button><span class="small">${selN}</span><button class="btn sm" data-a="fsel" data-v="${did}:1">+</button></div>` : ''}</div></div>`;
   }
   const nSel = Object.values(UI.fleetSel).filter(Boolean).length;
   const others = f.star != null ? S.fleets.filter(x => x.star === f.star && x.dest == null && x !== f) : [];

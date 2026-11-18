@@ -1,6 +1,6 @@
 'use strict';
 // ===================== STARWAKE v2 — STATIC DATA =====================
-const GAME_VERSION = 8;
+const GAME_VERSION = 9;
 const SAVE_FORMAT = 2;
 const START_YEAR = 2326;
 const LENGTHS = {
@@ -95,12 +95,15 @@ const MODULES = {
   cargo:   {name: 'Cargo Bay',        mass: 2, cost: 40,  desc: 'Carries 4 food or 2,000 settlers per trip on a trade route.'},
 };
 const DEFAULT_DESIGNS = [
-  {id: 'scout',    name: 'Scout',          hull: 'light',  mods: ['tel_m', 'booster']},
-  {id: 'science',  name: 'Science Vessel', hull: 'light',  mods: ['lab', 'tel_m']},
-  {id: 'colony',   name: 'Colony Ship',    hull: 'medium', mods: ['colony']},
-  {id: 'outposter',name: 'Outpost Ship',   hull: 'light',  mods: ['outpost']},
-  {id: 'freighter',name: 'Freighter',      hull: 'medium', mods: ['cargo', 'cargo']},
+  {id: 'scout',    name: 'Scout',          hull: 'light',  mods: ['tel_m', 'booster'], icon: 'dart',    acc: '#ffd23f'},
+  {id: 'science',  name: 'Science Vessel', hull: 'light',  mods: ['lab', 'tel_m'],     icon: 'ring',    acc: '#eef2f8'},
+  {id: 'colony',   name: 'Colony Ship',    hull: 'medium', mods: ['colony'],           icon: 'capsule', acc: '#4fcf5f'},
+  {id: 'outposter',name: 'Outpost Ship',   hull: 'light',  mods: ['outpost'],          icon: 'drill',   acc: '#ff5a5a'},
+  {id: 'freighter',name: 'Freighter',      hull: 'medium', mods: ['cargo', 'cargo'],   icon: 'hauler',  acc: '#a066ff'},
 ];
+const MAX_DESIGNS = 8;
+const SHIP_COLORS = [['White', '#eef2f8'], ['Silver', '#a9b4c4'], ['Gold', '#e6b84a'], ['Yellow', '#ffd23f'], ['Orange', '#ff9f43'], ['Bronze', '#b9774a'], ['Red', '#ff5a5a'], ['Crimson', '#c2223a'], ['Pink', '#ff8cc6'], ['Magenta', '#e040c8'], ['Purple', '#a066ff'], ['Navy', '#2b3f8f'], ['Sky blue', '#7fd4ff'], ['Teal', '#2ec4b6'], ['Green', '#4fcf5f'], ['Lime', '#b8f040'], ['Black', '#10131a']];
+const CIV_COLORS = ['#4aa8ff'].concat(SHIP_COLORS.filter(c => c[0] !== 'Black' && c[0] !== 'Navy').map(c => c[1]));
 const DRIVE_SPEEDS = [0.30, 0.40, 0.55, 0.70, 0.85, 0.95, 0.9999];
 const DRIVE_TECH = [null, 'fusion_torch', 'antimatter_catalysis', 'laser_sails', 'antimatter_drive', 'relativistic', 'near_light'];
 
