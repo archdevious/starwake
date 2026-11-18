@@ -63,7 +63,7 @@ function idleWorlds() {
   return S.bodies.filter(b => b.owner === 0 && b.col && !b.col.queue.length && !supplyTarget(b))
     .map(b => ({b, k: o[b.star] * 1000 + ST(b.star).bodies.indexOf(b.id)})).sort((a, b) => a.k - b.k);
 }
-function idleFleets() { return S.fleets.filter(f => f.dest == null && f.star != null && !f.task && !f.auto && f.ships.length).sort((a, b) => a.id - b.id); }
+function idleFleets() { return S.fleets.filter(f => f.ships.length && ((f.dest == null && f.star != null && !f.task && !f.auto) || (f.task && f.task.type === 'route' && f.task.warn))).sort((a, b) => a.id - b.id); }
 function attnState() {
   const w = idleWorlds(); if (w.length) return {kind: 'world', n: w.length, list: w};
   if (!S.res && availableTechs().length) return {kind: 'research'};
@@ -75,7 +75,7 @@ function renderAttn() {
   const a = attnState();
   el.innerHTML = a.kind === 'world' ? `<div class="chip click attn" data-a="attnGo" title="Worlds with nothing being built. Click to go to the next one."><span class="bad">Idle colonies (${a.n})</span></div>`
     : a.kind === 'research' ? `<div class="chip click attn" data-a="attnGo" title="Nothing is being researched. Click to open Research."><span class="bad">Idle research</span></div>`
-    : a.kind === 'fleet' ? `<div class="chip click attn" data-a="attnGo" title="Ships waiting at a star. Click to go to the next one."><span class="warn">Orbiting ships (${a.n})</span></div>`
+    : a.kind === 'fleet' ? `<div class="chip click attn" data-a="attnGo" title="Ships waiting for orders, and freighters whose route is not at full value. Click to go to the next one."><span class="warn">Idle ships (${a.n})</span></div>`
     : `<div class="chip dim" title="Nothing needs your attention">Nothing idle</div>`;
 }
 ACT.attnGo = () => {
@@ -87,7 +87,7 @@ ACT.attnGo = () => {
   } else if (a.kind === 'research') ACT.openResearch();
   else if (a.kind === 'fleet') {
     const last = UI.attnFleet; const pick = (last == null ? null : a.list.find(f => f.id > last)) || a.list[0]; UI.attnFleet = pick.id;
-    selectFleet(pick.id); centerOn(pick.star);
+    selectFleet(pick.id); if (pick.star != null) centerOn(pick.star); else { const [ox, oy] = sideShift(); UI.cam.tx = pick.x + ox; UI.cam.ty = pick.y + oy; UI.cam.tz = 0; UI.dirty = true; }
   }
 };
 

@@ -94,7 +94,7 @@ const SFX = {
 };
 function sfx(name) { if (!SND.ctx || SETTINGS.sfx <= 0 || !SFX[name]) return; try { SFX[name](SND.ctx.currentTime + 0.02); } catch (e) {} }
 // one sound for a whole year's news, the most important kind first
-const NEWS_SOUND = [['lost', 'lost'], ['warn', 'warn'], ['survey', 'discover'], ['arrive', 'arrive'], ['tech', 'tech'], ['colony', 'colony'], ['stage', 'colony'], ['ship', 'build'], ['build', 'build'], ['idle', 'idle']];
+const NEWS_SOUND = [['lost', 'lost'], ['warn', 'warn'], ['survey', 'discover'], ['arrive', 'arrive'], ['tech', 'tech'], ['colony', 'colony'], ['stage', 'colony'], ['ship', 'build'], ['build', 'build'], ['idle', 'idle'], ['route', 'warn']];
 function newsSound(msgs) {
   for (const [kind, s] of NEWS_SOUND) if (msgs.some(m => m.kind === kind && !(kind === 'survey' && !/life|probes/.test(m.text)))) { sfx(s); return; }
 }

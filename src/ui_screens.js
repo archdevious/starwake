@@ -16,7 +16,7 @@ ACT.mres = v => { if (UI.modalRes) UI.modalRes(v); };
 function confirmBox(title, text, yes) { modal({title, w: 460, body: `<div>${text}</div>`, foot: `<button class="btn" data-a="mres" data-v="no">Cancel</button><button class="btn danger" data-a="mres" data-v="yes">Confirm</button>`}).then(v => { if (v === 'yes') yes(); }); }
 
 // ---------- news feed ----------
-const NEWS_ICON = {info: 'ℹ️', tech: '🔬', build: '🏗️', ship: '🚀', colony: '🪐', warn: '⚠️', arrive: '🔭', spot: '✧', survey: '🧪', lost: '💥', stage: '🏙️', idle: '💤', budget: '🛰️'};
+const NEWS_ICON = {info: 'ℹ️', tech: '🔬', build: '🏗️', ship: '🚀', colony: '🪐', warn: '⚠️', arrive: '🔭', spot: '✧', survey: '🧪', lost: '💥', stage: '🏙️', idle: '💤', budget: '🛰️', route: '📦'};
 function showNews() {
   const el = $('#news'); if (!S) return;
   const list = S.msgs.slice(-14);
@@ -75,9 +75,9 @@ function designHTML() {
   for (const x of S.designs) { const cnt = shipsOfDesign(x.id);
     h += `<div class="opt ${d.src === x.id ? 'sel' : ''}" data-a="loadDesign" data-v="${x.id}">${designIcon(x, 34)}<span class="nm">${esc(x.name)}<div class="tiny dim">${HULLS[x.hull].name} · ${designCost(x)} cost</div><div class="tiny" style="color:${cnt ? '#dfe7f5' : 'var(--dim)'}">${cnt} in service</div></span><button class="x" data-a="scrapDesign" data-v="${x.id}" title="Scrap this design">🗑</button></div>`; }
   h += `<div class="tiny dim" style="margin-top:8px">Pick a design to change its look, or change its parts and save it as a new design.</div></div>`;
-  h += `<div><input type="text" id="dname" value="${esc(d.name)}" maxlength="28" style="width:100%"><div class="sec">Hull</div><div class="hullbtns">${Object.keys(HULLS).map(k => `<button class="btn sm ${d.hull === k ? 'on' : ''}" data-a="setHull" data-v="${k}">${HULLS[k].name} (${HULLS[k].slots} slots)</button>`).join('')}</div>
+  h += `<div><input type="text" id="dname" value="${esc(d.name)}" maxlength="28" style="width:100%"><div class="sec">Hull</div><div class="hullbtns">${Object.keys(HULLS).map(k => { const lock = k === 'heavy' && !has('heavy_hulls'); return `<button class="btn sm ${d.hull === k ? 'on' : ''}" ${lock ? 'disabled title="Needs Heavy Hull Construction"' : ''} data-a="setHull" data-v="${k}">${HULLS[k].name} (${HULLS[k].slots} slots)${lock ? ' 🔒' : ''}</button>`; }).join('')}</div>
     <div class="sec">Modules</div>`;
-  for (let i = 0; i < H.slots; i++) h += `<div class="slotrow"><span class="small dim" style="width:52px">Slot ${i + 1}</span><select data-c="setSlot" data-i="${i}"><option value="">— empty —</option>${Object.keys(MODULES).map(k => `<option value="${k}" ${d.mods[i] === k ? 'selected' : ''}>${MODULES[k].name} · mass ${MODULES[k].mass} · ${MODULES[k].cost} cost</option>`).join('')}</select></div>`;
+  for (let i = 0; i < H.slots; i++) h += `<div class="slotrow"><span class="small dim" style="width:52px">Slot ${i + 1}</span><select data-c="setSlot" data-i="${i}"><option value="">— empty —</option>${Object.keys(MODULES).map(k => { const bad = modFits(d.hull, k); return `<option value="${k}" ${d.mods[i] === k ? 'selected' : ''} ${bad ? 'disabled' : ''}>${MODULES[k].name} · mass ${MODULES[k].mass} · ${MODULES[k].cost} cost${bad ? ' (' + bad + ')' : ''}</option>`; }).join('')}</select></div>`;
   h += `<div class="small dim" style="margin-top:8px">${d.mods.filter(Boolean).map(m => `<div>• <b>${MODULES[m].name}</b>: ${MODULES[m].desc}</div>`).join('')}</div>
     <div class="sec">Secondary colour <span class="tiny dim" style="text-transform:none;letter-spacing:0">(the main colour is always your civilisation's)</span></div>
     <div class="sw">${SHIP_COLORS.map(([nm, c]) => `<i class="${d.acc === c ? 'sel' : ''}" style="background:${c}" title="${nm}" data-a="setAcc" data-v="${c}"></i>`).join('')}</div></div>`;
@@ -85,16 +85,17 @@ function designHTML() {
   const free = freeIcons(d.src), iconOk = free.includes(d.icon);
   h += `<div><div class="iconbox"><span class="lbl">Icon</span><button class="arr" style="left:10px" data-a="iconCycle" data-v="-1">◀</button>${iconSVG(d.icon, S.empire.color, d.acc, 150)}<button class="arr" style="right:10px" data-a="iconCycle" data-v="1">▶</button><div class="inm"><b>${SHIP_ICONS[d.icon].name}</b></div></div>
     <table class="statt small" style="margin-top:10px"><tr><td>Mass</td><td>${designMass(dd)}</td></tr><tr><td>Speed now</td><td><b>${pct(designSpeed(dd))}</b> of light</td></tr><tr><td>Telescope</td><td>${Math.round(designTel(dd))} ly</td></tr><tr><td>Build cost</td><td><b class="amber">${designCost(dd)}</b></td></tr><tr><td>Upkeep</td><td>${fmt(designCost(dd) * 0.01)} credits/yr</td></tr></table>
-    <button class="btn primary" style="width:100%;margin-top:12px" data-a="saveDesign" ${dd.mods.length && !full && iconOk ? '' : 'disabled'}>Save as new design</button>
+    <button class="btn primary" style="width:100%;margin-top:12px" data-a="saveDesign" ${dd.mods.length && !full && iconOk && !designReason(dd) ? '' : 'disabled'}>Save as new design</button>${designReason(dd) ? `<div class="tiny bad" style="margin-top:4px">${esc(designReason(dd))}</div>` : ''}
     ${full ? `<div class="tiny bad" style="margin-top:4px">All ${MAX_DESIGNS} design slots are used. Scrap a design first.</div>` : ''}
     ${d.src ? `<button class="btn" style="width:100%;margin-top:8px" data-a="saveLook" ${iconOk ? '' : 'disabled'}>Save look only (icon and colour)</button><div class="tiny dim" style="margin-top:4px">Restyles ${esc(design(d.src).name)} and its ${shipsOfDesign(d.src)} ship${shipsOfDesign(d.src) === 1 ? '' : 's'} in service. Nothing else changes.${design(d.src).std ? ' Starting designs keep this look in new games.' : ''}</div>` : ''}</div></div>`;
   return h;
 }
+function modFits(hull, m) { return hull === 'light' && (m === 'colony' || m === 'cargo') ? 'medium or heavy hull' : hull !== 'light' && m === 'booster' ? 'light hulls only' : null; }
 function newDesignEdit() { const f = freeIcons(null); return {name: 'New Design', hull: 'light', mods: ['tel_m', ''], icon: f[0] || 'dart', acc: '#eef2f8', src: null}; }
 ACT.openDesign = () => { UI.designEdit = newDesignEdit(); return modal({title: 'Ship Design', w: 1100, kind: 'design', body: designHTML(), foot: `<button class="btn" data-a="newDesignEd">New design</button><button class="btn" data-a="mclose">Close</button>`}).then(() => { renderSide(); UI.dirty = true; }); };
 ACT.newDesignEd = () => { UI.designEdit = newDesignEdit(); modalBody(designHTML()); };
 function rerenderDesign() { const n = $('#dname'); if (n) UI.designEdit.name = n.value; modalBody(designHTML()); }
-ACT.setHull = v => { UI.designEdit.hull = v; rerenderDesign(); };
+ACT.setHull = v => { if (v === 'heavy' && !has('heavy_hulls')) return; const d = UI.designEdit; d.hull = v; d.mods = d.mods.map(m => m && modFits(v, m) ? '' : m); rerenderDesign(); };
 ACT.setSlot = (v, el) => { UI.designEdit.mods[+el.dataset.i] = v; rerenderDesign(); };
 ACT.setAcc = v => { UI.designEdit.acc = v; rerenderDesign(); };
 ACT.iconCycle = v => { const d = UI.designEdit, f = freeIcons(d.src); if (!f.length) return; let i = f.indexOf(d.icon); i = i < 0 ? 0 : (i + (+v) + f.length) % f.length; d.icon = f[i]; rerenderDesign(); };

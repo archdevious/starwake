@@ -233,7 +233,7 @@ const FAR_STARS=[{"n": "Achernar", "d": [0.184, -0.484, -0.855], "ly": 139}, {"n
 
 'use strict';
 // ===================== STARWAKE v2 — STATIC DATA =====================
-const GAME_VERSION = 12;
+const GAME_VERSION = 13;
 const SAVE_FORMAT = 2;
 const START_YEAR = 2326;
 const LENGTHS = {
@@ -298,8 +298,8 @@ const FOCUS = {
 const PROJECTS = {
   shallow:     {name: 'Shallow Mines',        cost: 60,  stage: 'settlement', outpost: true, desc: '+2 production a year.'},
   mines:       {name: 'Deep Mines',           cost: 120, stage: 'settlement', outpost: true, req: 'shallow', replaces: 'shallow', tech: 'deep_mining', desc: 'Replaces Shallow Mines: +50% production instead of +2.'},
-  dock:        {name: 'Orbital Dock',         cost: 75,  stage: 'settlement', outpost: true, desc: 'Builds light-hull ships (Scouts, Science Vessels, Outpost Ships).'},
-  shipyard:    {name: 'Orbital Shipyard',     cost: 75,  stage: 'settlement', req: 'dock', replaces: 'dock', desc: 'Replaces the Orbital Dock: builds every kind of ship.'},
+  dock:        {name: 'Orbital Dock',         cost: 75,  stage: 'settlement', outpost: true, space: true, desc: 'Builds light-hull ships (Scouts, Science Vessels, Outpost Ships).'},
+  shipyard:    {name: 'Orbital Shipyard',     cost: 75,  stage: 'settlement', req: 'dock', replaces: 'dock', space: true, desc: 'Replaces the Orbital Dock: builds every kind of ship.'},
   campus:      {name: 'Research Campus',      cost: 90,  stage: 'settlement', desc: '+25% research here.'},
   institute:   {name: 'Research Institute',   cost: 100, stage: 'settlement', req: 'campus', replaces: 'campus', tech: 'networked_science', desc: 'Upgrades the Research Campus: +50% research here.'},
   tradeport:   {name: 'Trade Port',           cost: 90,  stage: 'settlement', desc: '+25% credits here.'},
@@ -309,8 +309,8 @@ const PROJECTS = {
   spires:      {name: 'Habitat Spires',       cost: 140, stage: 'settlement', req: 'habitat', replaces: 'habitat', tech: 'vertical_cities', desc: 'Upgrades the Habitat Expansion: +50% population capacity here.'},
   rstation:    {name: 'Robotic Research Station', cost: 60, stage: 'settlement', outpost: true, tech: 'survey_drones', desc: '+1 research a year, or +3 if this world has life, rings, an ocean under its ice or volcanoes.'},
   refinery:    {name: 'Gas Refinery',         cost: 60,  stage: 'settlement', outpost: true, outpostOnly: true, giantOnly: true, desc: '+2 credits a year. Outposts on gas and ice giants only.'},
-  observatory: {name: 'Deep Sky Observatory', cost: 250, stage: 'settlement', outpost: true, tech: 'deep_sky', desc: 'Telescopes here see 24 light-years instead of 16.'},
-  elevator:    {name: 'Space Elevator',       cost: 400, stage: 'city', tech: 'space_elevator', desc: 'Ships built here cost 25% less.'},
+  observatory: {name: 'Deep Sky Observatory', cost: 250, stage: 'settlement', outpost: true, tech: 'deep_sky', space: true, desc: 'Telescopes here see 24 light-years instead of 16.'},
+  elevator:    {name: 'Space Elevator',       cost: 400, stage: 'city', tech: 'space_elevator', space: true, desc: 'Ships built here cost 25% less.'},
   terraform:   {name: 'Terraforming',         cost: 600, stage: 'settlement', tech: 'terraforming', repeat: true, desc: 'Improves habitability one step (Hostile → Harsh → Livable → Garden). Destroys any native ecosystem.'},
   greatscope:  {name: 'The Great Telescope',  cost: 0, stage: 'settlement', unique: true, desc: 'Unique. Earth\'s telescope sees 24 light-years away, and knows worlds within 8.6 light-years of Earth and any signs of life on them.'},
 };
@@ -325,10 +325,10 @@ const MODULES = {
   tel_m:   {name: 'Medium Telescope', mass: 1, cost: 25,  desc: 'Telescope range 8 light-years (instead of 4).'},
   tel_l:   {name: 'Large Telescope',  mass: 3, cost: 90,  desc: 'Telescope range 16 light-years.'},
   lab:     {name: 'Science Lab',      mass: 1, cost: 40,  desc: 'Surveys systems and investigates anomalies.'},
-  colony:  {name: 'Colony Pod',       mass: 4, cost: 120, desc: 'Carries 20,000 settlers to found or grow a colony (twice as many with Hibernation).'},
+  colony:  {name: 'Colony Pod',       mass: 4, cost: 120, desc: 'Carries 20,000 settlers to found or grow a colony (twice as many with Hibernation). Needs a medium or heavy hull.'},
   outpost: {name: 'Outpost Kit',      mass: 2, cost: 80,  desc: 'Builds a robotic outpost on almost any world, for star systems where we have no colony. Where we already have a colony, order an outpost from that colony instead: it costs far less.'},
-  booster: {name: 'Booster',          mass: 0, cost: 20,  desc: '+10% of light speed (30% becomes 40%). Only one Booster counts.'},
-  cargo:   {name: 'Cargo Bay',        mass: 2, cost: 40,  desc: 'Carries 4 food or 2,000 settlers per trip on a trade route.'},
+  booster: {name: 'Booster',          mass: 0, cost: 20,  desc: '+10% of light speed (30% becomes 40%). Only one Booster counts. Light hulls only.'},
+  cargo:   {name: 'Cargo Bay',        mass: 2, cost: 40,  desc: 'Each trip carries 10,000 settlers and 10 food from your colonies, and brings trade back on a trade route. Needs a medium or heavy hull.'},
 };
 const DEFAULT_DESIGNS = [
   {id: 'scout',    name: 'Scout',          hull: 'light',  mods: ['tel_m', 'booster'], icon: 'dart',    acc: '#ffd23f'},
@@ -370,6 +370,7 @@ const TECHS = [
   {id: 'space_elevator', f: 'eng', cost: 1100, req: ['orbital_construction'], name: 'Space Elevators', desc: 'Unlocks the Space Elevator project (ships built there cost 25% less).'},
   {id: 'modular_habitats', f: 'eng', cost: 250, req: [], name: 'Modular Habitats', desc: 'Unlocks the Habitat Expansion project (+25% population capacity at a colony).'},
   {id: 'vertical_cities', f: 'eng', cost: 1200, req: ['modular_habitats'], name: 'Vertical Cities', desc: 'Unlocks Habitat Spires, an upgrade of the Habitat Expansion (+50% population capacity).'},
+  {id: 'heavy_hulls', f: 'eng', cost: 1300, req: ['orbital_construction'], name: 'Heavy Hull Construction', desc: 'Unlocks heavy hulls (5 slots) in the ship designer.'},
   {id: 'arcologies', f: 'eng', cost: 1600, req: ['autofactories'], name: 'Arcologies', desc: '+25% population capacity everywhere.'},
   {id: 'megastructures', f: 'eng', cost: 3600, req: ['space_elevator', 'arcologies'], name: 'Megastructures', desc: 'Colony projects cost 25% less.'},
   {id: 'quantum_computing', f: 'phys', cost: 400, req: [], name: 'Quantum Computing', desc: '+15% research everywhere.'},
@@ -378,7 +379,7 @@ const TECHS = [
   {id: 'exotic_matter', f: 'phys', cost: 3200, req: ['antimatter_production'], name: 'Exotic Matter', desc: 'The physics needed for near-light flight, and perhaps one day more.'},
   {id: 'stellar_priority', f: 'soc', cost: 300, req: [], name: 'Stellar Priority', desc: 'Space budget +3 points: the public wants more of Earth\'s economy spent beyond Earth.'},
   {id: 'spacefaring', f: 'soc', cost: 1300, req: ['stellar_priority'], name: 'Spacefaring Society', desc: 'Space budget +7 points, and it can never fall below 20%. A generation has grown up with family on other worlds.'},
-  {id: 'interstellar_commerce', f: 'soc', cost: 300, req: [], name: 'Interstellar Commerce', desc: '+20% credits; Cargo Bays carry twice as much.'},
+  {id: 'interstellar_commerce', f: 'soc', cost: 300, req: [], name: 'Interstellar Commerce', desc: '+20% credits; Cargo Bays carry 25% more.'},
   {id: 'interplanetary_markets', f: 'soc', cost: 1000, req: ['interstellar_commerce'], name: 'Interplanetary Markets', desc: 'Unlocks the Trade Exchange, an upgrade of the Trade Port (+50% credits).'},
   {id: 'colonial_charter', f: 'soc', cost: 550, req: [], name: 'Colonial Charters', desc: 'Settlements grow 50% faster.'},
   {id: 'unified_science', f: 'soc', cost: 1300, req: ['quantum_computing'], name: 'Unified Science Academy', desc: '+20% research everywhere.'},
@@ -854,7 +855,8 @@ function newFleetAt(starId, did) {
 function fleetSpeed(f) { let v = 1; for (const sh of f.ships) v = Math.min(v, designSpeed(design(sh.d))); return v; }
 function fleetTel(f) { let v = 0; for (const sh of f.ships) v = Math.max(v, designTel(design(sh.d))); return v; }
 function fleetHas(f, m) { return f.ships.some(sh => designHas(design(sh.d), m)); }
-function fleetCargo(f) { let n = 0; for (const sh of f.ships) n += design(sh.d).mods.filter(m => m === 'cargo').length; return n * (has('interstellar_commerce') ? 2 : 1); }
+function fleetCargo(f) { let n = 0; for (const sh of f.ships) n += design(sh.d).mods.filter(m => m === 'cargo').length; return n; }
+function cargoCap(f) { const n = fleetCargo(f) * (has('interstellar_commerce') ? 1.25 : 1); return {pop: n * 0.01, food: n * 10}; }
 function etaTo(f, starId) { const s = ST(starId); return Math.max(1, Math.ceil((d3(f, s) - 1e-6) / fleetSpeed(f))); }
 function cleanupFleets() { S.fleets = S.fleets.filter(f => f.ships.length); }
 function orderMove(f, starId) {
@@ -862,7 +864,9 @@ function orderMove(f, starId) {
   const s = ST(starId);
   if (s.guard && s.guardKnown && has('bt_machines')) return 'Guardian machines hold that system. Your ships refuse to enter.';
   if (!S.known[starId]) return 'Unknown destination';
-  f.dest = starId; if (f.task && f.task.type !== 'route') f.task = null; return null;
+  f.task = null; // a manual order ends any survey or trade route
+  if (f.star != null) loadCargo(f, null);
+  f.dest = starId; return null;
 }
 function splitFleet(f, ids) { const nf = {id: nid(), ships: f.ships.filter(s => ids.includes(s.id)), star: f.star, x: f.x, y: f.y, z: f.z, dest: null, task: null}; f.ships = f.ships.filter(s => !ids.includes(s.id)); S.fleets.push(nf); cleanupFleets(); return nf; }
 function mergeFleets(a, b) { a.ships.push(...b.ships); b.ships = []; cleanupFleets(); }
@@ -951,6 +955,7 @@ function upgradedFrom(c, id) { return Object.keys(c.proj).some(k => PROJECTS[k] 
 function projReason(b, id) {
   const P = PROJECTS[id], c = b.col;
   if (P.unique) return 'Unique';
+  if (c.home && !P.space) return 'Earth builds only space projects';
   if (c.outpost && !P.outpost) return 'Needs people';
   if (P.giantOnly && b.cls !== 'gasgiant' && b.cls !== 'icegiant') return 'Gas and ice giants only';
   if (P.req && !c.proj[P.req] && !Object.keys(c.proj).some(k => PROJECTS[k] && PROJECTS[k].replaces === P.req)) return 'Needs ' + PROJECTS[P.req].name;
@@ -963,8 +968,15 @@ function projReason(b, id) {
   if (id === 'terraform' && (hab(b) === 'garden' || hab(b) === 'none' || hab(b) === 'outpost' || c.home)) return 'Cannot be improved further';
   return null;
 }
+function designReason(d) {
+  if (d.hull === 'heavy' && !has('heavy_hulls')) return 'Heavy hulls need Heavy Hull Construction';
+  if (d.hull === 'light' && d.mods.some(m => m === 'colony' || m === 'cargo')) return 'Colony Pods and Cargo Bays need a medium or heavy hull';
+  if (d.hull !== 'light' && d.mods.includes('booster')) return 'Boosters only fit light hulls';
+  return null;
+}
 function shipReason(b, d) {
   const p = b.col.proj;
+  if (d && designReason(d)) return designReason(d);
   if (!p.shipyard && !p.dock) return 'Needs an Orbital Dock';
   if (d && b.col.outpost && designHas(d, 'colony')) return 'Outposts have no people to send';
   if (d && !p.shipyard && d.hull !== 'light') return 'Needs an Orbital Shipyard (medium and heavy hulls)';
@@ -1008,6 +1020,7 @@ function colonizeCheck(f, b, kind) {
 function foundColony(b, add) {
   const old = b.col; b.owner = 0; b.col = {pop: add, focus: 'balanced', proj: old ? old.proj : {}, queue: old ? old.queue.filter(q => !(q.kind === 'proj' && PROJECTS[q.id] && PROJECTS[q.id].outpostOnly)) : [], prog: old ? old.prog : 0, founded: S.year};
   msg((old ? 'The outpost on ' + b.name + ' became a colony' : 'A new colony is founded on ' + b.name) + ' with ' + Math.round(add * 1e6).toLocaleString() + ' settlers.', b.star, 'colony'); journal('Founded a colony on ' + b.name + '.', b.star);
+  for (const f of S.fleets) if (f.star === b.star && f.dest == null && hasLoad(f) && !(f.task && f.task.type === 'route')) unloadCargo(f, true);
   if (b.star !== 0) budgetEvent('firstStar', 1, 'Humanity\'s first colony at another star, on ' + b.name + ', inspires millions.', b.star);
 }
 function colonize(f, b, kind) {
@@ -1101,22 +1114,62 @@ function arrive(f) {
     return;
   }
   if (f.task && f.task.type === 'route') routeArrive(f);
+  else if (f.cargo) unloadCargo(f, true);
+}
+// ---------- freighters ----------
+// Out: settlers and food from the sending system. Back: trade (production + credits) paid by the size of the colony traded with.
+const TRADE_PAY = {settlement: [10, 20], city: [15, 30], core: [20, 40], home: [20, 40]};
+function ourColoniesAt(sid) { return ST(sid).bodies.map(B).filter(b => b.owner === 0 && b.col && !b.col.outpost); }
+function settlerSource(sid) { const L = ourColoniesAt(sid).filter(b => b.col.pop > 0.2); return L.find(b => b.col.pop >= popCap(b) * 0.99) || L.sort((a, b) => b.col.pop - a.col.pop)[0] || null; }
+function settlerTarget(sid) { return ourColoniesAt(sid).filter(b => b.col.pop < popCap(b) * 0.99).sort((a, b) => a.col.pop / popCap(a) - b.col.pop / popCap(b))[0] || null; }
+function hasLoad(f) { return !!(f.cargo && (f.cargo.pop > 0 || f.cargo.food > 0)); }
+function loadCargo(f, dst) {
+  if (!fleetCargo(f) || f.star == null || hasLoad(f)) return;
+  const sid = f.star, cap = cargoCap(f), c = f.cargo = f.cargo || {pop: 0, food: 0, trade: null};
+  const src = settlerSource(sid);
+  if (src && (dst == null || settlerTarget(dst))) { const n = Math.min(cap.pop, src.col.pop - 0.2); c.pop = n; src.col.pop -= n; }
+  const s = ST(sid);
+  if (ourColoniesAt(sid).length && systemFood(sid).net >= 0 && (s.stock || 0) >= 1) { const k = Math.min(cap.food, Math.floor(s.stock)); s.stock -= k; c.food = k; }
+}
+function unloadCargo(f, withTrade) {
+  const c = f.cargo, sid = f.star; if (!c || sid == null || !ourColoniesAt(sid).length) return;
+  if (c.pop > 0) { const t = settlerTarget(sid); if (t) { t.col.pop += c.pop; c.pop = 0; } }
+  if (c.food > 0) { ST(sid).stock = (ST(sid).stock || 0) + c.food; c.food = 0; }
+  if (withTrade && c.trade) {
+    const tr = c.trade; c.trade = null;
+    const L = ourColoniesAt(sid).filter(b => b.col.queue.length).sort((a, b) => b.col.pop - a.col.pop);
+    let bc = tr.bc; if (L.length) L[0].col.prog += tr.prod; else bc += Math.floor(tr.prod / 2);
+    S.bc = r1(S.bc + bc);
+    msg('A freighter brought trade home to ' + ST(sid).name + ': ' + (L.length ? '+' + tr.prod + ' production for ' + L[0].name + ', ' : '') + '+' + bc + ' credits.', sid, 'info');
+  }
+}
+function routeName(t) { return ST(t.a).name + ' → ' + ST(t.b).name; }
+function routeCheck(f) {
+  const t = f.task, cap = cargoCap(f), c = f.cargo || {};
+  const why = [];
+  if ((c.pop || 0) < cap.pop * 0.5) why.push(!settlerTarget(t.b) ? 'every colony at ' + ST(t.b).name + ' is full, so no settlers are carried' : 'no colony at ' + ST(t.a).name + ' can spare settlers');
+  if ((c.food || 0) < cap.food * 0.5) why.push('no spare food in store at ' + ST(t.a).name);
+  const w = why.join('; ');
+  if (w && w !== t.warn) msg('Freighter route ' + routeName(t) + ': ' + w + '.', t.a, 'route');
+  else if (!w && t.warn) msg('Freighter route ' + routeName(t) + ' is back to full loads.', t.a, 'info');
+  t.warn = w;
 }
 function routeArrive(f) {
   const t = f.task, here = f.star;
-  const cap = fleetCargo(f) * 4;
-  if (here === t.a) {
-    if (t.cargo === 'food') { const s = ST(here); const take = Math.min(cap, Math.floor(s.stock)); s.stock -= take; t.load = take; }
-    else { const src = ST(here).bodies.map(B).filter(b => b.owner === 0 && b.col && !b.col.outpost && b.col.pop > 0.2).sort((a, b) => b.col.pop - a.col.pop)[0]; const n = fleetCargo(f) * 0.002; if (src) { src.col.pop -= n; t.load = n; } else t.load = 0; }
-    f.dest = t.b;
-  } else if (here === t.b) {
-    if (t.load) {
-      if (t.cargo === 'food') { ST(here).stock += t.load; }
-      else { const dst = ST(here).bodies.map(B).filter(b => b.owner === 0 && b.col && !b.col.outpost).sort((a, b) => a.col.pop - b.col.pop)[0]; if (dst) dst.col.pop += t.load; }
-      t.delivered = (t.delivered || 0) + 1;
-    }
-    t.load = 0; f.dest = t.a;
-  }
+  if (here === t.b) {
+    unloadCargo(f, false);
+    const big = ourColoniesAt(here).sort((a, b) => b.col.pop - a.col.pop)[0];
+    f.cargo = f.cargo || {pop: 0, food: 0, trade: null};
+    if (big) { const p = TRADE_PAY[stageOf(big)] || TRADE_PAY.city; f.cargo.trade = {prod: p[0], bc: p[1]}; }
+    f.dest = t.a;
+  } else if (here === t.a) {
+    unloadCargo(f, true); loadCargo(f, t.b); routeCheck(f); f.dest = t.b;
+  } else f.dest = hasLoad(f) ? t.b : t.a;
+}
+function routeTaken(a, b, except) { return S.fleets.some(o => o !== except && o.task && o.task.type === 'route' && ((o.task.a === a && o.task.b === b) || (o.task.a === b && o.task.b === a))); }
+function startRoute(f, a, b) {
+  f.task = {type: 'route', a, b, warn: ''}; f.auto = false;
+  if (f.star != null && f.dest == null) routeArrive(f); else f.dest = hasLoad(f) ? b : a;
 }
 function processSurveys() {
   for (const f of S.fleets.slice()) {
@@ -1192,7 +1245,7 @@ function itemValid(b, it) {
   if (it.kind === 'outpost') { const t = B(it.id); return !!t && t.star === b.star && t.owner == null && hab(t) !== 'none' && !b.col.outpost; }
   if (it.kind === 'settle') { const t = B(it.id); return !!t && t !== b && t.star === b.star && !b.col.outpost && peopleCanLive(t) && (t.owner == null || (t.owner === 0 && !!t.col && !!t.col.outpost)); }
   const P = PROJECTS[it.id], c = b.col;
-  if ((c.outpost && !P.outpost) || (!c.outpost && P.outpostOnly) || (P.tech && !has(P.tech))) return false;
+  if ((c.outpost && !P.outpost) || (!c.outpost && P.outpostOnly) || (P.tech && !has(P.tech)) || (c.home && !P.space)) return false;
   if (P.giantOnly && b.cls !== 'gasgiant' && b.cls !== 'icegiant') return false;
   if (P.req && !c.proj[P.req]) return false;
   if ((c.proj[it.id] && !P.repeat) || upgradedFrom(c, it.id)) return false;
@@ -1348,7 +1401,7 @@ function idleWorlds() {
   return S.bodies.filter(b => b.owner === 0 && b.col && !b.col.queue.length && !supplyTarget(b))
     .map(b => ({b, k: o[b.star] * 1000 + ST(b.star).bodies.indexOf(b.id)})).sort((a, b) => a.k - b.k);
 }
-function idleFleets() { return S.fleets.filter(f => f.dest == null && f.star != null && !f.task && !f.auto && f.ships.length).sort((a, b) => a.id - b.id); }
+function idleFleets() { return S.fleets.filter(f => f.ships.length && ((f.dest == null && f.star != null && !f.task && !f.auto) || (f.task && f.task.type === 'route' && f.task.warn))).sort((a, b) => a.id - b.id); }
 function attnState() {
   const w = idleWorlds(); if (w.length) return {kind: 'world', n: w.length, list: w};
   if (!S.res && availableTechs().length) return {kind: 'research'};
@@ -1360,7 +1413,7 @@ function renderAttn() {
   const a = attnState();
   el.innerHTML = a.kind === 'world' ? `<div class="chip click attn" data-a="attnGo" title="Worlds with nothing being built. Click to go to the next one."><span class="bad">Idle colonies (${a.n})</span></div>`
     : a.kind === 'research' ? `<div class="chip click attn" data-a="attnGo" title="Nothing is being researched. Click to open Research."><span class="bad">Idle research</span></div>`
-    : a.kind === 'fleet' ? `<div class="chip click attn" data-a="attnGo" title="Ships waiting at a star. Click to go to the next one."><span class="warn">Orbiting ships (${a.n})</span></div>`
+    : a.kind === 'fleet' ? `<div class="chip click attn" data-a="attnGo" title="Ships waiting for orders, and freighters whose route is not at full value. Click to go to the next one."><span class="warn">Idle ships (${a.n})</span></div>`
     : `<div class="chip dim" title="Nothing needs your attention">Nothing idle</div>`;
 }
 ACT.attnGo = () => {
@@ -1372,7 +1425,7 @@ ACT.attnGo = () => {
   } else if (a.kind === 'research') ACT.openResearch();
   else if (a.kind === 'fleet') {
     const last = UI.attnFleet; const pick = (last == null ? null : a.list.find(f => f.id > last)) || a.list[0]; UI.attnFleet = pick.id;
-    selectFleet(pick.id); centerOn(pick.star);
+    selectFleet(pick.id); if (pick.star != null) centerOn(pick.star); else { const [ox, oy] = sideShift(); UI.cam.tx = pick.x + ox; UI.cam.ty = pick.y + oy; UI.cam.tz = 0; UI.dirty = true; }
   }
 };
 
@@ -1767,7 +1820,7 @@ const SFX = {
 };
 function sfx(name) { if (!SND.ctx || SETTINGS.sfx <= 0 || !SFX[name]) return; try { SFX[name](SND.ctx.currentTime + 0.02); } catch (e) {} }
 // one sound for a whole year's news, the most important kind first
-const NEWS_SOUND = [['lost', 'lost'], ['warn', 'warn'], ['survey', 'discover'], ['arrive', 'arrive'], ['tech', 'tech'], ['colony', 'colony'], ['stage', 'colony'], ['ship', 'build'], ['build', 'build'], ['idle', 'idle']];
+const NEWS_SOUND = [['lost', 'lost'], ['warn', 'warn'], ['survey', 'discover'], ['arrive', 'arrive'], ['tech', 'tech'], ['colony', 'colony'], ['stage', 'colony'], ['ship', 'build'], ['build', 'build'], ['idle', 'idle'], ['route', 'warn']];
 function newsSound(msgs) {
   for (const [kind, s] of NEWS_SOUND) if (msgs.some(m => m.kind === kind && !(kind === 'survey' && !/life|probes/.test(m.text)))) { sfx(s); return; }
 }
@@ -1874,7 +1927,7 @@ function buildLine(b) {
   return `<span class="dim">Building:</span> ${esc(itemName(it))}${it.n > 1 ? ' ×' + it.n : ''} <span class="dim">(${yrs} yr)${c.queue.length > 1 ? ' +' + (c.queue.length - 1) + ' more' : ''}</span>`;
 }
 function fleetName(f) { const cnt = {}; for (const sh of f.ships) { const n = design(sh.d).name; cnt[n] = (cnt[n] || 0) + 1; } return Object.entries(cnt).map(([n, c]) => (c > 1 ? c + '× ' : '') + esc(n)).join(', '); }
-function taskText(f) { const t = f.task; if (!t) return ''; if (t.type === 'survey') return (t.probe ? 'probe survey' : 'surveying') + ' (' + t.left + ' yr left)'; if (t.type === 'route') return 'trade route: ' + ST(t.a).name + ' ⇄ ' + ST(t.b).name + ' (' + t.cargo + ')'; return ''; }
+function taskText(f) { const t = f.task; if (!t) return ''; if (t.type === 'survey') return (t.probe ? 'probe survey' : 'surveying') + ' (' + t.left + ' yr left)'; if (t.type === 'route') return 'trade route ' + esc(routeName(t)); return ''; }
 
 // ---------- colony ----------
 function outputHTML(b, o) {
@@ -1929,8 +1982,9 @@ function colonyPanel(b) {
       h += ownOut.map(t => row(t, 'settle')).join('');
     }
   } else if (tab === 'proj') {
+    if (c.home) h += `<div class="tiny dim" style="padding:2px 6px 6px">Earth's own economy is not yours to build on: it grows through the space budget. Only space projects can be built here.</div>`;
     for (const id in PROJECTS) {
-      const P = PROJECTS[id]; if (P.unique || P.outpostOnly || (P.tech && !has(P.tech))) continue; if (c.proj[id] && !P.repeat) continue;
+      const P = PROJECTS[id]; if (P.unique || P.outpostOnly || (P.tech && !has(P.tech)) || (c.home && !P.space)) continue; if (c.proj[id] && !P.repeat) continue;
       if (Object.keys(c.proj).some(k => PROJECTS[k] && PROJECTS[k].replaces === id)) continue;
       const why = projReason(b, id), cost = projCost(id);
       h += `<div class="opt" ${why ? `style="opacity:.45;cursor:default"` : `data-a="qadd" data-v="${b.id}:proj:${id}"`}><span class="nm">${P.name}<div class="tiny dim">${esc(why || P.desc)}</div></span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`;
@@ -1946,7 +2000,7 @@ function shipListHTML(b, o) {
   if (base) h += `<div class="small dim" style="padding:6px">${base}. Build one first (Projects tab).</div>`;
   for (const d of S.designs) {
     const why = base || shipReason(b, d), cost = shipCost(d, b);
-    h += `<div class="opt" ${why ? 'style="opacity:.45;cursor:default"' : `data-a="qadd" data-v="${b.id}:ship:${d.id}"`}>${designIcon(d, 30)}<span class="nm">${esc(d.name)}<div class="tiny dim">${!base && why ? esc(why) : designSummary(d)}</div></span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`;
+    h += `<div class="opt" ${why ? 'style="opacity:.45;cursor:default"' : `data-a="qadd" data-v="${b.id}:ship:${d.id}"`}>${designIcon(d, 30)}<span class="nm">${esc(d.name)}<div class="tiny dim">${!base && why ? esc(why) : designSummary(d)}</div>${!why && designHas(d, 'cargo') && colonyStars().length < 2 ? '<div class="tiny amber">Trade routes need a colony at both ends.</div>' : ''}</span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`;
   }
   return h;
 }
@@ -1968,24 +2022,29 @@ ACT.buy = v => { if (buyItem(B(+v))) toast('Bought: finishes next year'); render
 function fleetPanel(f) {
   const where = f.dest != null ? `En route to ${esc(ST(f.dest).name)} · ${etaTo(f, f.dest)} year${etaTo(f, f.dest) > 1 ? 's' : ''} left` : f.star != null ? 'At ' + esc(ST(f.star).name) : 'In deep space';
   let h = `<div class="hdr"><div><h2>${fleetName(f)}</h2><div class="dim small">${where}</div></div><button class="x" data-a="close">✕</button></div>
-    <div class="small dim">Speed ${pct(fleetSpeed(f))} of light (${fleetSpeed(f).toFixed(2)} ly per year) · telescope ${Math.round(fleetTel(f))} ly${fleetCargo(f) ? ' · carries ' + fleetCargo(f) * 4 + ' food per trip' : ''}</div>
+    <div class="small dim">Speed ${pct(fleetSpeed(f))} of light (${fleetSpeed(f).toFixed(2)} ly per year) · telescope ${Math.round(fleetTel(f))} ly${fleetCargo(f) ? ' · carries ' + people(cargoCap(f).pop) + ' settlers and ' + Math.round(cargoCap(f).food) + ' food per trip' : ''}</div>
     <div class="small acc" style="margin-top:6px">Click any known star to send this ship there.</div>
     <div style="margin-top:6px"><button class="btn sm ${f.auto ? 'on' : ''}" data-a="autoExp" data-v="${f.id}">${f.auto ? 'Auto-explore: on (click to stop)' : 'Auto-explore'}</button></div>`;
-  if (f.task) h += `<div class="card small" style="margin-top:8px">${taskText(f)} ${f.task.type === 'route' ? `<button class="btn sm" data-a="endRoute" data-v="${f.id}">End route</button>` : ''}</div>`;
+  if (f.task && f.task.type === 'route') {
+    const t = f.task;
+    h += `<div class="card small" style="margin-top:8px"><b>Trade route</b>: settlers and food go ${esc(ST(t.a).name)} → ${esc(ST(t.b).name)}, trade comes back to ${esc(ST(t.a).name)}.
+      ${t.warn ? `<div class="bad tiny" style="margin-top:3px">Not at full value: ${esc(t.warn)}.</div>` : ''}
+      <div class="row" style="gap:5px;margin-top:6px"><button class="btn sm" data-a="routeSetup" data-v="${f.id}">Change route</button><button class="btn sm" data-a="endRoute" data-v="${f.id}">End route</button></div></div>`;
+  } else if (f.task) h += `<div class="card small" style="margin-top:8px">${taskText(f)}</div>`;
+  if (f.cargo && (f.cargo.pop > 0 || f.cargo.food > 0 || f.cargo.trade)) {
+    const c = f.cargo, bits = [];
+    if (c.pop > 0) bits.push(people(c.pop) + ' settlers'); if (c.food > 0) bits.push(Math.round(c.food) + ' food'); if (c.trade) bits.push('trade goods worth ' + c.trade.prod + ' production and ' + c.trade.bc + ' credits');
+    h += `<div class="small" style="margin-top:6px">Carrying: <b>${bits.join(', ')}</b>${f.dest == null && !f.task && (c.pop > 0 || c.food > 0) ? '<div class="tiny dim">Unloads when it reaches one of your colonies, or when a colony is founded here.</div>' : ''}</div>`;
+  }
+  if (fleetCargo(f) && !(f.task && f.task.type === 'route')) h += `<div style="margin-top:6px"><button class="btn sm" data-a="routeSetup" data-v="${f.id}">Start a trade route</button></div>`;
+  if (UI.routeSetup === f.id) h += routeSetupHTML(f);
   if (f.star != null && f.dest == null) {
     const s = ST(f.star), acts = [];
     if (fleetHas(f, 'lab') && !S.surveyed[s.id] && !(f.task && f.task.type === 'survey')) acts.push(`<button class="btn sm primary" data-a="survey" data-v="${f.id}">Survey system (${has('survey_drones') ? 1 : 3} yr)</button>`);
     if (canProbeSurvey(f) && !fleetHas(f, 'lab')) acts.push(`<button class="btn sm" data-a="probeSurvey" data-v="${f.id}" title="The ship is used up when the survey finishes">Probe survey (5 yr, uses up the ship)</button>`);
     if (canInvestigate(f)) acts.push(`<button class="btn sm amber" data-a="investigate" data-v="${f.id}">Investigate strange readings</button>`);
-    if (fleetCargo(f) && colonyStars().includes(s.id)) acts.push(`<button class="btn sm" data-a="routeSetup" data-v="${f.id}">Start a trade route from here</button>`);
     if (fleetHas(f, 'colony') || fleetHas(f, 'outpost')) acts.push(`<button class="btn sm" data-a="star" data-v="${s.id}">Choose a world to settle ▸</button>`);
     if (acts.length) h += `<div class="sec">Actions</div><div class="row wrap" style="gap:5px">${acts.join('')}</div>`;
-    if (UI.routeSetup === f.id) {
-      const dests = colonyStars().filter(x => x !== s.id);
-      h += `<div class="card" style="margin-top:8px"><div class="small">Trade route from <b>${esc(s.name)}</b> to:</div><select id="rdest" style="width:100%;margin:5px 0">${dests.map(x => `<option value="${x}">${esc(ST(x).name)} (${etaTo(f, x)} yr each way)</option>`).join('')}</select>
-        <div class="small">Carry: <select id="rcargo"><option value="food">Food (from this system's store)</option><option value="settlers">Settlers</option></select></div>
-        ${dests.length ? `<button class="btn sm primary" style="margin-top:6px" data-a="routeGo" data-v="${f.id}">Start route</button>` : '<div class="small bad">You need a second colony system first.</div>'}</div>`;
-    }
   }
   h += `<div class="sec">Ships (${f.ships.length})</div>`;
   const groups = {}; for (const sh of f.ships) (groups[sh.d] = groups[sh.d] || []).push(sh);
@@ -2005,11 +2064,33 @@ ACT.probeSurvey = v => { const f = S.fleets.find(x => x.id === +v); f.task = {ty
 ACT.autoExp = v => { const f = S.fleets.find(x => x.id === +v); f.auto = !f.auto; if (f.auto && f.dest == null && !f.task) { const t = exploreTarget(f); if (t) { orderMove(f, t.id); toast('Exploring: heading to ' + ST(t.id).name); } else { f.auto = false; toast('No unexplored stars on our charts'); } } UI.dirty = true; renderSide(); };
 ACT.survey = v => { const f = S.fleets.find(x => x.id === +v); f.task = {type: 'survey', left: has('survey_drones') ? 1 : 3}; renderSide(); toast('Survey started'); };
 ACT.endRoute = v => { const f = S.fleets.find(x => x.id === +v); f.task = null; renderSide(); };
-ACT.routeSetup = v => { UI.routeSetup = +v; renderSide(); };
+function routeSetupHTML(f) {
+  const stars = colonyStars();
+  if (stars.length < 2) return `<div class="card small" style="margin-top:8px">Trade routes need a colony at both ends. Found a colony at another star first.</div>`;
+  const R = UI.route || {};
+  if (R.f !== f.id) {
+    const pops = sid => ourColoniesAt(sid).reduce((t, b) => t + b.col.pop, 0);
+    const big = stars.slice().sort((x, y) => pops(y) - pops(x));
+    let a = big[0], b = f.star != null && f.star !== a && stars.includes(f.star) ? f.star : big[1];
+    if (f.task && f.task.type === 'route') { a = f.task.a; b = f.task.b; }
+    UI.route = {f: f.id, a, b};
+  }
+  const r = UI.route, opts = sel => stars.map(x => `<option value="${x}" ${x === sel ? 'selected' : ''}>${esc(ST(x).name)}</option>`).join('');
+  const taken = r.a !== r.b && routeTaken(r.a, r.b, f);
+  return `<div class="card small" style="margin-top:8px"><b>Trade route</b>
+    <div class="row" style="gap:5px;margin:6px 0;align-items:center"><select data-c="routeA" style="flex:1">${opts(r.a)}</select><button class="btn sm" data-a="routeSwap" title="Swap direction">⇄</button><select data-c="routeB" style="flex:1">${opts(r.b)}</select></div>
+    <div class="tiny dim">Settlers and food go ${esc(ST(r.a).name)} → ${esc(ST(r.b).name)}. Trade comes back to ${esc(ST(r.a).name)}, paid by the size of the colony at ${esc(ST(r.b).name)}. ${r.a !== r.b ? 'About ' + (etaTo({x: ST(r.a).x, y: ST(r.a).y, z: ST(r.a).z, ships: f.ships}, r.b)) + ' years each way.' : ''}</div>
+    ${r.a === r.b ? '<div class="tiny bad">Pick two different systems.</div>' : taken ? '<div class="tiny bad">Another freighter already runs a route between these systems.</div>' : ''}
+    <div class="row" style="gap:5px;margin-top:6px"><button class="btn sm primary" data-a="routeGo" data-v="${f.id}" ${r.a === r.b || taken ? 'disabled' : ''}>${f.task && f.task.type === 'route' ? 'Change route' : 'Start route'}</button><button class="btn sm" data-a="routeCancel">Cancel</button></div></div>`;
+}
+ACT.routeSetup = v => { UI.routeSetup = +v; UI.route = null; renderSide(); };
+ACT.routeCancel = () => { UI.routeSetup = null; UI.route = null; renderSide(); };
+ACT.routeA = v => { UI.route.a = +v; renderSide(); };
+ACT.routeB = v => { UI.route.b = +v; renderSide(); };
+ACT.routeSwap = () => { const r = UI.route; [r.a, r.b] = [r.b, r.a]; renderSide(); };
 ACT.routeGo = v => {
-  const f = S.fleets.find(x => x.id === +v); const b2 = +$('#rdest').value, cargo = $('#rcargo').value;
-  f.task = {type: 'route', a: f.star, b: b2, cargo, load: 0};
-  routeArrive(f); UI.routeSetup = null; UI.dirty = true; renderSide(); toast('Trade route started');
+  const f = S.fleets.find(x => x.id === +v), r = UI.route; if (!f || !r || r.a === r.b || routeTaken(r.a, r.b, f)) return;
+  startRoute(f, r.a, r.b); UI.routeSetup = null; UI.route = null; UI.dirty = true; renderSide(); toast('Trade route: ' + routeName(f.task));
 };
 ACT.fsel = v => { const [did, d] = v.split(':'); const f = S.fleets.find(x => x.id === UI.viewId); const list = f.ships.filter(sh => sh.d === did); if (+d > 0) { const sh = list.find(sh => !UI.fleetSel[sh.id]); if (sh) UI.fleetSel[sh.id] = true; } else { const sh = list.slice().reverse().find(sh => UI.fleetSel[sh.id]); if (sh) delete UI.fleetSel[sh.id]; } renderSide(); };
 ACT.split = v => { const f = S.fleets.find(x => x.id === +v); const ids = f.ships.filter(sh => UI.fleetSel[sh.id]).map(sh => sh.id); const nf = splitFleet(f, ids); UI.fleetSel = {}; selectFleet(nf.id); };
@@ -2086,7 +2167,7 @@ ACT.mres = v => { if (UI.modalRes) UI.modalRes(v); };
 function confirmBox(title, text, yes) { modal({title, w: 460, body: `<div>${text}</div>`, foot: `<button class="btn" data-a="mres" data-v="no">Cancel</button><button class="btn danger" data-a="mres" data-v="yes">Confirm</button>`}).then(v => { if (v === 'yes') yes(); }); }
 
 // ---------- news feed ----------
-const NEWS_ICON = {info: 'ℹ️', tech: '🔬', build: '🏗️', ship: '🚀', colony: '🪐', warn: '⚠️', arrive: '🔭', spot: '✧', survey: '🧪', lost: '💥', stage: '🏙️', idle: '💤', budget: '🛰️'};
+const NEWS_ICON = {info: 'ℹ️', tech: '🔬', build: '🏗️', ship: '🚀', colony: '🪐', warn: '⚠️', arrive: '🔭', spot: '✧', survey: '🧪', lost: '💥', stage: '🏙️', idle: '💤', budget: '🛰️', route: '📦'};
 function showNews() {
   const el = $('#news'); if (!S) return;
   const list = S.msgs.slice(-14);
@@ -2145,9 +2226,9 @@ function designHTML() {
   for (const x of S.designs) { const cnt = shipsOfDesign(x.id);
     h += `<div class="opt ${d.src === x.id ? 'sel' : ''}" data-a="loadDesign" data-v="${x.id}">${designIcon(x, 34)}<span class="nm">${esc(x.name)}<div class="tiny dim">${HULLS[x.hull].name} · ${designCost(x)} cost</div><div class="tiny" style="color:${cnt ? '#dfe7f5' : 'var(--dim)'}">${cnt} in service</div></span><button class="x" data-a="scrapDesign" data-v="${x.id}" title="Scrap this design">🗑</button></div>`; }
   h += `<div class="tiny dim" style="margin-top:8px">Pick a design to change its look, or change its parts and save it as a new design.</div></div>`;
-  h += `<div><input type="text" id="dname" value="${esc(d.name)}" maxlength="28" style="width:100%"><div class="sec">Hull</div><div class="hullbtns">${Object.keys(HULLS).map(k => `<button class="btn sm ${d.hull === k ? 'on' : ''}" data-a="setHull" data-v="${k}">${HULLS[k].name} (${HULLS[k].slots} slots)</button>`).join('')}</div>
+  h += `<div><input type="text" id="dname" value="${esc(d.name)}" maxlength="28" style="width:100%"><div class="sec">Hull</div><div class="hullbtns">${Object.keys(HULLS).map(k => { const lock = k === 'heavy' && !has('heavy_hulls'); return `<button class="btn sm ${d.hull === k ? 'on' : ''}" ${lock ? 'disabled title="Needs Heavy Hull Construction"' : ''} data-a="setHull" data-v="${k}">${HULLS[k].name} (${HULLS[k].slots} slots)${lock ? ' 🔒' : ''}</button>`; }).join('')}</div>
     <div class="sec">Modules</div>`;
-  for (let i = 0; i < H.slots; i++) h += `<div class="slotrow"><span class="small dim" style="width:52px">Slot ${i + 1}</span><select data-c="setSlot" data-i="${i}"><option value="">— empty —</option>${Object.keys(MODULES).map(k => `<option value="${k}" ${d.mods[i] === k ? 'selected' : ''}>${MODULES[k].name} · mass ${MODULES[k].mass} · ${MODULES[k].cost} cost</option>`).join('')}</select></div>`;
+  for (let i = 0; i < H.slots; i++) h += `<div class="slotrow"><span class="small dim" style="width:52px">Slot ${i + 1}</span><select data-c="setSlot" data-i="${i}"><option value="">— empty —</option>${Object.keys(MODULES).map(k => { const bad = modFits(d.hull, k); return `<option value="${k}" ${d.mods[i] === k ? 'selected' : ''} ${bad ? 'disabled' : ''}>${MODULES[k].name} · mass ${MODULES[k].mass} · ${MODULES[k].cost} cost${bad ? ' (' + bad + ')' : ''}</option>`; }).join('')}</select></div>`;
   h += `<div class="small dim" style="margin-top:8px">${d.mods.filter(Boolean).map(m => `<div>• <b>${MODULES[m].name}</b>: ${MODULES[m].desc}</div>`).join('')}</div>
     <div class="sec">Secondary colour <span class="tiny dim" style="text-transform:none;letter-spacing:0">(the main colour is always your civilisation's)</span></div>
     <div class="sw">${SHIP_COLORS.map(([nm, c]) => `<i class="${d.acc === c ? 'sel' : ''}" style="background:${c}" title="${nm}" data-a="setAcc" data-v="${c}"></i>`).join('')}</div></div>`;
@@ -2155,16 +2236,17 @@ function designHTML() {
   const free = freeIcons(d.src), iconOk = free.includes(d.icon);
   h += `<div><div class="iconbox"><span class="lbl">Icon</span><button class="arr" style="left:10px" data-a="iconCycle" data-v="-1">◀</button>${iconSVG(d.icon, S.empire.color, d.acc, 150)}<button class="arr" style="right:10px" data-a="iconCycle" data-v="1">▶</button><div class="inm"><b>${SHIP_ICONS[d.icon].name}</b></div></div>
     <table class="statt small" style="margin-top:10px"><tr><td>Mass</td><td>${designMass(dd)}</td></tr><tr><td>Speed now</td><td><b>${pct(designSpeed(dd))}</b> of light</td></tr><tr><td>Telescope</td><td>${Math.round(designTel(dd))} ly</td></tr><tr><td>Build cost</td><td><b class="amber">${designCost(dd)}</b></td></tr><tr><td>Upkeep</td><td>${fmt(designCost(dd) * 0.01)} credits/yr</td></tr></table>
-    <button class="btn primary" style="width:100%;margin-top:12px" data-a="saveDesign" ${dd.mods.length && !full && iconOk ? '' : 'disabled'}>Save as new design</button>
+    <button class="btn primary" style="width:100%;margin-top:12px" data-a="saveDesign" ${dd.mods.length && !full && iconOk && !designReason(dd) ? '' : 'disabled'}>Save as new design</button>${designReason(dd) ? `<div class="tiny bad" style="margin-top:4px">${esc(designReason(dd))}</div>` : ''}
     ${full ? `<div class="tiny bad" style="margin-top:4px">All ${MAX_DESIGNS} design slots are used. Scrap a design first.</div>` : ''}
     ${d.src ? `<button class="btn" style="width:100%;margin-top:8px" data-a="saveLook" ${iconOk ? '' : 'disabled'}>Save look only (icon and colour)</button><div class="tiny dim" style="margin-top:4px">Restyles ${esc(design(d.src).name)} and its ${shipsOfDesign(d.src)} ship${shipsOfDesign(d.src) === 1 ? '' : 's'} in service. Nothing else changes.${design(d.src).std ? ' Starting designs keep this look in new games.' : ''}</div>` : ''}</div></div>`;
   return h;
 }
+function modFits(hull, m) { return hull === 'light' && (m === 'colony' || m === 'cargo') ? 'medium or heavy hull' : hull !== 'light' && m === 'booster' ? 'light hulls only' : null; }
 function newDesignEdit() { const f = freeIcons(null); return {name: 'New Design', hull: 'light', mods: ['tel_m', ''], icon: f[0] || 'dart', acc: '#eef2f8', src: null}; }
 ACT.openDesign = () => { UI.designEdit = newDesignEdit(); return modal({title: 'Ship Design', w: 1100, kind: 'design', body: designHTML(), foot: `<button class="btn" data-a="newDesignEd">New design</button><button class="btn" data-a="mclose">Close</button>`}).then(() => { renderSide(); UI.dirty = true; }); };
 ACT.newDesignEd = () => { UI.designEdit = newDesignEdit(); modalBody(designHTML()); };
 function rerenderDesign() { const n = $('#dname'); if (n) UI.designEdit.name = n.value; modalBody(designHTML()); }
-ACT.setHull = v => { UI.designEdit.hull = v; rerenderDesign(); };
+ACT.setHull = v => { if (v === 'heavy' && !has('heavy_hulls')) return; const d = UI.designEdit; d.hull = v; d.mods = d.mods.map(m => m && modFits(v, m) ? '' : m); rerenderDesign(); };
 ACT.setSlot = (v, el) => { UI.designEdit.mods[+el.dataset.i] = v; rerenderDesign(); };
 ACT.setAcc = v => { UI.designEdit.acc = v; rerenderDesign(); };
 ACT.iconCycle = v => { const d = UI.designEdit, f = freeIcons(d.src); if (!f.length) return; let i = f.indexOf(d.icon); i = i < 0 ? 0 : (i + (+v) + f.length) % f.length; d.icon = f[i]; rerenderDesign(); };

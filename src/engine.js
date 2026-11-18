@@ -215,7 +215,8 @@ function newFleetAt(starId, did) {
 function fleetSpeed(f) { let v = 1; for (const sh of f.ships) v = Math.min(v, designSpeed(design(sh.d))); return v; }
 function fleetTel(f) { let v = 0; for (const sh of f.ships) v = Math.max(v, designTel(design(sh.d))); return v; }
 function fleetHas(f, m) { return f.ships.some(sh => designHas(design(sh.d), m)); }
-function fleetCargo(f) { let n = 0; for (const sh of f.ships) n += design(sh.d).mods.filter(m => m === 'cargo').length; return n * (has('interstellar_commerce') ? 2 : 1); }
+function fleetCargo(f) { let n = 0; for (const sh of f.ships) n += design(sh.d).mods.filter(m => m === 'cargo').length; return n; }
+function cargoCap(f) { const n = fleetCargo(f) * (has('interstellar_commerce') ? 1.25 : 1); return {pop: n * 0.01, food: n * 10}; }
 function etaTo(f, starId) { const s = ST(starId); return Math.max(1, Math.ceil((d3(f, s) - 1e-6) / fleetSpeed(f))); }
 function cleanupFleets() { S.fleets = S.fleets.filter(f => f.ships.length); }
 function orderMove(f, starId) {
@@ -223,7 +224,9 @@ function orderMove(f, starId) {
   const s = ST(starId);
   if (s.guard && s.guardKnown && has('bt_machines')) return 'Guardian machines hold that system. Your ships refuse to enter.';
   if (!S.known[starId]) return 'Unknown destination';
-  f.dest = starId; if (f.task && f.task.type !== 'route') f.task = null; return null;
+  f.task = null; // a manual order ends any survey or trade route
+  if (f.star != null) loadCargo(f, null);
+  f.dest = starId; return null;
 }
 function splitFleet(f, ids) { const nf = {id: nid(), ships: f.ships.filter(s => ids.includes(s.id)), star: f.star, x: f.x, y: f.y, z: f.z, dest: null, task: null}; f.ships = f.ships.filter(s => !ids.includes(s.id)); S.fleets.push(nf); cleanupFleets(); return nf; }
 function mergeFleets(a, b) { a.ships.push(...b.ships); b.ships = []; cleanupFleets(); }
@@ -312,6 +315,7 @@ function upgradedFrom(c, id) { return Object.keys(c.proj).some(k => PROJECTS[k] 
 function projReason(b, id) {
   const P = PROJECTS[id], c = b.col;
   if (P.unique) return 'Unique';
+  if (c.home && !P.space) return 'Earth builds only space projects';
   if (c.outpost && !P.outpost) return 'Needs people';
   if (P.giantOnly && b.cls !== 'gasgiant' && b.cls !== 'icegiant') return 'Gas and ice giants only';
   if (P.req && !c.proj[P.req] && !Object.keys(c.proj).some(k => PROJECTS[k] && PROJECTS[k].replaces === P.req)) return 'Needs ' + PROJECTS[P.req].name;
@@ -324,8 +328,15 @@ function projReason(b, id) {
   if (id === 'terraform' && (hab(b) === 'garden' || hab(b) === 'none' || hab(b) === 'outpost' || c.home)) return 'Cannot be improved further';
   return null;
 }
+function designReason(d) {
+  if (d.hull === 'heavy' && !has('heavy_hulls')) return 'Heavy hulls need Heavy Hull Construction';
+  if (d.hull === 'light' && d.mods.some(m => m === 'colony' || m === 'cargo')) return 'Colony Pods and Cargo Bays need a medium or heavy hull';
+  if (d.hull !== 'light' && d.mods.includes('booster')) return 'Boosters only fit light hulls';
+  return null;
+}
 function shipReason(b, d) {
   const p = b.col.proj;
+  if (d && designReason(d)) return designReason(d);
   if (!p.shipyard && !p.dock) return 'Needs an Orbital Dock';
   if (d && b.col.outpost && designHas(d, 'colony')) return 'Outposts have no people to send';
   if (d && !p.shipyard && d.hull !== 'light') return 'Needs an Orbital Shipyard (medium and heavy hulls)';
@@ -369,6 +380,7 @@ function colonizeCheck(f, b, kind) {
 function foundColony(b, add) {
   const old = b.col; b.owner = 0; b.col = {pop: add, focus: 'balanced', proj: old ? old.proj : {}, queue: old ? old.queue.filter(q => !(q.kind === 'proj' && PROJECTS[q.id] && PROJECTS[q.id].outpostOnly)) : [], prog: old ? old.prog : 0, founded: S.year};
   msg((old ? 'The outpost on ' + b.name + ' became a colony' : 'A new colony is founded on ' + b.name) + ' with ' + Math.round(add * 1e6).toLocaleString() + ' settlers.', b.star, 'colony'); journal('Founded a colony on ' + b.name + '.', b.star);
+  for (const f of S.fleets) if (f.star === b.star && f.dest == null && hasLoad(f) && !(f.task && f.task.type === 'route')) unloadCargo(f, true);
   if (b.star !== 0) budgetEvent('firstStar', 1, 'Humanity\'s first colony at another star, on ' + b.name + ', inspires millions.', b.star);
 }
 function colonize(f, b, kind) {
@@ -462,22 +474,62 @@ function arrive(f) {
     return;
   }
   if (f.task && f.task.type === 'route') routeArrive(f);
+  else if (f.cargo) unloadCargo(f, true);
+}
+// ---------- freighters ----------
+// Out: settlers and food from the sending system. Back: trade (production + credits) paid by the size of the colony traded with.
+const TRADE_PAY = {settlement: [10, 20], city: [15, 30], core: [20, 40], home: [20, 40]};
+function ourColoniesAt(sid) { return ST(sid).bodies.map(B).filter(b => b.owner === 0 && b.col && !b.col.outpost); }
+function settlerSource(sid) { const L = ourColoniesAt(sid).filter(b => b.col.pop > 0.2); return L.find(b => b.col.pop >= popCap(b) * 0.99) || L.sort((a, b) => b.col.pop - a.col.pop)[0] || null; }
+function settlerTarget(sid) { return ourColoniesAt(sid).filter(b => b.col.pop < popCap(b) * 0.99).sort((a, b) => a.col.pop / popCap(a) - b.col.pop / popCap(b))[0] || null; }
+function hasLoad(f) { return !!(f.cargo && (f.cargo.pop > 0 || f.cargo.food > 0)); }
+function loadCargo(f, dst) {
+  if (!fleetCargo(f) || f.star == null || hasLoad(f)) return;
+  const sid = f.star, cap = cargoCap(f), c = f.cargo = f.cargo || {pop: 0, food: 0, trade: null};
+  const src = settlerSource(sid);
+  if (src && (dst == null || settlerTarget(dst))) { const n = Math.min(cap.pop, src.col.pop - 0.2); c.pop = n; src.col.pop -= n; }
+  const s = ST(sid);
+  if (ourColoniesAt(sid).length && systemFood(sid).net >= 0 && (s.stock || 0) >= 1) { const k = Math.min(cap.food, Math.floor(s.stock)); s.stock -= k; c.food = k; }
+}
+function unloadCargo(f, withTrade) {
+  const c = f.cargo, sid = f.star; if (!c || sid == null || !ourColoniesAt(sid).length) return;
+  if (c.pop > 0) { const t = settlerTarget(sid); if (t) { t.col.pop += c.pop; c.pop = 0; } }
+  if (c.food > 0) { ST(sid).stock = (ST(sid).stock || 0) + c.food; c.food = 0; }
+  if (withTrade && c.trade) {
+    const tr = c.trade; c.trade = null;
+    const L = ourColoniesAt(sid).filter(b => b.col.queue.length).sort((a, b) => b.col.pop - a.col.pop);
+    let bc = tr.bc; if (L.length) L[0].col.prog += tr.prod; else bc += Math.floor(tr.prod / 2);
+    S.bc = r1(S.bc + bc);
+    msg('A freighter brought trade home to ' + ST(sid).name + ': ' + (L.length ? '+' + tr.prod + ' production for ' + L[0].name + ', ' : '') + '+' + bc + ' credits.', sid, 'info');
+  }
+}
+function routeName(t) { return ST(t.a).name + ' → ' + ST(t.b).name; }
+function routeCheck(f) {
+  const t = f.task, cap = cargoCap(f), c = f.cargo || {};
+  const why = [];
+  if ((c.pop || 0) < cap.pop * 0.5) why.push(!settlerTarget(t.b) ? 'every colony at ' + ST(t.b).name + ' is full, so no settlers are carried' : 'no colony at ' + ST(t.a).name + ' can spare settlers');
+  if ((c.food || 0) < cap.food * 0.5) why.push('no spare food in store at ' + ST(t.a).name);
+  const w = why.join('; ');
+  if (w && w !== t.warn) msg('Freighter route ' + routeName(t) + ': ' + w + '.', t.a, 'route');
+  else if (!w && t.warn) msg('Freighter route ' + routeName(t) + ' is back to full loads.', t.a, 'info');
+  t.warn = w;
 }
 function routeArrive(f) {
   const t = f.task, here = f.star;
-  const cap = fleetCargo(f) * 4;
-  if (here === t.a) {
-    if (t.cargo === 'food') { const s = ST(here); const take = Math.min(cap, Math.floor(s.stock)); s.stock -= take; t.load = take; }
-    else { const src = ST(here).bodies.map(B).filter(b => b.owner === 0 && b.col && !b.col.outpost && b.col.pop > 0.2).sort((a, b) => b.col.pop - a.col.pop)[0]; const n = fleetCargo(f) * 0.002; if (src) { src.col.pop -= n; t.load = n; } else t.load = 0; }
-    f.dest = t.b;
-  } else if (here === t.b) {
-    if (t.load) {
-      if (t.cargo === 'food') { ST(here).stock += t.load; }
-      else { const dst = ST(here).bodies.map(B).filter(b => b.owner === 0 && b.col && !b.col.outpost).sort((a, b) => a.col.pop - b.col.pop)[0]; if (dst) dst.col.pop += t.load; }
-      t.delivered = (t.delivered || 0) + 1;
-    }
-    t.load = 0; f.dest = t.a;
-  }
+  if (here === t.b) {
+    unloadCargo(f, false);
+    const big = ourColoniesAt(here).sort((a, b) => b.col.pop - a.col.pop)[0];
+    f.cargo = f.cargo || {pop: 0, food: 0, trade: null};
+    if (big) { const p = TRADE_PAY[stageOf(big)] || TRADE_PAY.city; f.cargo.trade = {prod: p[0], bc: p[1]}; }
+    f.dest = t.a;
+  } else if (here === t.a) {
+    unloadCargo(f, true); loadCargo(f, t.b); routeCheck(f); f.dest = t.b;
+  } else f.dest = hasLoad(f) ? t.b : t.a;
+}
+function routeTaken(a, b, except) { return S.fleets.some(o => o !== except && o.task && o.task.type === 'route' && ((o.task.a === a && o.task.b === b) || (o.task.a === b && o.task.b === a))); }
+function startRoute(f, a, b) {
+  f.task = {type: 'route', a, b, warn: ''}; f.auto = false;
+  if (f.star != null && f.dest == null) routeArrive(f); else f.dest = hasLoad(f) ? b : a;
 }
 function processSurveys() {
   for (const f of S.fleets.slice()) {
@@ -553,7 +605,7 @@ function itemValid(b, it) {
   if (it.kind === 'outpost') { const t = B(it.id); return !!t && t.star === b.star && t.owner == null && hab(t) !== 'none' && !b.col.outpost; }
   if (it.kind === 'settle') { const t = B(it.id); return !!t && t !== b && t.star === b.star && !b.col.outpost && peopleCanLive(t) && (t.owner == null || (t.owner === 0 && !!t.col && !!t.col.outpost)); }
   const P = PROJECTS[it.id], c = b.col;
-  if ((c.outpost && !P.outpost) || (!c.outpost && P.outpostOnly) || (P.tech && !has(P.tech))) return false;
+  if ((c.outpost && !P.outpost) || (!c.outpost && P.outpostOnly) || (P.tech && !has(P.tech)) || (c.home && !P.space)) return false;
   if (P.giantOnly && b.cls !== 'gasgiant' && b.cls !== 'icegiant') return false;
   if (P.req && !c.proj[P.req]) return false;
   if ((c.proj[it.id] && !P.repeat) || upgradedFrom(c, it.id)) return false;

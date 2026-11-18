@@ -98,7 +98,7 @@ function buildLine(b) {
   return `<span class="dim">Building:</span> ${esc(itemName(it))}${it.n > 1 ? ' ×' + it.n : ''} <span class="dim">(${yrs} yr)${c.queue.length > 1 ? ' +' + (c.queue.length - 1) + ' more' : ''}</span>`;
 }
 function fleetName(f) { const cnt = {}; for (const sh of f.ships) { const n = design(sh.d).name; cnt[n] = (cnt[n] || 0) + 1; } return Object.entries(cnt).map(([n, c]) => (c > 1 ? c + '× ' : '') + esc(n)).join(', '); }
-function taskText(f) { const t = f.task; if (!t) return ''; if (t.type === 'survey') return (t.probe ? 'probe survey' : 'surveying') + ' (' + t.left + ' yr left)'; if (t.type === 'route') return 'trade route: ' + ST(t.a).name + ' ⇄ ' + ST(t.b).name + ' (' + t.cargo + ')'; return ''; }
+function taskText(f) { const t = f.task; if (!t) return ''; if (t.type === 'survey') return (t.probe ? 'probe survey' : 'surveying') + ' (' + t.left + ' yr left)'; if (t.type === 'route') return 'trade route ' + esc(routeName(t)); return ''; }
 
 // ---------- colony ----------
 function outputHTML(b, o) {
@@ -153,8 +153,9 @@ function colonyPanel(b) {
       h += ownOut.map(t => row(t, 'settle')).join('');
     }
   } else if (tab === 'proj') {
+    if (c.home) h += `<div class="tiny dim" style="padding:2px 6px 6px">Earth's own economy is not yours to build on: it grows through the space budget. Only space projects can be built here.</div>`;
     for (const id in PROJECTS) {
-      const P = PROJECTS[id]; if (P.unique || P.outpostOnly || (P.tech && !has(P.tech))) continue; if (c.proj[id] && !P.repeat) continue;
+      const P = PROJECTS[id]; if (P.unique || P.outpostOnly || (P.tech && !has(P.tech)) || (c.home && !P.space)) continue; if (c.proj[id] && !P.repeat) continue;
       if (Object.keys(c.proj).some(k => PROJECTS[k] && PROJECTS[k].replaces === id)) continue;
       const why = projReason(b, id), cost = projCost(id);
       h += `<div class="opt" ${why ? `style="opacity:.45;cursor:default"` : `data-a="qadd" data-v="${b.id}:proj:${id}"`}><span class="nm">${P.name}<div class="tiny dim">${esc(why || P.desc)}</div></span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`;
@@ -170,7 +171,7 @@ function shipListHTML(b, o) {
   if (base) h += `<div class="small dim" style="padding:6px">${base}. Build one first (Projects tab).</div>`;
   for (const d of S.designs) {
     const why = base || shipReason(b, d), cost = shipCost(d, b);
-    h += `<div class="opt" ${why ? 'style="opacity:.45;cursor:default"' : `data-a="qadd" data-v="${b.id}:ship:${d.id}"`}>${designIcon(d, 30)}<span class="nm">${esc(d.name)}<div class="tiny dim">${!base && why ? esc(why) : designSummary(d)}</div></span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`;
+    h += `<div class="opt" ${why ? 'style="opacity:.45;cursor:default"' : `data-a="qadd" data-v="${b.id}:ship:${d.id}"`}>${designIcon(d, 30)}<span class="nm">${esc(d.name)}<div class="tiny dim">${!base && why ? esc(why) : designSummary(d)}</div>${!why && designHas(d, 'cargo') && colonyStars().length < 2 ? '<div class="tiny amber">Trade routes need a colony at both ends.</div>' : ''}</span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`;
   }
   return h;
 }
@@ -192,24 +193,29 @@ ACT.buy = v => { if (buyItem(B(+v))) toast('Bought: finishes next year'); render
 function fleetPanel(f) {
   const where = f.dest != null ? `En route to ${esc(ST(f.dest).name)} · ${etaTo(f, f.dest)} year${etaTo(f, f.dest) > 1 ? 's' : ''} left` : f.star != null ? 'At ' + esc(ST(f.star).name) : 'In deep space';
   let h = `<div class="hdr"><div><h2>${fleetName(f)}</h2><div class="dim small">${where}</div></div><button class="x" data-a="close">✕</button></div>
-    <div class="small dim">Speed ${pct(fleetSpeed(f))} of light (${fleetSpeed(f).toFixed(2)} ly per year) · telescope ${Math.round(fleetTel(f))} ly${fleetCargo(f) ? ' · carries ' + fleetCargo(f) * 4 + ' food per trip' : ''}</div>
+    <div class="small dim">Speed ${pct(fleetSpeed(f))} of light (${fleetSpeed(f).toFixed(2)} ly per year) · telescope ${Math.round(fleetTel(f))} ly${fleetCargo(f) ? ' · carries ' + people(cargoCap(f).pop) + ' settlers and ' + Math.round(cargoCap(f).food) + ' food per trip' : ''}</div>
     <div class="small acc" style="margin-top:6px">Click any known star to send this ship there.</div>
     <div style="margin-top:6px"><button class="btn sm ${f.auto ? 'on' : ''}" data-a="autoExp" data-v="${f.id}">${f.auto ? 'Auto-explore: on (click to stop)' : 'Auto-explore'}</button></div>`;
-  if (f.task) h += `<div class="card small" style="margin-top:8px">${taskText(f)} ${f.task.type === 'route' ? `<button class="btn sm" data-a="endRoute" data-v="${f.id}">End route</button>` : ''}</div>`;
+  if (f.task && f.task.type === 'route') {
+    const t = f.task;
+    h += `<div class="card small" style="margin-top:8px"><b>Trade route</b>: settlers and food go ${esc(ST(t.a).name)} → ${esc(ST(t.b).name)}, trade comes back to ${esc(ST(t.a).name)}.
+      ${t.warn ? `<div class="bad tiny" style="margin-top:3px">Not at full value: ${esc(t.warn)}.</div>` : ''}
+      <div class="row" style="gap:5px;margin-top:6px"><button class="btn sm" data-a="routeSetup" data-v="${f.id}">Change route</button><button class="btn sm" data-a="endRoute" data-v="${f.id}">End route</button></div></div>`;
+  } else if (f.task) h += `<div class="card small" style="margin-top:8px">${taskText(f)}</div>`;
+  if (f.cargo && (f.cargo.pop > 0 || f.cargo.food > 0 || f.cargo.trade)) {
+    const c = f.cargo, bits = [];
+    if (c.pop > 0) bits.push(people(c.pop) + ' settlers'); if (c.food > 0) bits.push(Math.round(c.food) + ' food'); if (c.trade) bits.push('trade goods worth ' + c.trade.prod + ' production and ' + c.trade.bc + ' credits');
+    h += `<div class="small" style="margin-top:6px">Carrying: <b>${bits.join(', ')}</b>${f.dest == null && !f.task && (c.pop > 0 || c.food > 0) ? '<div class="tiny dim">Unloads when it reaches one of your colonies, or when a colony is founded here.</div>' : ''}</div>`;
+  }
+  if (fleetCargo(f) && !(f.task && f.task.type === 'route')) h += `<div style="margin-top:6px"><button class="btn sm" data-a="routeSetup" data-v="${f.id}">Start a trade route</button></div>`;
+  if (UI.routeSetup === f.id) h += routeSetupHTML(f);
   if (f.star != null && f.dest == null) {
     const s = ST(f.star), acts = [];
     if (fleetHas(f, 'lab') && !S.surveyed[s.id] && !(f.task && f.task.type === 'survey')) acts.push(`<button class="btn sm primary" data-a="survey" data-v="${f.id}">Survey system (${has('survey_drones') ? 1 : 3} yr)</button>`);
     if (canProbeSurvey(f) && !fleetHas(f, 'lab')) acts.push(`<button class="btn sm" data-a="probeSurvey" data-v="${f.id}" title="The ship is used up when the survey finishes">Probe survey (5 yr, uses up the ship)</button>`);
     if (canInvestigate(f)) acts.push(`<button class="btn sm amber" data-a="investigate" data-v="${f.id}">Investigate strange readings</button>`);
-    if (fleetCargo(f) && colonyStars().includes(s.id)) acts.push(`<button class="btn sm" data-a="routeSetup" data-v="${f.id}">Start a trade route from here</button>`);
     if (fleetHas(f, 'colony') || fleetHas(f, 'outpost')) acts.push(`<button class="btn sm" data-a="star" data-v="${s.id}">Choose a world to settle ▸</button>`);
     if (acts.length) h += `<div class="sec">Actions</div><div class="row wrap" style="gap:5px">${acts.join('')}</div>`;
-    if (UI.routeSetup === f.id) {
-      const dests = colonyStars().filter(x => x !== s.id);
-      h += `<div class="card" style="margin-top:8px"><div class="small">Trade route from <b>${esc(s.name)}</b> to:</div><select id="rdest" style="width:100%;margin:5px 0">${dests.map(x => `<option value="${x}">${esc(ST(x).name)} (${etaTo(f, x)} yr each way)</option>`).join('')}</select>
-        <div class="small">Carry: <select id="rcargo"><option value="food">Food (from this system's store)</option><option value="settlers">Settlers</option></select></div>
-        ${dests.length ? `<button class="btn sm primary" style="margin-top:6px" data-a="routeGo" data-v="${f.id}">Start route</button>` : '<div class="small bad">You need a second colony system first.</div>'}</div>`;
-    }
   }
   h += `<div class="sec">Ships (${f.ships.length})</div>`;
   const groups = {}; for (const sh of f.ships) (groups[sh.d] = groups[sh.d] || []).push(sh);
@@ -229,11 +235,33 @@ ACT.probeSurvey = v => { const f = S.fleets.find(x => x.id === +v); f.task = {ty
 ACT.autoExp = v => { const f = S.fleets.find(x => x.id === +v); f.auto = !f.auto; if (f.auto && f.dest == null && !f.task) { const t = exploreTarget(f); if (t) { orderMove(f, t.id); toast('Exploring: heading to ' + ST(t.id).name); } else { f.auto = false; toast('No unexplored stars on our charts'); } } UI.dirty = true; renderSide(); };
 ACT.survey = v => { const f = S.fleets.find(x => x.id === +v); f.task = {type: 'survey', left: has('survey_drones') ? 1 : 3}; renderSide(); toast('Survey started'); };
 ACT.endRoute = v => { const f = S.fleets.find(x => x.id === +v); f.task = null; renderSide(); };
-ACT.routeSetup = v => { UI.routeSetup = +v; renderSide(); };
+function routeSetupHTML(f) {
+  const stars = colonyStars();
+  if (stars.length < 2) return `<div class="card small" style="margin-top:8px">Trade routes need a colony at both ends. Found a colony at another star first.</div>`;
+  const R = UI.route || {};
+  if (R.f !== f.id) {
+    const pops = sid => ourColoniesAt(sid).reduce((t, b) => t + b.col.pop, 0);
+    const big = stars.slice().sort((x, y) => pops(y) - pops(x));
+    let a = big[0], b = f.star != null && f.star !== a && stars.includes(f.star) ? f.star : big[1];
+    if (f.task && f.task.type === 'route') { a = f.task.a; b = f.task.b; }
+    UI.route = {f: f.id, a, b};
+  }
+  const r = UI.route, opts = sel => stars.map(x => `<option value="${x}" ${x === sel ? 'selected' : ''}>${esc(ST(x).name)}</option>`).join('');
+  const taken = r.a !== r.b && routeTaken(r.a, r.b, f);
+  return `<div class="card small" style="margin-top:8px"><b>Trade route</b>
+    <div class="row" style="gap:5px;margin:6px 0;align-items:center"><select data-c="routeA" style="flex:1">${opts(r.a)}</select><button class="btn sm" data-a="routeSwap" title="Swap direction">⇄</button><select data-c="routeB" style="flex:1">${opts(r.b)}</select></div>
+    <div class="tiny dim">Settlers and food go ${esc(ST(r.a).name)} → ${esc(ST(r.b).name)}. Trade comes back to ${esc(ST(r.a).name)}, paid by the size of the colony at ${esc(ST(r.b).name)}. ${r.a !== r.b ? 'About ' + (etaTo({x: ST(r.a).x, y: ST(r.a).y, z: ST(r.a).z, ships: f.ships}, r.b)) + ' years each way.' : ''}</div>
+    ${r.a === r.b ? '<div class="tiny bad">Pick two different systems.</div>' : taken ? '<div class="tiny bad">Another freighter already runs a route between these systems.</div>' : ''}
+    <div class="row" style="gap:5px;margin-top:6px"><button class="btn sm primary" data-a="routeGo" data-v="${f.id}" ${r.a === r.b || taken ? 'disabled' : ''}>${f.task && f.task.type === 'route' ? 'Change route' : 'Start route'}</button><button class="btn sm" data-a="routeCancel">Cancel</button></div></div>`;
+}
+ACT.routeSetup = v => { UI.routeSetup = +v; UI.route = null; renderSide(); };
+ACT.routeCancel = () => { UI.routeSetup = null; UI.route = null; renderSide(); };
+ACT.routeA = v => { UI.route.a = +v; renderSide(); };
+ACT.routeB = v => { UI.route.b = +v; renderSide(); };
+ACT.routeSwap = () => { const r = UI.route; [r.a, r.b] = [r.b, r.a]; renderSide(); };
 ACT.routeGo = v => {
-  const f = S.fleets.find(x => x.id === +v); const b2 = +$('#rdest').value, cargo = $('#rcargo').value;
-  f.task = {type: 'route', a: f.star, b: b2, cargo, load: 0};
-  routeArrive(f); UI.routeSetup = null; UI.dirty = true; renderSide(); toast('Trade route started');
+  const f = S.fleets.find(x => x.id === +v), r = UI.route; if (!f || !r || r.a === r.b || routeTaken(r.a, r.b, f)) return;
+  startRoute(f, r.a, r.b); UI.routeSetup = null; UI.route = null; UI.dirty = true; renderSide(); toast('Trade route: ' + routeName(f.task));
 };
 ACT.fsel = v => { const [did, d] = v.split(':'); const f = S.fleets.find(x => x.id === UI.viewId); const list = f.ships.filter(sh => sh.d === did); if (+d > 0) { const sh = list.find(sh => !UI.fleetSel[sh.id]); if (sh) UI.fleetSel[sh.id] = true; } else { const sh = list.slice().reverse().find(sh => UI.fleetSel[sh.id]); if (sh) delete UI.fleetSel[sh.id]; } renderSide(); };
 ACT.split = v => { const f = S.fleets.find(x => x.id === +v); const ids = f.ships.filter(sh => UI.fleetSel[sh.id]).map(sh => sh.id); const nf = splitFleet(f, ids); UI.fleetSel = {}; selectFleet(nf.id); };
