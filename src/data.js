@@ -1,6 +1,6 @@
 'use strict';
 // ===================== STARWAKE v2 — STATIC DATA =====================
-const GAME_VERSION = 6;
+const GAME_VERSION = 7;
 const SAVE_FORMAT = 2;
 const START_YEAR = 2326;
 const LENGTHS = {
@@ -48,11 +48,11 @@ const HAB = {
 const HAB_ORDER = ['none', 'outpost', 'hostile', 'harsh', 'livable', 'garden'];
 // colony stages
 const STAGES = {
-  outpost:    {name: 'Outpost',    prod: 2,  rp: 0,   bc: -1,  food: 0,  eat: 0},
-  settlement: {name: 'Settlement', prod: 2,  rp: 1,   bc: 1,   food: 1,  eat: 1},
-  city:       {name: 'City',       prod: 6,  rp: 4,   bc: 4,   food: 4,  eat: 4},
-  core:       {name: 'Core World', prod: 15, rp: 10,  bc: 10,  food: 10, eat: 10},
-  home:       {name: 'Homeworld',  prod: 40, rp: 25,  bc: 30,  food: 30, eat: 40},
+  outpost:    {name: 'Outpost',    prod: 3,  rp: 0,   bc: -1,  food: 0,  eat: 0},
+  settlement: {name: 'Settlement', prod: 3,  rp: 1.5, bc: 1.5, food: 1,  eat: 1},
+  city:       {name: 'Province',   prod: 8,  rp: 5,   bc: 5,   food: 4,  eat: 4},
+  core:       {name: 'Core World', prod: 20, rp: 13,  bc: 13,  food: 10, eat: 10},
+  home:       {name: 'Homeworld',  prod: 25, rp: 16,  bc: 20,  food: 30, eat: 40},
 };
 const STAGE_ORDER = ['outpost', 'settlement', 'city', 'core', 'home'];
 const FOCUS = {

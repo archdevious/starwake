@@ -154,23 +154,43 @@ function drawMap() {
   boxes.push(...dots);
   // fleets
   UI.fleetBoxes = [];
-  const byStar = {};
+  const byStar = {}, moving = [];
   for (const f of S.fleets) {
     if (f.dest == null && f.star != null) { (byStar[f.star] = byStar[f.star] || []).push(f); continue; }
     const p = proj(f.x, f.y, f.z), d = ST(f.dest), q = proj(d.x, d.y, d.z);
     const ang = Math.atan2(q[1] - p[1], q[0] - p[0]);
-    drawShipIcon(x, p[0], p[1], f, ang, UI.selFleet === f.id);
-    if (!(f.task && f.task.type === 'route')) {
-      x.font = '10.5px Segoe UI, sans-serif'; const t = etaTo(f, f.dest) + ' yr', tw = x.measureText(t).width + 4;
-      const cands = [[9, -15], [9, 3], [-9 - tw, -15], [-9 - tw, 3]].map(([dx, dy]) => ({x: p[0] + dx, y: p[1] + dy, w: tw, h: 12}));
-      const free = cands.find(b => !boxes.some(o => b.x < o.x + o.w && b.x + b.w > o.x && b.y < o.y + o.h && b.y + b.h > o.y)) || (UI.selFleet === f.id ? cands[0] : null);
-      if (free) { boxes.push(free); x.fillStyle = '#a8dcff'; x.textAlign = 'left'; x.fillText(t, free.x + 2, free.y + 10); }
+    let px = p[0], py = p[1];
+    // keep icons clear of nearby stars so stars stay easy to click
+    for (const sp of UI.pts) { const dx = px - sp.x, dy = py - sp.y, dd = Math.hypot(dx, dy); if (dd < 22) { const ux = dd > 0.5 ? dx / dd : -Math.sin(ang), uy = dd > 0.5 ? dy / dd : Math.cos(ang); px = sp.x + ux * 22; py = sp.y + uy * 22; } }
+    moving.push({f, px, py, ang});
+  }
+  // spread ships that would sit on top of each other
+  const groups = [];
+  for (const m of moving) { const g = groups.find(g => Math.hypot(g[0].px - m.px, g[0].py - m.py) < 12); if (g) g.push(m); else groups.push([m]); }
+  for (const g of groups) {
+    if (g.length > 3) {
+      const m = g[0]; drawShipIcon(x, m.px, m.py, m.f, m.ang, g.some(z => UI.selFleet === z.f.id));
+      x.fillStyle = '#ffd678'; x.font = 'bold 10px Segoe UI, sans-serif'; x.textAlign = 'left'; x.fillText('×' + g.length, m.px + 9, m.py + 4);
+      UI.fleetBoxes.push({x: m.px - 10, y: m.py - 10, w: 34, h: 20, group: g.map(z => z.f.id)});
+      continue;
     }
-    UI.fleetBoxes.push({x: p[0] - 9, y: p[1] - 9, w: 18, h: 18, f: f.id});
+    g.forEach((m, i) => {
+      const off = i === 0 ? 0 : (i % 2 ? 1 : -1) * Math.ceil(i / 2) * 13;
+      m.px += -Math.sin(m.ang) * off; m.py += Math.cos(m.ang) * off;
+      const f = m.f;
+      drawShipIcon(x, m.px, m.py, f, m.ang, UI.selFleet === f.id);
+      if (!(f.task && f.task.type === 'route')) {
+        x.font = '10.5px Segoe UI, sans-serif'; const t = etaTo(f, f.dest) + ' yr', tw = x.measureText(t).width + 4;
+        const cands = [[9, -15], [9, 3], [-9 - tw, -15], [-9 - tw, 3]].map(([dx, dy]) => ({x: m.px + dx, y: m.py + dy, w: tw, h: 12}));
+        const free = cands.find(b => !boxes.some(o => b.x < o.x + o.w && b.x + b.w > o.x && b.y < o.y + o.h && b.y + b.h > o.y)) || (UI.selFleet === f.id ? cands[0] : null);
+        if (free) { boxes.push(free); x.fillStyle = '#a8dcff'; x.textAlign = 'left'; x.fillText(t, free.x + 2, free.y + 10); }
+      }
+      UI.fleetBoxes.push({x: m.px - 9, y: m.py - 9, w: 18, h: 18, f: f.id});
+    });
   }
   for (const sid in byStar) {
     const s = ST(+sid); const p = proj(s.x, s.y, s.z);
-    byStar[sid].forEach((f, i) => { const fx = p[0] + 16, fy = p[1] - 12 + i * 13; drawShipIcon(x, fx, fy, f, 0, UI.selFleet === f.id); x.fillStyle = '#d8e6f8'; x.font = '10px Segoe UI, sans-serif'; x.textAlign = 'left'; if (f.ships.length > 1) x.fillText(f.ships.length, fx + 8, fy + 3.5); UI.fleetBoxes.push({x: fx - 8, y: fy - 6, w: 22, h: 12, f: f.id}); });
+    byStar[sid].forEach((f, i) => { const fx = p[0] + 26, fy = p[1] - 16 + i * 17; drawShipIcon(x, fx, fy, f, 0, UI.selFleet === f.id); x.fillStyle = '#d8e6f8'; x.font = '10px Segoe UI, sans-serif'; x.textAlign = 'left'; if (f.ships.length > 1) x.fillText(f.ships.length, fx + 8, fy + 3.5); UI.fleetBoxes.push({x: fx - 9, y: fy - 7, w: 24, h: 14, f: f.id}); });
   }
   // move preview
   const sf = UI.selFleet != null ? S.fleets.find(f => f.id === UI.selFleet) : null;
@@ -193,7 +213,7 @@ function drawShipIcon(x, px, py, f, ang, sel) {
 }
 function mapLoop() { if (S && UI.dirty && $('#app').style.display !== 'none') drawMap(); requestAnimationFrame(mapLoop); }
 function hitStar(sx, sy) { let best = null, bd = 16; for (const p of UI.pts) { const d = Math.hypot(p.x - sx, p.y - sy); if (d < bd) { bd = d; best = p.id; } } return best; }
-function hitFleet(sx, sy) { for (let i = UI.fleetBoxes.length - 1; i >= 0; i--) { const b = UI.fleetBoxes[i]; if (sx >= b.x && sx <= b.x + b.w && sy >= b.y && sy <= b.y + b.h) return b.f; } return null; }
+function hitFleet(sx, sy) { for (let i = UI.fleetBoxes.length - 1; i >= 0; i--) { const b = UI.fleetBoxes[i]; if (sx >= b.x && sx <= b.x + b.w && sy >= b.y && sy <= b.y + b.h) return b.group ? {group: b.group} : b.f; } return null; }
 function initMapInput() {
   const c = cv();
   c.addEventListener('contextmenu', e => e.preventDefault());
@@ -221,9 +241,12 @@ function initMapInput() {
     const D = UI.drag; UI.drag = null; c.style.cursor = 'default';
     if (!D || D.moved || UI.busy) return;
     const r = c.getBoundingClientRect(); const sx = e.clientX - r.left, sy = e.clientY - r.top;
-    const fid = hitFleet(sx, sy), sid = hitStar(sx, sy);
+    const sid = hitStar(sx, sy), sp = sid != null ? UI.pts.find(p => p.id === sid) : null;
+    const nearStar = sp && Math.hypot(sp.x - sx, sp.y - sy) < 10;
+    const fid = nearStar ? null : hitFleet(sx, sy);
     const sf = UI.selFleet != null ? S.fleets.find(f => f.id === UI.selFleet) : null;
     if (e.button === 2) { if (sf && sid != null) sendFleet(sf, sid); return; }
+    if (fid != null && typeof fid === 'object') { pickFleet(fid.group); return; }
     if (fid != null) { selectFleet(fid); return; }
     if (sid != null) { if (sf && sid !== sf.star) { sendFleet(sf, sid); return; } selectStar(sid); return; }
     UI.selFleet = null; UI.selStar = null; closeSide();
@@ -252,6 +275,10 @@ function sendFleet(f, sid) {
   toast('Heading to ' + ST(sid).name + ': ' + etaTo(f, sid) + ' year' + (etaTo(f, sid) > 1 ? 's' : ''));
   UI.dirty = true; renderSide();
 }
+function pickFleet(ids) {
+  modal({title: 'Choose a ship', w: 420, body: ids.map(id => { const f = S.fleets.find(x => x.id === id); return f ? `<div class="opt" data-a="pickF" data-v="${id}"><span class="nm">${fleetName(f)}<div class="tiny dim">to ${esc(ST(f.dest).name)} · ${etaTo(f, f.dest)} yr</div></span></div>` : ''; }).join('')});
+}
+ACT.pickF = v => { ACT.mclose(); selectFleet(+v); };
 function selectStar(sid) { UI.selStar = sid; UI.selFleet = null; UI.view = 'star'; UI.viewId = sid; UI.dirty = true; renderSide(); }
 function selectFleet(fid) { const f = S.fleets.find(x => x.id === fid); if (!f) return; UI.selFleet = fid; UI.selStar = f.star; UI.view = 'fleet'; UI.viewId = fid; UI.fleetSel = {}; UI.routeSetup = null; UI.dirty = true; renderSide(); }
 function selectColony(bid) { UI.selStar = B(bid).star; UI.selFleet = null; UI.view = 'colony'; UI.viewId = bid; UI.dirty = true; renderSide(); }

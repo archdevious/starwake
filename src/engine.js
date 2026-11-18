@@ -338,7 +338,7 @@ function colonize(f, b, kind) {
   if (kind === 'colony') {
     const add = settlerCount() * pods;
     if (b.owner === 0 && b.col && !b.col.outpost) { b.col.pop += add; msg(Math.round(add * 1e6).toLocaleString() + ' new settlers arrived on ' + b.name + '.', b.star, 'colony'); }
-    else { const old = b.col; b.owner = 0; b.col = {pop: add, focus: 'balanced', proj: old ? old.proj : {}, queue: [], prog: 0, founded: S.year}; msg('A new colony is founded on ' + b.name + ' with ' + Math.round(add * 1e6).toLocaleString() + ' settlers.', b.star, 'colony'); journal('Founded a colony on ' + b.name + '.', b.star); }
+    else { const old = b.col; b.owner = 0; b.col = {pop: add, focus: 'balanced', proj: old ? old.proj : {}, queue: old ? old.queue.filter(q => !(q.kind === 'proj' && PROJECTS[q.id] && PROJECTS[q.id].outpostOnly)) : [], prog: old ? old.prog : 0, founded: S.year}; msg((old ? 'The outpost on ' + b.name + ' became a colony' : 'A new colony is founded on ' + b.name) + ' with ' + Math.round(add * 1e6).toLocaleString() + ' settlers.', b.star, 'colony'); journal('Founded a colony on ' + b.name + '.', b.star); }
   } else { b.owner = 0; b.col = {pop: 0, outpost: true, mode: 'build', focus: 'balanced', proj: {}, queue: [], prog: 0, founded: S.year}; msg('A mining outpost is established on ' + b.name + '.', b.star, 'colony'); }
   cleanupFleets();
   return true;
