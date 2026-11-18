@@ -29,7 +29,7 @@ ACT.newsClose = () => { $('#news').classList.remove('show'); };
 
 // ---------- anomaly events ----------
 function openEvent(f) {
-  const s = ST(f.star), ev = eventOf(s);
+  const s = ST(f.star), ev = eventOf(s); sfx('discover');
   const body = `<div class="evt"><div class="dim small">${esc(s.name)} · ${S.year}</div><p>${esc(ev.text)}</p>${ev.ch.map((c, i) => `<button class="btn choice" data-a="mres" data-v="${i}">${esc(c.t)}</button>`).join('')}</div>`;
   modal({title: '◆ ' + esc(ev.title), w: 620, noClose: true, kind: 'event', body}).then(v => {
     const r = resolveChoice(f, +v);
@@ -153,7 +153,7 @@ function drawHistChart(cvs) {
   for (const s of series) { c.strokeStyle = s.color; c.lineWidth = 2.4; c.beginPath(); hist.forEach((r, i) => { const v = r[s.k] * (s.mul || 1); i ? c.lineTo(X(i), Y(v)) : c.moveTo(X(i), Y(v)); }); c.stroke(); }
 }
 async function showEnd() {
-  UI.busy = true; const o = S.over, sc = score();
+  UI.busy = true; const o = S.over, sc = score(); sfx('end');
   if (!S.recorded) { S.recorded = true; try { const hof = JSON.parse(localStorage.getItem('starwake.hof') || '[]');
     hof.push({date: Date.now(), name: S.empire.name, race: 'Humans', color: S.empire.color, result: o.result, turn: S.turn, year: S.year, score: sc.total, size: LENGTHS[S.len].label, shape: '', rivals: 0, version: GAME_VERSION});
     localStorage.setItem('starwake.hof', JSON.stringify(hof)); localStorage.removeItem(SKEY('auto')); } catch (e) {} }
@@ -185,7 +185,8 @@ function renderTitleMenu() {
       <button class="btn ${auto ? '' : 'primary'}" style="padding:12px" data-a="tNew">New Game</button>
       <button class="btn" style="padding:12px" data-a="openSaves" data-v="load">Load Game</button>
       <button class="btn" style="padding:12px" data-a="openHof">🏆 Hall of Fame</button>
-      <button class="btn" style="padding:12px" data-a="openHelp">How to Play</button></div>
+      <button class="btn" style="padding:12px" data-a="openHelp">How to Play</button>
+      <button class="btn" style="padding:12px" data-a="openSettings">Settings</button></div>
     <div style="position:fixed;right:14px;bottom:10px" class="tiny faint">Starwake v${GAME_VERSION}</div>`;
 }
 ACT.tContinue = () => loadFrom('auto');
@@ -218,9 +219,12 @@ ACT.tStart = () => { ngKeepName(); newGame({len: NG.len, story: NG.story, name: 
 
 // ---------- settings ----------
 function settingsHTML() {
-  return `<div class="row sb"><div><b>Nearest systems</b><div class="tiny dim">When you select a star, number its closest systems on the map and list them.</div></div>
+  const slider = (key, label, hint) => `<div class="setline"><div><b>${label}</b><div class="tiny dim">${hint}</div></div><div class="row" style="gap:8px"><input type="range" min="0" max="100" step="5" value="${SETTINGS[key]}" data-c="setVol" data-k="${key}" style="width:150px"><span class="small" style="width:36px;text-align:right">${SETTINGS[key] ? SETTINGS[key] + '%' : 'Off'}</span></div></div>`;
+  return slider('music', 'Music', 'Slow ambient music, generated live as you play.') + slider('sfx', 'Sound effects', 'Buttons, arrivals, discoveries and warnings.') +
+    `<div class="setline"><div><b>Nearest systems</b><div class="tiny dim">When you select a star, number its closest systems on the map and list them.</div></div>
     <select data-c="setNear">${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => `<option value="${n}" ${SETTINGS.near === n ? 'selected' : ''}>${n ? n : 'Off'}</option>`).join('')}</select></div>
-    <div class="tiny dim" style="margin-top:12px">Settings are kept in this browser and apply to every game.</div>`;
+    <div class="tiny dim" style="margin-top:12px">Settings are kept in this browser and apply to every game. Sound starts after your first click.</div>`;
 }
+ACT.setVol = (v, el) => { SETTINGS[el.dataset.k] = +v; saveSettings(); audioVolumes(); if (el.dataset.k === 'sfx') sfx('arrive'); modalBody(settingsHTML()); };
 ACT.openSettings = () => modal({title: 'Settings', w: 520, body: settingsHTML(), foot: `<button class="btn primary" data-a="mclose">Done</button>`});
 ACT.setNear = v => { SETTINGS.near = +v; saveSettings(); UI.dirty = true; if (S) renderSide(); };

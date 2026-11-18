@@ -13,7 +13,7 @@ function startPlaying(isNew) {
 const FF_QUIET = new Set(['spot', 'info']);
 async function runEndTurn(skip) {
   if (UI.busy || !S || S.over || modalOpen()) return;
-  UI.busy = true; $('#endturn').disabled = true; $('#ffwd').disabled = true;
+  UI.busy = true; $('#endturn').disabled = true; $('#ffwd').disabled = true; sfx('turn');
   try {
     let n = 0; const allMsgs = [];
     do {
@@ -24,7 +24,7 @@ async function runEndTurn(skip) {
     } while (n < 40);
     if (skip) S.msgs = allMsgs;
     autosave();
-    refresh(); showNews();
+    refresh(); showNews(); newsSound(S.msgs);
     if (S.over) { await showEnd(); return; }
     if (!S.res && availableTechs().length) await ACT.openResearch();
   } catch (e) { console.error(e); toast('Error: ' + e.message, 6000); }

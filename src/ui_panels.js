@@ -65,8 +65,9 @@ function starPanel(sid) {
     for (const bid of s.bodies) {
       const b = B(bid), ours = b.owner === 0 && b.col;
       const st = ours ? stageOf(b) : null;
-      h += `<div class="card ${ours ? 'click' : ''}" ${ours ? `data-a="colony" data-v="${b.id}"` : ''}><div class="body">${planetBall(b, 32)}<div style="flex:1;min-width:0"><b>${bodyName(b)}</b><div class="dim small">${sizeWord(b)}${lc(PCLASS[b.cls].name)}</div>${bodyFacts(b)}
-        ${ours ? `<div class="row sb small" style="margin-top:5px"><span class="good">Ours · ${STAGES[st].name}${b.col.outpost ? '' : ' · ' + people(b.col.pop)}</span><span class="acc">Manage ▸</span></div>` : ''}
+      const idle = ours && !b.col.queue.length && !supplyTarget(b);
+      h += `<div class="card ${ours ? 'click' : ''} ${idle ? 'idlecard' : ''}" ${ours ? `data-a="colony" data-v="${b.id}"` : ''} ${idle ? 'title="Nothing is being built here"' : ''}><div class="body">${planetBall(b, 32)}<div style="flex:1;min-width:0"><b>${bodyName(b)}</b><div class="dim small">${sizeWord(b)}${lc(PCLASS[b.cls].name)}</div>${bodyFacts(b)}
+        ${ours ? `<div class="row sb small" style="margin-top:5px"><span class="good">Ours · ${STAGES[st].name}${b.col.outpost ? '' : ' · ' + people(b.col.pop)}${idle ? ' <span class="bad">· nothing being built</span>' : ''}</span><span class="acc" style="white-space:nowrap">Manage ▸</span></div>` : ''}
         ${bodyActions(b) ? `<div class="row wrap" style="margin-top:6px;gap:5px">${bodyActions(b)}</div>` : ''}</div></div></div>`;
     }
   }
@@ -105,13 +106,17 @@ function colonyPanel(b) {
     c.queue.forEach((q, i) => { h += `<div class="qitem"><span class="dim tiny">${i + 1}</span><span class="nm">${esc(itemName(q))}</span>${q.kind === 'ship' ? `<button class="btn sm" data-a="qn" data-v="${b.id}:${i}:-1">−</button><b class="small">${q.n || 1}</b><button class="btn sm" data-a="qn" data-v="${b.id}:${i}:1">+</button>` : ''}${i ? `<button class="x" data-a="qup" data-v="${b.id}:${i}">▲</button>` : ''}<button class="x" data-a="qdel" data-v="${b.id}:${i}">✕</button></div>`; });
   } else h += `<div class="card small dim">Nothing being built: production is sold for ${Math.floor(o.prod / 2)} credit${Math.floor(o.prod / 2) === 1 ? '' : 's'} a year.</div>`;
   const tab = UI.buildTab;
-  h += `<div class="row" style="margin:8px 0 4px;gap:4px"><button class="btn sm ${tab === 'proj' ? 'on' : ''}" data-a="btab" data-v="proj">Projects</button><button class="btn sm ${tab === 'ship' ? 'on' : ''}" data-a="btab" data-v="ship">Ships</button></div>`;
-  if (tab === 'proj') {
-    for (const t of outpostTargets(b)) {
+  const ots = outpostTargets(b);
+  h += `<div class="row" style="margin:8px 0 4px;gap:4px"><button class="btn sm ${tab === 'proj' ? 'on' : ''}" data-a="btab" data-v="proj">Projects</button><button class="btn sm ${tab === 'outp' ? 'on' : ''}" data-a="btab" data-v="outp">Outposts${ots.length ? ' (' + ots.length + ')' : ''}</button><button class="btn sm ${tab === 'ship' ? 'on' : ''}" data-a="btab" data-v="ship">Ships</button></div>`;
+  if (tab === 'outp') {
+    h += `<div class="tiny dim" style="padding:2px 6px 6px">Robotic outposts in this system: production, no people, 1 credit a year upkeep.</div>`;
+    if (!ots.length) h += `<div class="small dim" style="padding:6px">Every world in this system that can hold an outpost is already claimed.</div>`;
+    for (const t of ots) {
       if (c.queue.some(q => q.kind === 'outpost' && q.id === t.id)) continue;
       const cost = itemCost(b, {kind: 'outpost', id: t.id});
-      h += `<div class="opt" data-a="qadd" data-v="${b.id}:outpost:${t.id}"><span class="nm">Outpost on ${esc(t.name)}<div class="tiny dim">A robotic outpost in this system: production, no people. Costs 1 credit a year.</div></span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`;
+      h += `<div class="opt" data-a="qadd" data-v="${b.id}:outpost:${t.id}"><span class="nm">Outpost on ${esc(t.name)}<div class="tiny dim">${lc(PCLASS[t.cls].name)}${S.surveyed[b.star] ? ' · ' + MINERALS[t.min].toLowerCase() + ' minerals' : ''}</div></span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`;
     }
+  } else if (tab === 'proj') {
     for (const id in PROJECTS) {
       const P = PROJECTS[id]; if (P.unique || P.outpostOnly || (P.tech && !has(P.tech))) continue; if (c.proj[id] && !P.repeat) continue;
       const why = projReason(b, id), cost = projCost(id);

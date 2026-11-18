@@ -15,7 +15,7 @@ function hexA(c, a) { const n = parseInt(c.slice(1), 16); return `rgba(${n >> 16
 const UI = {cam: {tx: 0, ty: 0, tz: 0, yaw: 0.6, pitch: 0.95, zoom: 14}, selStar: null, selFleet: null, view: null, viewId: null, hoverStar: null, busy: false,
   dirty: true, drag: null, pts: [], fleetBoxes: [], newsOpen: true, buildTab: 'proj', fleetSel: {}, routeSetup: null};
 const ACT = {};
-document.addEventListener('click', e => { const el = e.target.closest('[data-a]'); if (!el || el.disabled) return; const f = ACT[el.dataset.a]; if (f) { e.stopPropagation(); f(el.dataset.v, el, e); } });
+document.addEventListener('click', e => { const el = e.target.closest('[data-a]'); if (!el || el.disabled) return; const f = ACT[el.dataset.a]; if (f) { e.stopPropagation(); if (el.tagName === 'BUTTON' || el.classList.contains('opt') || el.classList.contains('tech')) sfx('click'); f(el.dataset.v, el, e); } });
 document.addEventListener('change', e => { const el = e.target.closest('[data-c]'); if (!el) return; const f = ACT[el.dataset.c]; if (f) f(el.value, el, e); });
 function toast(t, ms) { const el = $('#toast'); el.textContent = t; el.classList.add('show'); clearTimeout(UI._tt); UI._tt = setTimeout(() => el.classList.remove('show'), ms || 2400); }
 function bodyColor(b) {
@@ -30,7 +30,7 @@ function habSeen(b) { // before life is known, the rating ignores hidden native 
   if (lifeKnown(b) || !b.toxicLife) return hab(b);
   b.toxicLife = false; const h = hab(b); b.toxicLife = true; return h;
 }
-const SETTINGS = (() => { try { return Object.assign({near: 3}, JSON.parse(localStorage.getItem('starwake.settings') || '{}')); } catch (e) { return {near: 3}; } })();
+const SETTINGS = (() => { try { return Object.assign({near: 3, music: 40, sfx: 60}, JSON.parse(localStorage.getItem('starwake.settings') || '{}')); } catch (e) { return {near: 3, music: 40, sfx: 60}; } })();
 function saveSettings() { try { localStorage.setItem('starwake.settings', JSON.stringify(SETTINGS)); } catch (e) {} }
 function nearest3(sid) { const s0 = ST(sid); return S.stars.filter(s => s.id !== sid && S.known[s.id]).map(s => ({s, d: d3(s0, s)})).sort((a, b) => a.d - b.d).slice(0, SETTINGS.near); }
 function lifeKnown(b) { return b.star === 0 || b.owner === 0 || S.surveyed[b.star] || has('biosignatures') || inGreatScope(ST(b.star)); }
