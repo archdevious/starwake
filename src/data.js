@@ -1,6 +1,6 @@
 'use strict';
 // ===================== STARWAKE v2 — STATIC DATA =====================
-const GAME_VERSION = 11;
+const GAME_VERSION = 12;
 const SAVE_FORMAT = 2;
 const START_YEAR = 2326;
 const LENGTHS = {
@@ -67,10 +67,13 @@ const PROJECTS = {
   mines:       {name: 'Deep Mines',           cost: 120, stage: 'settlement', outpost: true, req: 'shallow', replaces: 'shallow', tech: 'deep_mining', desc: 'Replaces Shallow Mines: +50% production instead of +2.'},
   dock:        {name: 'Orbital Dock',         cost: 75,  stage: 'settlement', outpost: true, desc: 'Builds light-hull ships (Scouts, Science Vessels, Outpost Ships).'},
   shipyard:    {name: 'Orbital Shipyard',     cost: 75,  stage: 'settlement', req: 'dock', replaces: 'dock', desc: 'Replaces the Orbital Dock: builds every kind of ship.'},
-  campus:      {name: 'Research Campus',      cost: 180, stage: 'settlement', desc: '+50% research here.'},
-  tradeport:   {name: 'Trade Port',           cost: 180, stage: 'settlement', desc: '+50% credits here.'},
+  campus:      {name: 'Research Campus',      cost: 90,  stage: 'settlement', desc: '+25% research here.'},
+  institute:   {name: 'Research Institute',   cost: 100, stage: 'settlement', req: 'campus', replaces: 'campus', tech: 'networked_science', desc: 'Upgrades the Research Campus: +50% research here.'},
+  tradeport:   {name: 'Trade Port',           cost: 90,  stage: 'settlement', desc: '+25% credits here.'},
+  exchange:    {name: 'Trade Exchange',       cost: 100, stage: 'settlement', req: 'tradeport', replaces: 'tradeport', tech: 'interplanetary_markets', desc: 'Upgrades the Trade Port: +50% credits here.'},
   agridomes:   {name: 'Agri-Domes',           cost: 120, stage: 'settlement', desc: '+3 food, plus 3 more for each stage above Settlement.'},
-  habitat:     {name: 'Habitat Expansion',    cost: 250, stage: 'settlement', desc: '+50% population capacity here.'},
+  habitat:     {name: 'Habitat Expansion',    cost: 125, stage: 'settlement', tech: 'modular_habitats', desc: '+25% population capacity here.'},
+  spires:      {name: 'Habitat Spires',       cost: 140, stage: 'settlement', req: 'habitat', replaces: 'habitat', tech: 'vertical_cities', desc: 'Upgrades the Habitat Expansion: +50% population capacity here.'},
   rstation:    {name: 'Robotic Research Station', cost: 60, stage: 'settlement', outpost: true, tech: 'survey_drones', desc: '+1 research a year, or +3 if this world has life, rings, an ocean under its ice or volcanoes.'},
   refinery:    {name: 'Gas Refinery',         cost: 60,  stage: 'settlement', outpost: true, outpostOnly: true, giantOnly: true, desc: '+2 credits a year. Outposts on gas and ice giants only.'},
   observatory: {name: 'Deep Sky Observatory', cost: 250, stage: 'settlement', outpost: true, tech: 'deep_sky', desc: 'Telescopes here see 24 light-years instead of 16.'},
@@ -132,14 +135,18 @@ const TECHS = [
   {id: 'orbital_logistics', f: 'eng', cost: 700, req: ['orbital_construction'], name: 'Orbital Logistics', desc: 'Outposts supplying a colony lose nothing in transport (instead of 20%).'},
   {id: 'autofactories', f: 'eng', cost: 650, req: [], name: 'Autofactories', desc: '+20% production everywhere.'},
   {id: 'space_elevator', f: 'eng', cost: 1100, req: ['orbital_construction'], name: 'Space Elevators', desc: 'Unlocks the Space Elevator project (ships built there cost 25% less).'},
+  {id: 'modular_habitats', f: 'eng', cost: 250, req: [], name: 'Modular Habitats', desc: 'Unlocks the Habitat Expansion project (+25% population capacity at a colony).'},
+  {id: 'vertical_cities', f: 'eng', cost: 1200, req: ['modular_habitats'], name: 'Vertical Cities', desc: 'Unlocks Habitat Spires, an upgrade of the Habitat Expansion (+50% population capacity).'},
   {id: 'arcologies', f: 'eng', cost: 1600, req: ['autofactories'], name: 'Arcologies', desc: '+25% population capacity everywhere.'},
   {id: 'megastructures', f: 'eng', cost: 3600, req: ['space_elevator', 'arcologies'], name: 'Megastructures', desc: 'Colony projects cost 25% less.'},
   {id: 'quantum_computing', f: 'phys', cost: 400, req: [], name: 'Quantum Computing', desc: '+15% research everywhere.'},
+  {id: 'networked_science', f: 'phys', cost: 1100, req: ['quantum_computing'], name: 'Networked Science', desc: 'Unlocks the Research Institute, an upgrade of the Research Campus (+50% research).'},
   {id: 'antimatter_production', f: 'phys', cost: 1300, req: ['quantum_computing'], name: 'Antimatter Production', desc: '+10% production everywhere; needed for antimatter drives.'},
   {id: 'exotic_matter', f: 'phys', cost: 3200, req: ['antimatter_production'], name: 'Exotic Matter', desc: 'The physics needed for near-light flight, and perhaps one day more.'},
   {id: 'stellar_priority', f: 'soc', cost: 300, req: [], name: 'Stellar Priority', desc: 'Space budget +3 points: the public wants more of Earth\'s economy spent beyond Earth.'},
   {id: 'spacefaring', f: 'soc', cost: 1300, req: ['stellar_priority'], name: 'Spacefaring Society', desc: 'Space budget +7 points, and it can never fall below 20%. A generation has grown up with family on other worlds.'},
   {id: 'interstellar_commerce', f: 'soc', cost: 300, req: [], name: 'Interstellar Commerce', desc: '+20% credits; Cargo Bays carry twice as much.'},
+  {id: 'interplanetary_markets', f: 'soc', cost: 1000, req: ['interstellar_commerce'], name: 'Interplanetary Markets', desc: 'Unlocks the Trade Exchange, an upgrade of the Trade Port (+50% credits).'},
   {id: 'colonial_charter', f: 'soc', cost: 550, req: [], name: 'Colonial Charters', desc: 'Settlements grow 50% faster.'},
   {id: 'unified_science', f: 'soc', cost: 1300, req: ['quantum_computing'], name: 'Unified Science Academy', desc: '+20% research everywhere.'},
   {id: 'xenology', f: 'soc', cost: 1800, req: ['biosignatures'], name: 'Xenology', desc: 'Anomalies give 50% more research.'},

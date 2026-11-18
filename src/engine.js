@@ -251,10 +251,10 @@ function hab(b) {
 function popCap(b, hOver) {
   if (b.star === 0 && b.name === 'Earth') return 12000 * (has('arcologies') ? 1.25 : 1);
   const h = hOver || hab(b);
-  let c = b.clouds ? 40 : HAB[h].cap * b.size;
+  let c = b.clouds ? 20 : HAB[h].cap * b.size;
   if (h === 'harsh' && has('gene_adaptation')) c *= 1.5;
   if (has('arcologies')) c *= 1.25;
-  if (b.col && b.col.proj.habitat) c *= 1.5;
+  if (b.col && b.col.proj.spires) c *= 1.5; else if (b.col && b.col.proj.habitat) c *= 1.25;
   return c;
 }
 function stageOf(b) {
@@ -275,8 +275,8 @@ function colOut(b) {
   if (c.focus === 'farming') { fm.food = 2; fm.prod = fm.rp = fm.bc = 0.8; }
   const p = c.proj;
   let prod = (st.prod * MIN_MULT[b.min] + (p.shallow ? 2 : 0)) * fm.prod * (p.mines ? 1.5 : 1) * S.mods.prod * (has('autofactories') ? 1.2 : 1) * (has('antimatter_production') ? 1.1 : 1) * (has('bt_fusion') ? 1.15 : 1);
-  let rp = (st.rp + (p.rstation ? (b.life !== 'none' || b.traits.some(t => t === 'rings' || t === 'subocean' || t === 'volcanic') ? 3 : 1) : 0)) * fm.rp * (p.campus ? 1.5 : 1) * S.mods.rp * (has('quantum_computing') ? 1.15 : 1) * (has('unified_science') ? 1.2 : 1) * (has('bt_signal') ? 1.15 : 1);
-  let bc = stg === 'outpost' ? st.bc + (p.refinery ? 2 : 0) : st.bc * fm.bc * (p.tradeport ? 1.5 : 1) * S.mods.bc * (has('interstellar_commerce') ? 1.2 : 1);
+  let rp = (st.rp + (p.rstation ? (b.life !== 'none' || b.traits.some(t => t === 'rings' || t === 'subocean' || t === 'volcanic') ? 3 : 1) : 0)) * fm.rp * (p.institute ? 1.5 : p.campus ? 1.25 : 1) * S.mods.rp * (has('quantum_computing') ? 1.15 : 1) * (has('unified_science') ? 1.2 : 1) * (has('bt_signal') ? 1.15 : 1);
+  let bc = stg === 'outpost' ? st.bc + (p.refinery ? 2 : 0) : st.bc * fm.bc * (p.exchange ? 1.5 : p.tradeport ? 1.25 : 1) * S.mods.bc * (has('interstellar_commerce') ? 1.2 : 1);
   let fert = HAB[h].fert * ((h === 'harsh' || h === 'hostile') && has('closed_ecology') ? 1.5 : 1);
   const lvl = Math.max(0, STAGE_ORDER.indexOf(stg) - 1);
   let food = st.food * fert * fm.food + (p.agridomes ? (3 + 3 * Math.max(0, lvl - 0)) * (has('bt_seeds') ? 2 : 1) : 0) + (c.home ? S.mods.earthFood : 0);
@@ -301,19 +301,24 @@ function growthRate(b) {
 }
 function shipCost(d, b) { return Math.round(designCost(d) * (b && b.col.proj.elevator ? 0.75 : 1)); }
 function projCost(id) { return Math.round(PROJECTS[id].cost * (has('megastructures') ? 0.75 : 1)); }
-const OUTPOST_PROJ_COST = 40;
-function itemCost(b, it) { return it.kind === 'proj' ? projCost(it.id) : it.kind === 'outpost' ? Math.round(OUTPOST_PROJ_COST * (has('megastructures') ? 0.75 : 1)) : shipCost(design(it.id), b); }
-function itemName(it) { return it.kind === 'proj' ? PROJECTS[it.id].name : it.kind === 'outpost' ? 'Outpost on ' + B(it.id).name : design(it.id).name; }
+// projects that claim another world in the same system (no ship: they finish instantly with no travel)
+const OUTPOST_PROJ_COST = 60, SETTLE_PROJ_COST = 120;
+function itemCost(b, it) { return it.kind === 'proj' ? projCost(it.id) : it.kind === 'outpost' || it.kind === 'settle' ? Math.round((it.kind === 'outpost' ? OUTPOST_PROJ_COST : SETTLE_PROJ_COST) * (has('megastructures') ? 0.75 : 1)) : shipCost(design(it.id), b); }
+function itemName(it) { return it.kind === 'proj' ? PROJECTS[it.id].name : it.kind === 'outpost' ? 'Outpost on ' + B(it.id).name : it.kind === 'settle' ? 'Settle ' + B(it.id).name : design(it.id).name; }
+function peopleCanLive(t) { const h = hab(t); return h !== 'none' && h !== 'outpost'; }
+function settleTargets(b) { if (b.col.outpost) return []; return ST(b.star).bodies.map(B).filter(x => x !== b && peopleCanLive(x) && (x.owner == null || (x.owner === 0 && x.col && x.col.outpost))); }
 function outpostTargets(b) { return ST(b.star).bodies.map(B).filter(x => x.owner == null && hab(x) !== 'none'); }
+function upgradedFrom(c, id) { return Object.keys(c.proj).some(k => PROJECTS[k] && PROJECTS[k].replaces === id); }
 function projReason(b, id) {
   const P = PROJECTS[id], c = b.col;
   if (P.unique) return 'Unique';
   if (c.outpost && !P.outpost) return 'Needs people';
   if (P.giantOnly && b.cls !== 'gasgiant' && b.cls !== 'icegiant') return 'Gas and ice giants only';
-  if (P.req && !c.proj[P.req] && !(P.req === 'dock' && c.proj.shipyard) && !(P.req === 'shallow' && c.proj.mines)) return 'Needs ' + PROJECTS[P.req].name;
+  if (P.req && !c.proj[P.req] && !Object.keys(c.proj).some(k => PROJECTS[k] && PROJECTS[k].replaces === P.req)) return 'Needs ' + PROJECTS[P.req].name;
   if (!c.outpost && P.outpostOnly) return 'Outposts only';
   if (P.tech && !has(P.tech)) return 'Needs ' + TECH[P.tech].name;
   if (c.proj[id] && !P.repeat) return 'Already built';
+  if (upgradedFrom(c, id)) return 'Already upgraded';
   if (c.queue.some(q => q.kind === 'proj' && q.id === id)) return 'Already queued';
   if (!c.outpost && STAGE_ORDER.indexOf(stageOf(b)) < STAGE_ORDER.indexOf(P.stage)) return 'Needs a ' + STAGES[P.stage].name;
   if (id === 'terraform' && (hab(b) === 'garden' || hab(b) === 'none' || hab(b) === 'outpost' || c.home)) return 'Cannot be improved further';
@@ -335,6 +340,8 @@ function completeItem(b, it) {
       if (b.life === 'ecosystem') { b.life = 'microbial'; msg('Terraforming on ' + b.name + ' has wiped out most of its native ecosystem.', b.star, 'warn'); }
       msg(b.name + ' is now ' + HAB[hab(b)].name + ' after a terraforming stage.', b.star, 'build');
     } else { b.col.proj[it.id] = 1; if (PROJECTS[it.id].replaces) delete b.col.proj[PROJECTS[it.id].replaces]; msg(b.name + ' completed ' + PROJECTS[it.id].name + '.', b.star, 'build'); }
+  } else if (it.kind === 'settle') {
+    foundColony(B(it.id), settlerCount());
   } else if (it.kind === 'outpost') {
     const t = B(it.id); t.owner = 0; t.col = {pop: 0, outpost: true, mode: 'build', focus: 'balanced', proj: {}, queue: [], prog: 0, founded: S.year};
     msg(b.name + ' established an outpost on ' + t.name + '.', b.star, 'colony');
@@ -359,6 +366,11 @@ function colonizeCheck(f, b, kind) {
   if (hab(b) === 'none') return 'Nothing can be built there';
   return null;
 }
+function foundColony(b, add) {
+  const old = b.col; b.owner = 0; b.col = {pop: add, focus: 'balanced', proj: old ? old.proj : {}, queue: old ? old.queue.filter(q => !(q.kind === 'proj' && PROJECTS[q.id] && PROJECTS[q.id].outpostOnly)) : [], prog: old ? old.prog : 0, founded: S.year};
+  msg((old ? 'The outpost on ' + b.name + ' became a colony' : 'A new colony is founded on ' + b.name) + ' with ' + Math.round(add * 1e6).toLocaleString() + ' settlers.', b.star, 'colony'); journal('Founded a colony on ' + b.name + '.', b.star);
+  if (b.star !== 0) budgetEvent('firstStar', 1, 'Humanity\'s first colony at another star, on ' + b.name + ', inspires millions.', b.star);
+}
 function colonize(f, b, kind) {
   if (colonizeCheck(f, b, kind)) return false;
   const idx = f.ships.findIndex(sh => designHas(design(sh.d), kind === 'colony' ? 'colony' : 'outpost'));
@@ -368,7 +380,7 @@ function colonize(f, b, kind) {
   if (kind === 'colony') {
     const add = settlerCount() * pods;
     if (b.owner === 0 && b.col && !b.col.outpost) { b.col.pop += add; msg(Math.round(add * 1e6).toLocaleString() + ' new settlers arrived on ' + b.name + '.', b.star, 'colony'); }
-    else { const old = b.col; b.owner = 0; b.col = {pop: add, focus: 'balanced', proj: old ? old.proj : {}, queue: old ? old.queue.filter(q => !(q.kind === 'proj' && PROJECTS[q.id] && PROJECTS[q.id].outpostOnly)) : [], prog: old ? old.prog : 0, founded: S.year}; msg((old ? 'The outpost on ' + b.name + ' became a colony' : 'A new colony is founded on ' + b.name) + ' with ' + Math.round(add * 1e6).toLocaleString() + ' settlers.', b.star, 'colony'); journal('Founded a colony on ' + b.name + '.', b.star); if (b.star !== 0) budgetEvent('firstStar', 1, 'Humanity\'s first colony at another star, on ' + b.name + ', inspires millions.', b.star); }
+    else foundColony(b, add);
   } else { b.owner = 0; b.col = {pop: 0, outpost: true, mode: 'build', focus: 'balanced', proj: {}, queue: [], prog: 0, founded: S.year}; msg('A mining outpost is established on ' + b.name + '.', b.star, 'colony'); }
   cleanupFleets();
   return true;
@@ -539,11 +551,12 @@ function supplyTarget(b) {
 function itemValid(b, it) {
   if (it.kind === 'ship') return !!design(it.id) && !shipReason(b, design(it.id));
   if (it.kind === 'outpost') { const t = B(it.id); return !!t && t.star === b.star && t.owner == null && hab(t) !== 'none' && !b.col.outpost; }
+  if (it.kind === 'settle') { const t = B(it.id); return !!t && t !== b && t.star === b.star && !b.col.outpost && peopleCanLive(t) && (t.owner == null || (t.owner === 0 && !!t.col && !!t.col.outpost)); }
   const P = PROJECTS[it.id], c = b.col;
   if ((c.outpost && !P.outpost) || (!c.outpost && P.outpostOnly) || (P.tech && !has(P.tech))) return false;
   if (P.giantOnly && b.cls !== 'gasgiant' && b.cls !== 'icegiant') return false;
   if (P.req && !c.proj[P.req]) return false;
-  if (c.proj[it.id] && !P.repeat) return false;
+  if ((c.proj[it.id] && !P.repeat) || upgradedFrom(c, it.id)) return false;
   if (it.id === 'terraform' && (hab(b) === 'garden' || hab(b) === 'none' || hab(b) === 'outpost' || c.home)) return false;
   return true;
 }

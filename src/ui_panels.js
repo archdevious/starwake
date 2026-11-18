@@ -41,7 +41,7 @@ function sizeWord(b) { if (PCLASS[b.cls].belt) return ''; return ['', 'Small ', 
 function bodyActions(b) {
   const out = [];
   for (const f of S.fleets.filter(f => f.star === b.star && f.dest == null)) {
-    if (fleetHas(f, 'colony') && !(b.col && (b.col.home || b.col.pop > popCap(b) * 0.5))) { const e = colonizeCheck(f, b, 'colony'); if (!e) out.push(`<button class="btn sm primary" data-a="colonize" data-v="${f.id}:${b.id}:colony">${b.owner === 0 && b.col ? (b.col.outpost ? 'Turn outpost into colony' : 'Add settlers') : 'Found colony'}</button>`); }
+    if (fleetHas(f, 'colony') && !(b.col && (b.col.home || b.col.pop > popCap(b) * 0.5))) { const e = colonizeCheck(f, b, 'colony'); if (!e) out.push(`<button class="btn sm primary" data-a="colonize" data-v="${f.id}:${b.id}:colony">${b.owner === 0 && b.col ? (b.col.outpost ? 'Turn outpost into colony' : 'Add settlers') : 'Found colony'}</button>${!(b.owner === 0 && b.col && !b.col.outpost) && ST(b.star).bodies.some(x => x !== b.id && B(x).owner === 0 && B(x).col && !B(x).col.outpost) ? '<span class="tiny amber">Cheaper as a Settle project from your colony here.</span>' : ''}`); }
     if (fleetHas(f, 'outpost') && b.owner !== 0) { const e = colonizeCheck(f, b, 'outpost'); if (!e) { const cheap = ST(b.star).bodies.some(x => B(x).owner === 0 && B(x).col && !B(x).col.outpost); out.push(`<button class="btn sm" data-a="colonize" data-v="${f.id}:${b.id}:outpost">Build outpost</button>${cheap ? '<span class="tiny amber">Cheaper as a project from your colony here.</span>' : ''}`); } }
     if (out.length) break;
   }
@@ -101,6 +101,14 @@ function fleetName(f) { const cnt = {}; for (const sh of f.ships) { const n = de
 function taskText(f) { const t = f.task; if (!t) return ''; if (t.type === 'survey') return (t.probe ? 'probe survey' : 'surveying') + ' (' + t.left + ' yr left)'; if (t.type === 'route') return 'trade route: ' + ST(t.a).name + ' ⇄ ' + ST(t.b).name + ' (' + t.cargo + ')'; return ''; }
 
 // ---------- colony ----------
+function outputHTML(b, o) {
+  const sf = systemFood(b.star), bad = ST(b.star).short || sf.net < 0;
+  const tg = (t, tip) => `<span class="otag" title="${tip}">${t}</span>`;
+  const loc = tg('local', 'Production is used only by this colony (or by outposts supplying it).');
+  const emp = tg('empire', 'Research and credits from every colony go into one empire-wide total.');
+  return `<div class="grid2 small"><div>Production <b>${o.prod}</b> ${loc}</div><div>Research <b>${o.rp}</b> ${emp}</div><div>Credits <b>${o.bc}</b> ${emp}</div><div>Food <b>${o.food}</b> <span class="dim">(eats ${o.eat})</span> ${tg('system', 'Food is shared by everything at the same star.')}</div></div>
+    <div class="tiny ${bad ? 'bad' : 'dim'}" style="margin-top:3px">${esc(ST(b.star).name)} system food: ${sf.net >= 0 ? '+' : ''}${sf.net} a year${sf.net >= 0 ? ' surplus' : ' shortfall'}, ${sf.stock} stored</div>`;
+}
 function colonyPanel(b) {
   const c = b.col, o = colOut(b), st = stageOf(b);
   const cap = o.cap, g = growthRate(b);
@@ -113,7 +121,7 @@ function colonyPanel(b) {
     ${nextT ? `<div class="tiny dim" style="margin-top:3px">Becomes a ${STAGES[st === 'settlement' ? 'city' : 'core'].name} at ${people(nextT)}.</div>` : ''}
     ${c.home ? budgetHTML() : ''}
     <div class="sec">Output per year</div>
-    <div class="grid2 small"><div>Production <b>${o.prod}</b></div><div>Research <b>${o.rp}</b></div><div>Credits <b>${o.bc}</b></div><div>Food <b>${o.food}</b> <span class="dim">(eats ${o.eat})</span></div></div>
+    ${outputHTML(b, o)}
     <div class="sec">Focus</div><div class="row wrap" style="gap:4px">${Object.keys(FOCUS).map(k => `<button class="btn sm ${c.focus === k ? 'on' : ''}" data-a="focus" data-v="${b.id}:${k}" title="${esc(FOCUS[k].desc)}">${FOCUS[k].name}</button>`).join('')}</div>
     <div class="tiny dim" style="margin-top:3px">${esc(FOCUS[c.focus].desc)}</div>`;
   const built = Object.keys(c.proj).filter(k => PROJECTS[k]);
@@ -126,20 +134,28 @@ function colonyPanel(b) {
     c.queue.forEach((q, i) => { h += `<div class="qitem"><span class="dim tiny">${i + 1}</span><span class="nm">${esc(itemName(q))}</span>${q.kind === 'ship' ? `<button class="btn sm" data-a="qn" data-v="${b.id}:${i}:-1">−</button><b class="small">${q.n || 1}</b><button class="btn sm" data-a="qn" data-v="${b.id}:${i}:1">+</button>` : ''}${i ? `<button class="x" data-a="qup" data-v="${b.id}:${i}">▲</button>` : ''}<button class="x" data-a="qdel" data-v="${b.id}:${i}">✕</button></div>`; });
   } else h += `<div class="card small dim">Nothing being built: production is sold for ${Math.floor(o.prod / 2)} credit${Math.floor(o.prod / 2) === 1 ? '' : 's'} a year.</div>`;
   const tab = UI.buildTab;
-  const ots = outpostTargets(b);
-  h += `<div class="row" style="margin:8px 0 4px;gap:4px"><button class="btn sm ${tab === 'proj' ? 'on' : ''}" data-a="btab" data-v="proj">Projects</button><button class="btn sm ${tab === 'outp' ? 'on' : ''}" data-a="btab" data-v="outp">Outposts${ots.length ? ' (' + ots.length + ')' : ''}</button><button class="btn sm ${tab === 'ship' ? 'on' : ''}" data-a="btab" data-v="ship">Ships</button></div>`;
+  const ots = outpostTargets(b), sts = settleTargets(b), ownOut = sts.filter(t => t.owner === 0);
+  const nWorlds = ots.length + ownOut.length;
+  h += `<div class="row" style="margin:8px 0 4px;gap:4px"><button class="btn sm ${tab === 'proj' ? 'on' : ''}" data-a="btab" data-v="proj">Projects</button><button class="btn sm ${tab === 'outp' ? 'on' : ''}" data-a="btab" data-v="outp">Worlds${nWorlds ? ' (' + nWorlds + ')' : ''}</button><button class="btn sm ${tab === 'ship' ? 'on' : ''}" data-a="btab" data-v="ship">Ships</button></div>`;
   if (tab === 'outp') {
-    h += `<div class="tiny dim" style="padding:2px 6px 6px">Robotic outposts in this system: production, no people, 1 credit a year upkeep.</div>`;
-    if (!ots.length) h += `<div class="small dim" style="padding:6px">Every world in this system that can hold an outpost is already claimed.</div>`;
+    h += `<div class="tiny dim" style="padding:2px 6px 6px">Claim other worlds in this system. No ship is needed: the outpost or colony appears as soon as the project is done.</div>`;
+    if (!nWorlds) h += `<div class="small dim" style="padding:6px">Every world in this system is already claimed.</div>`;
     const robo = ots.filter(t => HAB[habSeen(t)].cap <= 0), live = ots.filter(t => HAB[habSeen(t)].cap > 0);
-    const row = t => { const cost = itemCost(b, {kind: 'outpost', id: t.id}), hs = habSeen(t), q = c.queue.some(x => x.kind === 'outpost' && x.id === t.id);
-      return `<div class="opt" ${q ? 'style="opacity:.45;cursor:default"' : `data-a="qadd" data-v="${b.id}:outpost:${t.id}"`}><span class="nm">Outpost on ${esc(t.name)}<div class="tiny dim">${lc(PCLASS[t.cls].name)}${S.surveyed[b.star] ? ' · ' + MINERALS[t.min].toLowerCase() + ' minerals' : ''}${HAB[hs].cap > 0 ? ` · <span style="color:${HAB[hs].color}">${HAB[hs].name}</span> · ${people(popCap(t, hs))}` : ''}${q ? ' · queued' : ''}</div></span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`; };
-    if (robo.length) h += `<div class="sec" style="margin-top:4px">Robotic only</div>` + robo.map(row).join('');
-    if (live.length) h += `<div class="sec">Could hold people</div><div class="tiny dim" style="padding:0 6px 4px">An outpost here can become a colony later when a Colony Ship arrives.</div>` + live.map(row).join('');
+    const anyQ = t => c.queue.some(x => (x.kind === 'outpost' || x.kind === 'settle') && x.id === t.id);
+    const row = (t, kind) => { const cost = itemCost(b, {kind, id: t.id}), hs = habSeen(t), q = anyQ(t), own = t.owner === 0;
+      const label = kind === 'settle' ? (own ? 'Turn the outpost on ' + esc(t.name) + ' into a colony' : 'Settle ' + esc(t.name)) : 'Outpost on ' + esc(t.name);
+      const info = kind === 'settle' ? `${people(settlerCount())} settlers · grows to ${people(popCap(t))}` : `${lc(PCLASS[t.cls].name)}${S.surveyed[b.star] ? ' · ' + MINERALS[t.min].toLowerCase() + ' minerals' : ''}${HAB[hs].cap > 0 ? ` · <span style="color:${HAB[hs].color}">${HAB[hs].name}</span> · ${people(popCap(t, hs))}` : ''}`;
+      return `<div class="opt" ${q ? 'style="opacity:.45;cursor:default"' : `data-a="qadd" data-v="${b.id}:${kind}:${t.id}"`}><span class="nm">${label}<div class="tiny dim">${info}${q ? ' · queued' : ''}</div></span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`; };
+    if (robo.length) h += `<div class="sec" style="margin-top:4px">Robotic only</div>` + robo.map(t => row(t, 'outpost')).join('');
+    if (live.length || ownOut.length) {
+      h += `<div class="sec">Could hold people</div><div class="tiny dim" style="padding:0 6px 4px">Settle a world to found a colony, or claim it as an outpost first and settle it later.</div>`;
+      for (const t of live) { h += row(t, 'outpost'); if (sts.includes(t)) h += row(t, 'settle'); }
+      h += ownOut.map(t => row(t, 'settle')).join('');
+    }
   } else if (tab === 'proj') {
     for (const id in PROJECTS) {
       const P = PROJECTS[id]; if (P.unique || P.outpostOnly || (P.tech && !has(P.tech))) continue; if (c.proj[id] && !P.repeat) continue;
-      if ((id === 'shallow' && c.proj.mines) || (id === 'dock' && c.proj.shipyard)) continue;
+      if (Object.keys(c.proj).some(k => PROJECTS[k] && PROJECTS[k].replaces === id)) continue;
       const why = projReason(b, id), cost = projCost(id);
       h += `<div class="opt" ${why ? `style="opacity:.45;cursor:default"` : `data-a="qadd" data-v="${b.id}:proj:${id}"`}><span class="nm">${P.name}<div class="tiny dim">${esc(why || P.desc)}</div></span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`;
     }
@@ -166,7 +182,7 @@ function designSummary(d) {
 }
 ACT.focus = v => { const [bid, k] = v.split(':'); B(+bid).col.focus = k; renderSide(); };
 ACT.btab = v => { UI.buildTab = v; renderSide(); };
-ACT.qadd = v => { const [bid, kind, id] = v.split(':'); const c = B(+bid).col; if (kind === 'outpost') { c.queue.push({kind, id: +id}); renderSide(); return; } if (kind === 'ship') { const last = c.queue[c.queue.length - 1]; if (last && last.kind === 'ship' && last.id === id) last.n = (last.n || 1) + 1; else c.queue.push({kind, id, n: 1}); } else c.queue.push({kind, id}); renderSide(); };
+ACT.qadd = v => { const [bid, kind, id] = v.split(':'); const c = B(+bid).col; if (kind === 'outpost' || kind === 'settle') { c.queue.push({kind, id: +id}); renderSide(); return; } if (kind === 'ship') { const last = c.queue[c.queue.length - 1]; if (last && last.kind === 'ship' && last.id === id) last.n = (last.n || 1) + 1; else c.queue.push({kind, id, n: 1}); } else c.queue.push({kind, id}); renderSide(); };
 ACT.qdel = v => { const [bid, i] = v.split(':').map(Number); const c = B(bid).col; if (i === 0) c.prog = Math.floor(c.prog * 0.5); c.queue.splice(i, 1); renderSide(); };
 ACT.qup = v => { const [bid, i] = v.split(':').map(Number); const q = B(bid).col.queue; [q[i - 1], q[i]] = [q[i], q[i - 1]]; renderSide(); };
 ACT.qn = v => { const [bid, i, d] = v.split(':').map(Number); const it = B(bid).col.queue[i]; it.n = Math.max(1, (it.n || 1) + d); renderSide(); };

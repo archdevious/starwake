@@ -20,6 +20,9 @@ h1,h2,h3{margin:0;font-weight:600;letter-spacing:.06em}
 .brand{font-weight:700;letter-spacing:.22em;font-size:15px;color:#fff;white-space:nowrap}
 .brand b{color:var(--acc)}
 #res{display:flex;gap:6px;flex:1;min-width:0;overflow:hidden}
+#res .chip{flex-shrink:0}#res .chip.rchip{flex-shrink:1;min-width:60px}.rchip .ell{min-width:0;overflow:hidden;text-overflow:ellipsis}
+#attn{flex:1 0 auto;display:flex}#attn .chip{flex:1;justify-content:center}
+.otag{font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--dim,#8a94aa);border:1px solid var(--line);border-radius:4px;padding:0 4px;margin-left:3px;cursor:help}
 .chip{display:flex;align-items:center;gap:6px;background:#0f182c;border:1px solid var(--line);border-radius:6px;padding:3px 9px;white-space:nowrap;font-size:13px}
 .chip.click{cursor:pointer}.chip.click:hover{border-color:var(--acc)}
 .chip .k{color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.08em}

@@ -51,7 +51,7 @@ function renderTop() {
     <div class="chip" title="Year (turn)"><span class="k">Year</span><b>${S.year}</b><span class="dim small">${S.turn}/${S.maxTurns}</span></div>
     <div class="chip" title="Credits (income minus ship upkeep)"><span class="k">Credits</span><b>${fmt(Math.floor(S.bc))}</b><span class="${t.net >= 0 ? 'good' : 'bad'}">${sgn(t.net)}</span></div>
     <div class="chip" title="Population"><span class="k">Population</span><b>${people(t.pop)}</b></div>
-    <div class="chip click" data-a="openResearch" title="Research"><span class="k">Research</span>${res ? `<span class="ell" title="${esc(res.name)}">${esc(res.name)}</span><span class="dim">${Math.floor(S.res.prog + S.rpBank)}/${techCost(S.res.tech)}</span>` : (availableTechs().length ? '<span class="warn">Choose research!</span>' : '<span class="dim">All known</span>')}<span class="acc">+${fmt(t.rp)}</span></div>
+    <div class="chip click rchip" data-a="openResearch" title="Research"><span class="k">Research</span>${res ? `<span class="ell" title="${esc(res.name)}">${esc(res.name)}</span><span class="dim">${Math.floor(S.res.prog + S.rpBank)}/${techCost(S.res.tech)}</span>` : (availableTechs().length ? '<span class="warn">Choose research!</span>' : '<span class="dim">All known</span>')}<span class="acc">+${fmt(t.rp)}</span></div>
     ${short.length ? `<div class="chip click" data-a="goStar" data-v="${short[0]}"><span class="bad">Food shortage: ${short.map(s => esc(ST(s).name)).join(', ')}</span></div>` : ''}
     <div class="chip" title="Top ship speed, as a share of light speed"><span class="k">Top speed</span><b>${pct(topSpeed())}</b></div><span id="attn"></span>`;
   renderAttn();
