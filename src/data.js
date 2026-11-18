@@ -1,6 +1,6 @@
 'use strict';
 // ===================== STARWAKE v2 — STATIC DATA =====================
-const GAME_VERSION = 3;
+const GAME_VERSION = 4;
 const SAVE_FORMAT = 2;
 const START_YEAR = 2326;
 const LENGTHS = {
@@ -154,9 +154,9 @@ const ERAS = [
     {id: 'corporate', name: 'The Corporate Age', text: 'Corporations took over much of what governments once did, from power grids to spaceports.', why: 'Private investment and global markets built up deep reserves of wealth for the journey ahead.', fx: ['+25% credits', '+300 starting credits']},
   ]},
   {years: '2101–2176', name: 'Leaving the Cradle', q: 'How did we spread through the Solar System?', opts: [
-    {id: 'moonmars', name: 'The Moon and Mars', text: 'Mining bases on the Moon and domed settlements on Mars became humanity\'s first homes beyond Earth.', why: 'Both grew from research outposts into permanent settlements.', fx: ['Start with Settlements on the Moon and Mars', 'Mars can grow to 20 million people; the Moon stays small']},
-    {id: 'belt', name: 'The Belt Rush', text: 'Prospectors swarmed the asteroid belt and pushed on to the moons of Saturn.', why: 'Mining crews followed the ice and metal outward as far as Titan.', fx: ['Start with Settlements on Ceres and Titan, plus a mining outpost in the belt', 'All three stay small, but the outpost adds production from the start']},
-    {id: 'venus', name: 'Cloud Cities of Venus', text: 'Floating cities were built in Venus\' upper air, where pressure and temperature are close to Earth\'s.', why: 'The first cloud cities were small, but the upper air of Venus has room for far more.', fx: ['Start with a Settlement floating above Venus', 'It can grow to 40 million people, the most of any starting choice']},
+    {id: 'moonmars', name: 'The Moon and Mars', text: 'Mining bases on the Moon and domed settlements on Mars became humanity\'s first homes beyond Earth.', why: 'Both grew from research outposts into permanent settlements.', fx: ['Start with a small settlement on the Moon and a moderate-sized one on Mars']},
+    {id: 'belt', name: 'The Belt Rush', text: 'Prospectors swarmed the asteroid belt and pushed on to the moons of Saturn.', why: 'Mining crews followed the ice and metal outward as far as Titan.', fx: ['Start with small settlements on Ceres and Titan, plus a mining outpost in the belt']},
+    {id: 'venus', name: 'Cloud Cities of Venus', text: 'Floating cities were built in Venus\' upper air, where pressure and temperature are close to Earth\'s.', why: 'The first cloud cities were small, but the upper air of Venus has room for far more.', fx: ['Start with a large settlement floating above Venus']},
   ]},
   {years: '2176–2251', name: 'The Long Stride', q: 'Where did humanity put its effort?', opts: [
     {id: 'medicine', name: 'Medicine', text: 'Research focused on longer, healthier lives and on self-sufficient habitats.', why: 'Life-support research made sealed farms far more productive.', fx: ['Free tech, Closed Ecology: Harsh and Hostile colonies make 50% more food']},
@@ -165,7 +165,7 @@ const ERAS = [
   ]},
   {years: '2251–2326', name: 'First Light', q: 'What was our first step toward the stars?', opts: [
     {id: 'ark', name: 'The Ark Program', text: 'A great colony ship was completed in orbit.', why: 'It was built before anyone chose where it would go.', fx: ['Start with 1 extra Colony Ship']},
-    {id: 'telescope', name: 'The Great Telescope', text: 'A telescope array mapped the nearby stars and the worlds around them.', why: 'Its main mirror was placed in orbit around Earth and is still in service.', fx: ['A unique building on Earth. Its telescope sees 24 light-years away, and knows worlds within 8.6 light-years of Earth and any signs of life on them']},
+    {id: 'telescope', name: 'The Great Telescope', text: 'A telescope array mapped the nearby stars and the worlds around them.', why: 'Its main mirror was placed in orbit around Earth and is still in service.', fx: ['Start with a unique telescope on Earth that sees 24 light-years and knows the worlds and life within 8.6 light-years']},
     {id: 'probes', name: 'The Pathfinder Probes', text: 'Small, fast probes were built and launched toward the two nearest stars in the early 2300s.', why: 'After a couple of decades in transit, both have now arrived at Alpha Centauri and Barnard\'s Star, and the science vessel built to follow up on their findings is ready at Earth.', fx: ['Start with 2 Pathfinder Probes at Alpha Centauri and Barnard\'s Star, plus a free Science Vessel at Earth']},
   ]},
 ];
@@ -190,35 +190,43 @@ const SOL_BODIES = [
   {name: 'Triton', cls: 'moon', size: 1, temp: 'frozen', atm: 'thin', min: 1, traits: [], of: 'Neptune'},
 ];
 // Known exoplanets (from published discoveries; uncertain details are filled in by the game)
-const KNOWN_PLANETS = {
-  'Alpha Centauri': [['Proxima b', 'rocky', 2, 'temperate', ['locked', 'flares']], ['Proxima d', 'rocky', 1, 'hot', ['flares']]],
+const KNOWN_PLANETS = { // real planets (checked Nov 2026); disputed candidates kept only where noted
+  'Alpha Centauri': [['Proxima b', 'rocky', 2, 'temperate', ['locked', 'flares']], ['Proxima d', 'rocky', 1, 'hot', ['flares']], ['Alpha Centauri A b', 'gasgiant', 5, 'temperate']], // A b: 2025 JWST candidate
   "Barnard's Star": [['b', 'rocky', 1, 'hot'], ['c', 'rocky', 1, 'hot'], ['d', 'rocky', 1, 'hot'], ['e', 'rocky', 1, 'hot']],
   'Lalande 21185': [['b', 'superearth', 3, 'hot'], ['c', 'minineptune', 4, 'cold']],
   'Epsilon Eridani': [['b', 'gasgiant', 5, 'cold'], ['Inner belt', 'belt', 1, 'cold'], ['Outer belt', 'belt', 1, 'frozen']],
-  'Ross 128': [['b', 'superearth', 2, 'temperate', ['locked']]],
-  "Luyten's Star": [['b', 'superearth', 3, 'temperate', ['locked']], ['c', 'superearth', 3, 'hot']],
-  'Tau Ceti': [['g', 'superearth', 2, 'scorching'], ['h', 'superearth', 2, 'hot'], ['e', 'superearth', 3, 'hot'], ['f', 'superearth', 3, 'cold'], ['Debris belt', 'belt', 1, 'frozen']],
-  'Wolf 1061': [['b', 'rocky', 1, 'scorching'], ['c', 'superearth', 3, 'temperate', ['locked']], ['d', 'superearth', 4, 'frozen']],
-  'Gliese 876': [['d', 'superearth', 3, 'scorching'], ['c', 'gasgiant', 5, 'temperate'], ['b', 'gasgiant', 5, 'temperate'], ['e', 'icegiant', 4, 'cold']],
-  'Gliese 581': [['e', 'rocky', 1, 'scorching'], ['b', 'minineptune', 4, 'hot'], ['c', 'superearth', 3, 'hot']],
-  'Gliese 667': [['b', 'superearth', 3, 'scorching'], ['c', 'superearth', 3, 'temperate', ['locked']], ['d', 'superearth', 3, 'cold']],
-  "Teegarden's Star": [['b', 'rocky', 2, 'temperate', ['locked']], ['c', 'rocky', 2, 'cold'], ['d', 'rocky', 2, 'frozen']],
-  'Gliese 1061': [['b', 'rocky', 2, 'hot'], ['c', 'superearth', 2, 'temperate', ['locked']], ['d', 'superearth', 2, 'temperate', ['locked']]],
-  'Gliese 1002': [['b', 'rocky', 2, 'temperate', ['locked']], ['c', 'rocky', 2, 'temperate', ['locked']]],
-  'YZ Ceti': [['b', 'rocky', 1, 'scorching'], ['c', 'rocky', 1, 'hot'], ['d', 'rocky', 1, 'hot']],
   'Lacaille 9352': [['b', 'superearth', 3, 'hot'], ['c', 'superearth', 3, 'hot'], ['d', 'superearth', 3, 'temperate']],
-  'Gliese 687': [['b', 'minineptune', 4, 'cold']],
-  'Gliese 682': [['b', 'superearth', 3, 'temperate'], ['c', 'superearth', 3, 'hot']],
+  'Ross 128': [['b', 'superearth', 2, 'temperate', ['locked']]],
+  'Struve 2398': [['A b', 'superearth', 2, 'hot'], ['B c', 'superearth', 3, 'temperate', ['locked']]],
+  'Groombridge 34': [['Ab', 'superearth', 2, 'hot'], ['Ac', 'icegiant', 4, 'frozen']],
   'Epsilon Indi': [['Ab', 'gasgiant', 5, 'frozen']],
-  'Groombridge 34': [['Ab', 'superearth', 2, 'hot'], ['Ac', 'minineptune', 4, 'cold']],
+  'Gliese 1061': [['b', 'rocky', 2, 'hot'], ['c', 'superearth', 2, 'temperate', ['locked']], ['d', 'superearth', 2, 'temperate', ['locked']]],
+  'YZ Ceti': [['b', 'rocky', 1, 'scorching'], ['c', 'rocky', 1, 'hot'], ['d', 'rocky', 1, 'hot']],
+  "Luyten's Star": [['b', 'superearth', 3, 'temperate', ['locked']], ['c', 'rocky', 2, 'hot']],
+  "Teegarden's Star": [['b', 'rocky', 2, 'temperate', ['locked']], ['c', 'rocky', 2, 'temperate', ['locked']], ['d', 'rocky', 1, 'cold']],
+  'Wolf 1061': [['b', 'rocky', 1, 'scorching'], ['c', 'superearth', 3, 'temperate', ['locked']], ['d', 'superearth', 4, 'cold']],
+  'TZ Arietis': [['b', 'gasgiant', 5, 'cold']],
+  'Gliese 687': [['b', 'minineptune', 4, 'temperate'], ['c', 'minineptune', 4, 'cold']],
+  'Gliese 674': [['b', 'minineptune', 4, 'hot']],
+  'Gliese 876': [['d', 'superearth', 3, 'scorching'], ['c', 'gasgiant', 5, 'temperate'], ['b', 'gasgiant', 5, 'temperate'], ['e', 'icegiant', 4, 'cold']],
+  'Gliese 1002': [['b', 'rocky', 2, 'temperate', ['locked']], ['c', 'rocky', 2, 'temperate', ['locked']]],
   'Gliese 832': [['b', 'gasgiant', 5, 'frozen']],
-  'Gliese 229': [['Ac', 'minineptune', 4, 'hot']],
-  '82 Eridani': [['b', 'superearth', 2, 'scorching'], ['c', 'superearth', 2, 'scorching'], ['d', 'superearth', 3, 'hot']],
+  'Tau Ceti': [['g', 'superearth', 2, 'hot'], ['h', 'superearth', 2, 'hot'], ['f', 'superearth', 3, 'cold'], ['Debris belt', 'belt', 1, 'frozen']], // g, h, f still disputed
+  'Gliese 682': [['b', 'superearth', 3, 'temperate'], ['c', 'superearth', 3, 'hot']], // candidates
+  '82 Eridani': [['b', 'superearth', 2, 'hot'], ['c', 'superearth', 2, 'hot'], ['d', 'superearth', 3, 'temperate']],
+  'Gliese 581': [['e', 'rocky', 1, 'scorching'], ['b', 'minineptune', 4, 'hot'], ['c', 'superearth', 3, 'hot']],
+  'Gliese 667': [['b', 'superearth', 3, 'scorching'], ['c', 'superearth', 3, 'temperate', ['locked']]],
   'Fomalhaut': [['Dust belt', 'belt', 1, 'frozen']],
   'Vega': [['Debris disc', 'belt', 1, 'frozen']],
+  '61 Virginis': [['b', 'superearth', 3, 'hot'], ['c', 'minineptune', 4, 'hot'], ['d', 'minineptune', 4, 'hot'], ['Debris disc', 'belt', 1, 'frozen']],
+  'Gliese 433': [['b', 'superearth', 3, 'hot'], ['d', 'superearth', 3, 'hot'], ['c', 'icegiant', 4, 'cold']],
+  'Gliese 785': [['b', 'minineptune', 4, 'hot'], ['c', 'icegiant', 4, 'cold']],
+  'Gliese 849': [['b', 'gasgiant', 5, 'cold'], ['c', 'gasgiant', 5, 'frozen']],
+  'Gliese 176': [['b', 'superearth', 3, 'hot']],
+  'Gliese 436': [['b', 'minineptune', 4, 'scorching']],
   'Pollux': [['b', 'gasgiant', 5, 'hot']],
   'TRAPPIST-1': [['b', 'rocky', 1, 'scorching', ['locked']], ['c', 'rocky', 1, 'hot', ['locked']], ['d', 'rocky', 1, 'temperate', ['locked']], ['e', 'rocky', 1, 'temperate', ['locked']], ['f', 'rocky', 1, 'temperate', ['locked']], ['g', 'rocky', 1, 'cold', ['locked']], ['h', 'rocky', 1, 'frozen', ['locked']]],
-  'Sirius': [], 'Procyon': [], "Van Maanen's Star": [], 'Altair': [], '61 Cygni': [], 'Arcturus': [],
+  'Sirius': [], 'Procyon': [], "Van Maanen's Star": [], 'Altair': [], '61 Cygni': [], 'Arcturus': [], 'Gliese 229': [], "Kapteyn's Star": [],
 };
 
 // ---------- Anomaly stories (grounded mystery) ----------

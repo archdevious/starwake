@@ -49,6 +49,7 @@ ACT.colonize = v => {
 function starPanel(sid) {
   const s = ST(sid);
   let h = `<div class="hdr"><div><h2>${esc(s.name)}</h2><div class="dim small">${starTitle(s)}</div></div><button class="x" data-a="close">✕</button></div>`;
+  h += `<div class="sdesc">${esc(starDesc(s))}</div>`;
   if (s.guardKnown) h += `<div class="card" style="border-color:#7a2a2a"><b class="bad">Guardian machines.</b> Ancient automated defenses destroy any ship that enters this system.</div>`;
   if (!worldsKnown(s)) {
     h += `<div class="card dim">Only seen through telescopes. Send any ship here to see its worlds; a ship passing within 1 light-year will do.</div>`;
@@ -64,7 +65,7 @@ function starPanel(sid) {
     for (const bid of s.bodies) {
       const b = B(bid), ours = b.owner === 0 && b.col;
       const st = ours ? stageOf(b) : null;
-      h += `<div class="card ${ours && !b.col.outpost ? 'click' : ''}" ${ours && !b.col.outpost ? `data-a="colony" data-v="${b.id}"` : ''}><div class="body">${planetBall(b, 32)}<div style="flex:1;min-width:0"><b>${bodyName(b)}</b><div class="dim small">${sizeWord(b)}${PCLASS[b.cls].name.toLowerCase()}</div>${bodyFacts(b)}
+      h += `<div class="card ${ours && !b.col.outpost ? 'click' : ''}" ${ours && !b.col.outpost ? `data-a="colony" data-v="${b.id}"` : ''}><div class="body">${planetBall(b, 32)}<div style="flex:1;min-width:0"><b>${bodyName(b)}</b><div class="dim small">${sizeWord(b)}${lc(PCLASS[b.cls].name)}</div>${bodyFacts(b)}
         ${ours ? `<div class="row sb small" style="margin-top:5px"><span class="good">Ours · ${STAGES[st].name}${b.col.outpost ? '' : ' · ' + people(b.col.pop)}</span>${b.col.outpost ? '' : '<span class="acc">Manage ▸</span>'}</div>` : ''}
         ${bodyActions(b) ? `<div class="row wrap" style="margin-top:6px;gap:5px">${bodyActions(b)}</div>` : ''}</div></div></div>`;
     }
@@ -82,7 +83,7 @@ function colonyPanel(b) {
   const c = b.col, o = colOut(b), st = stageOf(b);
   const cap = o.cap, g = growthRate(b);
   const nextT = {settlement: 0.1, city: 10}[st];
-  let h = `<div class="hdr"><div class="row">${planetBall(b, 42)}<div><h2>${esc(b.name)}</h2><div class="dim small">${STAGES[st].name} · ${HAB[o.hab].name} ${PCLASS[b.cls].name.toLowerCase()}</div></div></div><button class="x" data-a="close">✕</button></div>
+  let h = `<div class="hdr"><div class="row">${planetBall(b, 42)}<div><h2>${esc(b.name)}</h2><div class="dim small">${STAGES[st].name} · ${HAB[o.hab].name} ${lc(PCLASS[b.cls].name)}</div></div></div><button class="x" data-a="close">✕</button></div>
     <div class="small"><a class="acc" style="cursor:pointer" data-a="star" data-v="${b.star}">◂ ${esc(ST(b.star).name)} system</a></div>
     <div class="sec">Population</div>
     <div class="row sb small"><span><b>${people(c.pop)}</b> of ${people(cap)}</span><span class="${ST(b.star).short ? 'bad' : 'good'}">${ST(b.star).short ? 'Shrinking (hunger)' : c.pop >= cap ? 'Full' : '+' + (g * (1 - c.pop / cap) * 100).toFixed(1) + '% per year'}</span></div>

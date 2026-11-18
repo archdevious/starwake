@@ -86,10 +86,13 @@ function knownSystem(star, list) {
   for (const [nm, cls, size, temp, traits] of list) {
     newBody(star, {name: (nm.length <= 3 ? star.name + ' ' + nm : nm.indexOf(star.name) === 0 ? nm : (/^(Proxima)/.test(nm) ? nm : star.name + ' ' + nm)),
       cls, size, temp, atm: atmFor(cls, temp), min: +wpick(MIN_W), traits: (traits || []).slice()});
+    const b = B(star.bodies[star.bodies.length - 1]); // giants may have an undiscovered moon
+    if ((cls === 'gasgiant' || cls === 'icegiant') && rnd() < 0.4)
+      newBody(star, {name: b.name + ' I', cls: 'moon', size: ri(1, 2), temp: temp === 'temperate' || temp === 'hot' ? temp : 'frozen', atm: rnd() < 0.3 ? 'thin' : 'none', min: +wpick(MIN_W), traits: rnd() < 0.4 ? ['subocean'] : [], of: b.name});
   }
-  if (star.name === 'Alpha Centauri') { // A and B: unknown planets, rolled
-    for (let i = 0; i < ri(1, 3); i++) { const temp = pick(['hot', 'temperate', 'cold', 'frozen']); const cls = temp === 'frozen' ? pick(['gasgiant', 'ice', 'icegiant']) : pick(['rocky', 'superearth', 'ocean']);
-      newBody(star, {name: 'Alpha Centauri ' + ['A', 'B'][i % 2] + ' ' + 'bcd'[Math.floor(i / 2)], cls, size: cls === 'gasgiant' ? 5 : ri(1, 3), temp, atm: atmFor(cls, temp), min: +wpick(MIN_W), traits: []}); }
+  if (star.name === 'Alpha Centauri') { // B: unknown planets, rolled
+    for (let i = 0, n = ri(0, 2); i < n; i++) { const temp = pick(['hot', 'temperate', 'cold', 'frozen']); const cls = temp === 'frozen' ? pick(['gasgiant', 'ice', 'icegiant']) : pick(['rocky', 'superearth', 'ocean']);
+      newBody(star, {name: 'Alpha Centauri B ' + 'bc'[i], cls, size: cls === 'gasgiant' ? 5 : ri(1, 3), temp, atm: atmFor(cls, temp), min: +wpick(MIN_W), traits: []}); }
   }
 }
 function assignLife() {

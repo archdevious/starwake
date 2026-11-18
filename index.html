@@ -176,6 +176,7 @@ table.list tr.click{cursor:pointer}table.list tr.click:hover td{background:#121d
 @media (max-width:1560px){#topbar .brand{display:none}}
 @media (max-width:1440px){.tbtns .btn{padding:5px 8px;font-size:12.5px}.tbtns{gap:4px}#topbar{gap:8px}.chip .ell{max-width:110px}}
 @media (max-width:1300px){.chip .k{display:none}.chip{padding:3px 6px}#res{gap:4px}}
+.sdesc{font-size:13px;line-height:1.5;color:#c4cfe2;margin:8px 0 10px}
 
 </style>
 </head>
@@ -207,13 +208,13 @@ table.list tr.click{cursor:pointer}table.list tr.click:hover td{background:#121d
 <div id="modal"></div>
 <script>
 "use strict";
-const STARS_STD=[{"n": "Sun", "x": 0, "y": 0, "z": 0, "sp": "G2V", "c": 1, "ly": 0}, {"n": "Alpha Centauri", "x": 3.09, "y": -3.02, "z": -0.05, "sp": "G2V", "c": 3, "ly": 4.3}, {"n": "Barnard's Star", "x": 4.94, "y": 2.97, "z": 1.44, "sp": "sdM4", "c": 1, "ly": 5.9}, {"n": "Wolf 359", "x": -1.9, "y": -3.91, "z": 6.48, "sp": "M6", "c": 1, "ly": 7.8}, {"n": "Lalande 21185", "x": -3.44, "y": -0.31, "z": 7.55, "sp": "M2V", "c": 1, "ly": 8.3}, {"n": "Luyten 726-8", "x": -2.11, "y": 0.17, "z": -8.31, "sp": "dM5.5e", "c": 2, "ly": 8.6}, {"n": "Sirius", "x": -5.77, "y": -6.24, "z": -1.33, "sp": "A0m...", "c": 2, "ly": 8.6}, {"n": "Ross 154", "x": 9.35, "y": 1.87, "z": -1.73, "sp": "M3.5Ve", "c": 1, "ly": 9.7}, {"n": "Ross 248", "x": -3.38, "y": 9.28, "z": -3.01, "sp": "dM6  e", "c": 1, "ly": 10.3}, {"n": "Epsilon Eridani", "x": -6.75, "y": -1.91, "z": -7.8, "sp": "K2V", "c": 1, "ly": 10.5}, {"n": "Lacaille 9352", "x": 4.34, "y": 0.39, "z": -9.76, "sp": "M2/M3V", "c": 1, "ly": 10.7}, {"n": "Ross 128", "x": 0.01, "y": -5.54, "z": 9.43, "sp": "M4.5V", "c": 1, "ly": 10.9}, {"n": "EZ Aqr", "x": 4.11, "y": 4.42, "z": -9.28, "sp": "M5  e", "c": 1, "ly": 11.1}, {"n": "61 Cygni", "x": 1.51, "y": 11.21, "z": -1.15, "sp": "K5V", "c": 2, "ly": 11.4}, {"n": "Procyon", "x": -9.29, "y": -6.2, "z": 2.58, "sp": "F5IV-V", "c": 2, "ly": 11.5}, {"n": "Struve 2398", "x": 0.13, "y": 10.61, "z": 4.78, "sp": "K5", "c": 2, "ly": 11.6}, {"n": "Groombridge 34", "x": -4.98, "y": 9.92, "z": -3.7, "sp": "M1V", "c": 2, "ly": 11.7}, {"n": "Epsilon Indi", "x": 7.23, "y": -3.19, "z": -8.79, "sp": "K5V", "c": 1, "ly": 11.8}, {"n": "Gliese 1111", "x": -9.54, "y": -2.92, "z": 6.34, "sp": "M6.5", "c": 1, "ly": 11.8}, {"n": "Tau Ceti", "x": -3.37, "y": 0.41, "z": -11.41, "sp": "G8V", "c": 1, "ly": 11.9}, {"n": "YZ Ceti", "x": -2.03, "y": 1.18, "z": -11.8, "sp": "M5.5Ve", "c": 1, "ly": 12.0}, {"n": "Luyten's Star", "x": -10.31, "y": -6.53, "z": 2.23, "sp": "M5", "c": 1, "ly": 12.4}, {"n": "Teegarden's Star", "x": -9.39, "y": 3.37, "z": -7.53, "sp": "M7V", "c": 1, "ly": 12.5}, {"n": "Kapteyn's Star", "x": -3.44, "y": -9.74, "z": -7.5, "sp": "M0V", "c": 1, "ly": 12.8}, {"n": "Lacaille 8760", "x": 9.2, "y": 0.63, "z": -8.98, "sp": "M1/M2V", "c": 1, "ly": 12.9}, {"n": "Kruger 60", "x": -3.31, "y": 12.62, "z": -0.0, "sp": "M2V", "c": 2, "ly": 13.0}, {"n": "Ross 614", "x": -11.23, "y": -7.27, "z": -1.45, "sp": "M4.5Ve", "c": 2, "ly": 13.5}, {"n": "Van Maanen's Star", "x": -3.95, "y": 6.35, "z": -11.72, "sp": "DG", "c": 1, "ly": 13.9}, {"n": "Gliese 1061", "x": -2.63, "y": -8.02, "z": -11.16, "sp": "M4.5", "c": 1, "ly": 14.0}, {"n": "Wolf 1061", "x": 12.8, "y": 0.75, "z": 5.62, "sp": "M4", "c": 1, "ly": 14.0}, {"n": "Gliese 473", "x": 1.44, "y": -4.24, "z": 13.31, "sp": "dM5.5e", "c": 2, "ly": 14.0}, {"n": "Gliese 1", "x": 3.31, "y": -0.98, "z": -13.73, "sp": "M2V", "c": 1, "ly": 14.2}, {"n": "Gliese 3522", "x": -9.42, "y": -7.96, "z": 7.75, "sp": "k", "c": 1, "ly": 14.6}, {"n": "Gliese 83.1", "x": -8.47, "y": 5.37, "z": -10.57, "sp": "dM8  e", "c": 1, "ly": 14.6}, {"n": "Gliese 3618", "x": 4.58, "y": -13.89, "z": -0.51, "sp": "m", "c": 1, "ly": 14.6}, {"n": "Gliese 687", "x": -1.87, "y": 12.39, "z": 7.82, "sp": "M3.5Vv", "c": 1, "ly": 14.8}, {"n": "Gliese 674", "x": 14.06, "y": -4.3, "z": -1.75, "sp": "K5", "c": 1, "ly": 14.8}, {"n": "Gliese 876", "x": 4.76, "y": 6.09, "z": -13.19, "sp": "M5", "c": 1, "ly": 15.3}, {"n": "Gliese 1002", "x": -0.25, "y": 5.8, "z": -14.18, "sp": "M5-5.5", "c": 1, "ly": 15.3}, {"n": "Gliese 832", "x": 10.95, "y": -2.09, "z": -11.69, "sp": "M1V", "c": 1, "ly": 16.2}, {"n": "40 Eridani", "x": -11.97, "y": -4.54, "z": -10.02, "sp": "K1V", "c": 3, "ly": 16.3}, {"n": "Gliese 682", "x": 15.96, "y": -3.98, "z": -1.91, "sp": "M5", "c": 1, "ly": 16.6}, {"n": "70 Ophiuchi", "x": 14.09, "y": 8.1, "z": 3.27, "sp": "K0V SB", "c": 2, "ly": 16.6}, {"n": "Altair", "x": 11.11, "y": 12.23, "z": -2.59, "sp": "A7IV-V", "c": 1, "ly": 16.7}, {"n": "Gliese 229", "x": -11.77, "y": -13.36, "z": -5.94, "sp": "M1/M2V", "c": 1, "ly": 18.8}, {"n": "Sigma Draconis", "x": -3.41, "y": 17.08, "z": 6.99, "sp": "K0V", "c": 1, "ly": 18.8}, {"n": "36 Ophiuchi", "x": 19.2, "y": -0.58, "z": 2.32, "sp": "K2:III", "c": 3, "ly": 19.4}, {"n": "Eta Cassiopeiae", "x": -10.43, "y": 16.29, "z": -1.71, "sp": "G0V SB", "c": 2, "ly": 19.4}, {"n": "82 Eridani", "x": -3.63, "y": -10.39, "z": -16.36, "sp": "G8V", "c": 1, "ly": 19.7}, {"n": "Delta Pavonis", "x": 14.53, "y": -8.47, "z": -10.68, "sp": "G5IV-V", "c": 1, "ly": 19.9}, {"n": "Gliese 581", "x": 15.44, "y": -1.6, "z": 13.03, "sp": "M5", "c": 1, "ly": 20.3}, {"n": "Xi Bootis", "x": 9.65, "y": 4.11, "z": 19.21, "sp": "G8V + ", "c": 2, "ly": 21.9}, {"n": "Gliese 667", "x": 22.06, "y": -3.16, "z": 0.55, "sp": "K4V", "c": 1, "ly": 22.3}, {"n": "Beta Hydri", "x": 10.66, "y": -15.36, "z": -15.57, "sp": "G2IV", "c": 1, "ly": 24.3}, {"n": "Vega", "x": 9.07, "y": 21.84, "z": 8.25, "sp": "A0Vvar", "c": 1, "ly": 25.0}, {"n": "Fomalhaut", "x": 9.98, "y": 3.73, "z": -22.76, "sp": "A3V", "c": 1, "ly": 25.1}];
-const STARS_LONG=[{"n": "Sun", "x": 0, "y": 0, "z": 0, "sp": "G2V", "c": 1, "ly": 0}, {"n": "Alpha Centauri", "x": 3.09, "y": -3.02, "z": -0.05, "sp": "G2V", "c": 3, "ly": 4.3}, {"n": "Barnard's Star", "x": 4.94, "y": 2.97, "z": 1.44, "sp": "sdM4", "c": 1, "ly": 5.9}, {"n": "Wolf 359", "x": -1.9, "y": -3.91, "z": 6.48, "sp": "M6", "c": 1, "ly": 7.8}, {"n": "Lalande 21185", "x": -3.44, "y": -0.31, "z": 7.55, "sp": "M2V", "c": 1, "ly": 8.3}, {"n": "Luyten 726-8", "x": -2.11, "y": 0.17, "z": -8.31, "sp": "dM5.5e", "c": 2, "ly": 8.6}, {"n": "Sirius", "x": -5.77, "y": -6.24, "z": -1.33, "sp": "A0m...", "c": 2, "ly": 8.6}, {"n": "Ross 154", "x": 9.35, "y": 1.87, "z": -1.73, "sp": "M3.5Ve", "c": 1, "ly": 9.7}, {"n": "Ross 248", "x": -3.38, "y": 9.28, "z": -3.01, "sp": "dM6  e", "c": 1, "ly": 10.3}, {"n": "Epsilon Eridani", "x": -6.75, "y": -1.91, "z": -7.8, "sp": "K2V", "c": 1, "ly": 10.5}, {"n": "Lacaille 9352", "x": 4.34, "y": 0.39, "z": -9.76, "sp": "M2/M3V", "c": 1, "ly": 10.7}, {"n": "Ross 128", "x": 0.01, "y": -5.54, "z": 9.43, "sp": "M4.5V", "c": 1, "ly": 10.9}, {"n": "EZ Aqr", "x": 4.11, "y": 4.42, "z": -9.28, "sp": "M5  e", "c": 1, "ly": 11.1}, {"n": "61 Cygni", "x": 1.51, "y": 11.21, "z": -1.15, "sp": "K5V", "c": 2, "ly": 11.4}, {"n": "Procyon", "x": -9.29, "y": -6.2, "z": 2.58, "sp": "F5IV-V", "c": 2, "ly": 11.5}, {"n": "Struve 2398", "x": 0.13, "y": 10.61, "z": 4.78, "sp": "K5", "c": 2, "ly": 11.6}, {"n": "Groombridge 34", "x": -4.98, "y": 9.92, "z": -3.7, "sp": "M1V", "c": 2, "ly": 11.7}, {"n": "Epsilon Indi", "x": 7.23, "y": -3.19, "z": -8.79, "sp": "K5V", "c": 1, "ly": 11.8}, {"n": "Tau Ceti", "x": -3.37, "y": 0.41, "z": -11.41, "sp": "G8V", "c": 1, "ly": 11.9}, {"n": "YZ Ceti", "x": -2.03, "y": 1.18, "z": -11.8, "sp": "M5.5Ve", "c": 1, "ly": 12.0}, {"n": "Luyten's Star", "x": -10.31, "y": -6.53, "z": 2.23, "sp": "M5", "c": 1, "ly": 12.4}, {"n": "Teegarden's Star", "x": -9.39, "y": 3.37, "z": -7.53, "sp": "M7V", "c": 1, "ly": 12.5}, {"n": "Kapteyn's Star", "x": -3.44, "y": -9.74, "z": -7.5, "sp": "M0V", "c": 1, "ly": 12.8}, {"n": "Lacaille 8760", "x": 9.2, "y": 0.63, "z": -8.98, "sp": "M1/M2V", "c": 1, "ly": 12.9}, {"n": "Kruger 60", "x": -3.31, "y": 12.62, "z": -0.0, "sp": "M2V", "c": 2, "ly": 13.0}, {"n": "Ross 614", "x": -11.23, "y": -7.27, "z": -1.45, "sp": "M4.5Ve", "c": 2, "ly": 13.5}, {"n": "Van Maanen's Star", "x": -3.95, "y": 6.35, "z": -11.72, "sp": "DG", "c": 1, "ly": 13.9}, {"n": "Gliese 1061", "x": -2.63, "y": -8.02, "z": -11.16, "sp": "M4.5", "c": 1, "ly": 14.0}, {"n": "Wolf 1061", "x": 12.8, "y": 0.75, "z": 5.62, "sp": "M4", "c": 1, "ly": 14.0}, {"n": "Gliese 687", "x": -1.87, "y": 12.39, "z": 7.82, "sp": "M3.5Vv", "c": 1, "ly": 14.8}, {"n": "Gliese 674", "x": 14.06, "y": -4.3, "z": -1.75, "sp": "K5", "c": 1, "ly": 14.8}, {"n": "Gliese 876", "x": 4.76, "y": 6.09, "z": -13.19, "sp": "M5", "c": 1, "ly": 15.3}, {"n": "Gliese 1002", "x": -0.25, "y": 5.8, "z": -14.18, "sp": "M5-5.5", "c": 1, "ly": 15.3}, {"n": "Gliese 832", "x": 10.95, "y": -2.09, "z": -11.69, "sp": "M1V", "c": 1, "ly": 16.2}, {"n": "40 Eridani", "x": -11.97, "y": -4.54, "z": -10.02, "sp": "K1V", "c": 3, "ly": 16.3}, {"n": "Gliese 682", "x": 15.96, "y": -3.98, "z": -1.91, "sp": "M5", "c": 1, "ly": 16.6}, {"n": "70 Ophiuchi", "x": 14.09, "y": 8.1, "z": 3.27, "sp": "K0V SB", "c": 2, "ly": 16.6}, {"n": "Altair", "x": 11.11, "y": 12.23, "z": -2.59, "sp": "A7IV-V", "c": 1, "ly": 16.7}, {"n": "Gliese 229", "x": -11.77, "y": -13.36, "z": -5.94, "sp": "M1/M2V", "c": 1, "ly": 18.8}, {"n": "Sigma Draconis", "x": -3.41, "y": 17.08, "z": 6.99, "sp": "K0V", "c": 1, "ly": 18.8}, {"n": "36 Ophiuchi", "x": 19.2, "y": -0.58, "z": 2.32, "sp": "K2:III", "c": 3, "ly": 19.4}, {"n": "Eta Cassiopeiae", "x": -10.43, "y": 16.29, "z": -1.71, "sp": "G0V SB", "c": 2, "ly": 19.4}, {"n": "82 Eridani", "x": -3.63, "y": -10.39, "z": -16.36, "sp": "G8V", "c": 1, "ly": 19.7}, {"n": "Delta Pavonis", "x": 14.53, "y": -8.47, "z": -10.68, "sp": "G5IV-V", "c": 1, "ly": 19.9}, {"n": "Gliese 581", "x": 15.44, "y": -1.6, "z": 13.03, "sp": "M5", "c": 1, "ly": 20.3}, {"n": "Xi Bootis", "x": 9.65, "y": 4.11, "z": 19.21, "sp": "G8V + ", "c": 2, "ly": 21.9}, {"n": "Gliese 667", "x": 22.06, "y": -3.16, "z": 0.55, "sp": "K4V", "c": 1, "ly": 22.3}, {"n": "Beta Hydri", "x": 10.66, "y": -15.36, "z": -15.57, "sp": "G2IV", "c": 1, "ly": 24.3}, {"n": "Vega", "x": 9.07, "y": 21.84, "z": 8.25, "sp": "A0Vvar", "c": 1, "ly": 25.0}, {"n": "Fomalhaut", "x": 9.98, "y": 3.73, "z": -22.76, "sp": "A3V", "c": 1, "ly": 25.1}, {"n": "Gliese 713", "x": -5.4, "y": 22.56, "z": 12.36, "sp": "F7Vvar", "c": 1, "ly": 26.3}, {"n": "Gliese 695", "x": 14.9, "y": 19.37, "z": 11.72, "sp": "G5IV", "c": 3, "ly": 27.1}, {"n": "Chara", "x": -5.03, "y": 4.84, "z": 26.63, "sp": "G0V", "c": 1, "ly": 27.5}, {"n": "Gliese 506", "x": 13.37, "y": -14.93, "z": 19.42, "sp": "G5V", "c": 1, "ly": 27.9}, {"n": "Gliese 17", "x": 10.71, "y": -13.55, "z": -22.05, "sp": "F9V", "c": 1, "ly": 28.0}, {"n": "Gliese 222", "x": -27.92, "y": -4.15, "z": -1.35, "sp": "G0V", "c": 1, "ly": 28.3}, {"n": "Gliese 666", "x": 27.23, "y": -8.69, "z": -2.64, "sp": "M0V", "c": 2, "ly": 28.7}, {"n": "Gliese 433", "x": 6.59, "y": -24.8, "z": 13.45, "sp": "M2V", "c": 1, "ly": 29.0}, {"n": "Gliese 785", "x": 24.38, "y": 6.82, "z": -14.27, "sp": "K3V", "c": 1, "ly": 29.1}, {"n": "Gliese 216", "x": -18.17, "y": -19.35, "z": -11.97, "sp": "F7V", "c": 2, "ly": 29.1}, {"n": "Groombridge 1830", "x": -8.12, "y": 1.65, "z": 28.47, "sp": "G8Vp", "c": 2, "ly": 29.7}, {"n": "Gliese 849", "x": 11.68, "y": 17.25, "z": -21.12, "sp": "M3", "c": 1, "ly": 29.7}, {"n": "Gliese 502", "x": 1.73, "y": 1.64, "z": 29.68, "sp": "G0V", "c": 1, "ly": 29.8}, {"n": "Gliese 137", "x": -21.77, "y": 0.68, "z": -20.36, "sp": "G5Vvar", "c": 1, "ly": 29.8}, {"n": "Gliese 442", "x": 9.53, "y": -26.47, "z": 10.64, "sp": "G3/G5V", "c": 2, "ly": 30.1}, {"n": "Gliese 827", "x": 19.57, "y": -12.16, "z": -19.53, "sp": "F6V", "c": 1, "ly": 30.2}, {"n": "Gliese 176", "x": -28.86, "y": -0.01, "z": -9.06, "sp": "M2", "c": 1, "ly": 30.2}, {"n": "Gliese 432", "x": 7.07, "y": -26.79, "z": 14.31, "sp": "K0V", "c": 2, "ly": 31.2}, {"n": "Gliese 434", "x": -8.98, "y": -0.56, "z": 30.03, "sp": "G8Vvar", "c": 1, "ly": 31.3}, {"n": "Gliese 631", "x": 27.17, "y": 6.64, "z": 15.13, "sp": "K2V", "c": 1, "ly": 31.8}, {"n": "Gliese 75", "x": -20.69, "y": 25.48, "z": 0.95, "sp": "K0V", "c": 1, "ly": 32.8}, {"n": "Gliese 436", "x": -7.58, "y": -4.47, "z": 31.88, "sp": "M3", "c": 1, "ly": 33.1}, {"n": "Gliese 231", "x": 7.92, "y": -28.05, "z": -16.02, "sp": "G5V", "c": 1, "ly": 33.3}, {"n": "Gliese 117", "x": -17.37, "y": -3.72, "z": -28.71, "sp": "K1V", "c": 1, "ly": 33.8}, {"n": "Pollux", "x": -30.3, "y": -6.57, "z": 13.42, "sp": "K0IIIv", "c": 1, "ly": 33.8}, {"n": "Alula Australis", "x": -11.62, "y": -3.14, "z": 31.77, "sp": "G0 Ve", "c": 2, "ly": 34.0}, {"n": "Gliese 124", "x": -27.79, "y": 19.75, "z": -4.42, "sp": "G0V", "c": 1, "ly": 34.4}, {"n": "Arcturus", "x": 11.91, "y": 3.2, "z": 32.33, "sp": "K2IIIp", "c": 1, "ly": 34.6, "real": 36.7}, {"n": "TRAPPIST-1", "x": 6.6, "y": 17.84, "z": -28.9, "sp": "M8V", "c": 1, "ly": 34.6, "real": 40.7}, {"n": "Gliese 635", "x": 16.17, "y": 21.19, "z": 22.6, "sp": "F9IV", "c": 2, "ly": 35.0}];
+const STARS_STD=[{"n": "Sun", "x": 0, "y": 0, "z": 0, "sp": "G2V", "c": 1, "ly": 0}, {"n": "Alpha Centauri", "x": 3.09, "y": -3.02, "z": -0.05, "sp": "G2V", "c": 3, "ly": 4.3}, {"n": "Barnard's Star", "x": 4.94, "y": 2.97, "z": 1.44, "sp": "sdM4", "c": 1, "ly": 5.9}, {"n": "Wolf 359", "x": -1.9, "y": -3.91, "z": 6.48, "sp": "M6", "c": 1, "ly": 7.8}, {"n": "Lalande 21185", "x": -3.44, "y": -0.31, "z": 7.55, "sp": "M2V", "c": 1, "ly": 8.3}, {"n": "Luyten 726-8", "x": -2.11, "y": 0.17, "z": -8.31, "sp": "dM5.5e", "c": 2, "ly": 8.6}, {"n": "Sirius", "x": -5.77, "y": -6.24, "z": -1.33, "sp": "A0m...", "c": 2, "ly": 8.6}, {"n": "Ross 154", "x": 9.35, "y": 1.87, "z": -1.73, "sp": "M3.5Ve", "c": 1, "ly": 9.7}, {"n": "Ross 248", "x": -3.38, "y": 9.28, "z": -3.01, "sp": "dM6  e", "c": 1, "ly": 10.3}, {"n": "Epsilon Eridani", "x": -6.75, "y": -1.91, "z": -7.8, "sp": "K2V", "c": 1, "ly": 10.5}, {"n": "Lacaille 9352", "x": 4.34, "y": 0.39, "z": -9.76, "sp": "M2/M3V", "c": 1, "ly": 10.7}, {"n": "Ross 128", "x": 0.01, "y": -5.54, "z": 9.43, "sp": "M4.5V", "c": 1, "ly": 10.9}, {"n": "EZ Aqr", "x": 4.11, "y": 4.42, "z": -9.28, "sp": "M5  e", "c": 1, "ly": 11.1}, {"n": "61 Cygni", "x": 1.51, "y": 11.21, "z": -1.15, "sp": "K5V", "c": 2, "ly": 11.4}, {"n": "Procyon", "x": -9.29, "y": -6.2, "z": 2.58, "sp": "F5IV-V", "c": 2, "ly": 11.5}, {"n": "Struve 2398", "x": 0.13, "y": 10.61, "z": 4.78, "sp": "K5", "c": 2, "ly": 11.6}, {"n": "Groombridge 34", "x": -4.98, "y": 9.92, "z": -3.7, "sp": "M1V", "c": 2, "ly": 11.7}, {"n": "Epsilon Indi", "x": 7.23, "y": -3.19, "z": -8.79, "sp": "K5V", "c": 1, "ly": 11.8}, {"n": "Gliese 1111", "x": -9.54, "y": -2.92, "z": 6.34, "sp": "M6.5", "c": 1, "ly": 11.8}, {"n": "Tau Ceti", "x": -3.37, "y": 0.41, "z": -11.41, "sp": "G8V", "c": 1, "ly": 11.9}, {"n": "YZ Ceti", "x": -2.03, "y": 1.18, "z": -11.8, "sp": "M5.5Ve", "c": 1, "ly": 12.0}, {"n": "Luyten's Star", "x": -10.31, "y": -6.53, "z": 2.23, "sp": "M5", "c": 1, "ly": 12.4}, {"n": "Teegarden's Star", "x": -9.39, "y": 3.37, "z": -7.53, "sp": "M7V", "c": 1, "ly": 12.5}, {"n": "Kapteyn's Star", "x": -3.44, "y": -9.74, "z": -7.5, "sp": "M0V", "c": 1, "ly": 12.8}, {"n": "Lacaille 8760", "x": 9.2, "y": 0.63, "z": -8.98, "sp": "M1/M2V", "c": 1, "ly": 12.9}, {"n": "Kruger 60", "x": -3.31, "y": 12.62, "z": -0.0, "sp": "M2V", "c": 2, "ly": 13.0}, {"n": "Ross 614", "x": -11.23, "y": -7.27, "z": -1.45, "sp": "M4.5Ve", "c": 2, "ly": 13.5}, {"n": "Van Maanen's Star", "x": -3.95, "y": 6.35, "z": -11.72, "sp": "DG", "c": 1, "ly": 13.9}, {"n": "Gliese 1061", "x": -2.63, "y": -8.02, "z": -11.16, "sp": "M4.5", "c": 1, "ly": 14.0}, {"n": "Wolf 1061", "x": 12.8, "y": 0.75, "z": 5.62, "sp": "M4", "c": 1, "ly": 14.0}, {"n": "Gliese 473", "x": 1.44, "y": -4.24, "z": 13.31, "sp": "dM5.5e", "c": 2, "ly": 14.0}, {"n": "Gliese 1", "x": 3.31, "y": -0.98, "z": -13.73, "sp": "M2V", "c": 1, "ly": 14.2}, {"n": "Gliese 3522", "x": -9.42, "y": -7.96, "z": 7.75, "sp": "k", "c": 1, "ly": 14.6}, {"n": "TZ Arietis", "x": -8.47, "y": 5.37, "z": -10.57, "sp": "dM8  e", "c": 1, "ly": 14.6}, {"n": "Gliese 3618", "x": 4.58, "y": -13.89, "z": -0.51, "sp": "m", "c": 1, "ly": 14.6}, {"n": "Gliese 687", "x": -1.87, "y": 12.39, "z": 7.82, "sp": "M3.5Vv", "c": 1, "ly": 14.8}, {"n": "Gliese 674", "x": 14.06, "y": -4.3, "z": -1.75, "sp": "K5", "c": 1, "ly": 14.8}, {"n": "Gliese 876", "x": 4.76, "y": 6.09, "z": -13.19, "sp": "M5", "c": 1, "ly": 15.3}, {"n": "Gliese 1002", "x": -0.25, "y": 5.8, "z": -14.18, "sp": "M5-5.5", "c": 1, "ly": 15.3}, {"n": "Gliese 832", "x": 10.95, "y": -2.09, "z": -11.69, "sp": "M1V", "c": 1, "ly": 16.2}, {"n": "40 Eridani", "x": -11.97, "y": -4.54, "z": -10.02, "sp": "K1V", "c": 3, "ly": 16.3}, {"n": "Gliese 682", "x": 15.96, "y": -3.98, "z": -1.91, "sp": "M5", "c": 1, "ly": 16.6}, {"n": "70 Ophiuchi", "x": 14.09, "y": 8.1, "z": 3.27, "sp": "K0V SB", "c": 2, "ly": 16.6}, {"n": "Altair", "x": 11.11, "y": 12.23, "z": -2.59, "sp": "A7IV-V", "c": 1, "ly": 16.7}, {"n": "Gliese 229", "x": -11.77, "y": -13.36, "z": -5.94, "sp": "M1/M2V", "c": 1, "ly": 18.8}, {"n": "Sigma Draconis", "x": -3.41, "y": 17.08, "z": 6.99, "sp": "K0V", "c": 1, "ly": 18.8}, {"n": "36 Ophiuchi", "x": 19.2, "y": -0.58, "z": 2.32, "sp": "K2:III", "c": 3, "ly": 19.4}, {"n": "Eta Cassiopeiae", "x": -10.43, "y": 16.29, "z": -1.71, "sp": "G0V SB", "c": 2, "ly": 19.4}, {"n": "82 Eridani", "x": -3.63, "y": -10.39, "z": -16.36, "sp": "G8V", "c": 1, "ly": 19.7}, {"n": "Delta Pavonis", "x": 14.53, "y": -8.47, "z": -10.68, "sp": "G5IV-V", "c": 1, "ly": 19.9}, {"n": "Gliese 581", "x": 15.44, "y": -1.6, "z": 13.03, "sp": "M5", "c": 1, "ly": 20.3}, {"n": "Xi Bootis", "x": 9.65, "y": 4.11, "z": 19.21, "sp": "G8V + ", "c": 2, "ly": 21.9}, {"n": "Gliese 667", "x": 22.06, "y": -3.16, "z": 0.55, "sp": "K4V", "c": 1, "ly": 22.3}, {"n": "Beta Hydri", "x": 10.66, "y": -15.36, "z": -15.57, "sp": "G2IV", "c": 1, "ly": 24.3}, {"n": "Vega", "x": 9.07, "y": 21.84, "z": 8.25, "sp": "A0Vvar", "c": 1, "ly": 25.0}, {"n": "Fomalhaut", "x": 9.98, "y": 3.73, "z": -22.76, "sp": "A3V", "c": 1, "ly": 25.1}];
+const STARS_LONG=[{"n": "Sun", "x": 0, "y": 0, "z": 0, "sp": "G2V", "c": 1, "ly": 0}, {"n": "Alpha Centauri", "x": 3.09, "y": -3.02, "z": -0.05, "sp": "G2V", "c": 3, "ly": 4.3}, {"n": "Barnard's Star", "x": 4.94, "y": 2.97, "z": 1.44, "sp": "sdM4", "c": 1, "ly": 5.9}, {"n": "Wolf 359", "x": -1.9, "y": -3.91, "z": 6.48, "sp": "M6", "c": 1, "ly": 7.8}, {"n": "Lalande 21185", "x": -3.44, "y": -0.31, "z": 7.55, "sp": "M2V", "c": 1, "ly": 8.3}, {"n": "Luyten 726-8", "x": -2.11, "y": 0.17, "z": -8.31, "sp": "dM5.5e", "c": 2, "ly": 8.6}, {"n": "Sirius", "x": -5.77, "y": -6.24, "z": -1.33, "sp": "A0m...", "c": 2, "ly": 8.6}, {"n": "Ross 154", "x": 9.35, "y": 1.87, "z": -1.73, "sp": "M3.5Ve", "c": 1, "ly": 9.7}, {"n": "Ross 248", "x": -3.38, "y": 9.28, "z": -3.01, "sp": "dM6  e", "c": 1, "ly": 10.3}, {"n": "Epsilon Eridani", "x": -6.75, "y": -1.91, "z": -7.8, "sp": "K2V", "c": 1, "ly": 10.5}, {"n": "Lacaille 9352", "x": 4.34, "y": 0.39, "z": -9.76, "sp": "M2/M3V", "c": 1, "ly": 10.7}, {"n": "Ross 128", "x": 0.01, "y": -5.54, "z": 9.43, "sp": "M4.5V", "c": 1, "ly": 10.9}, {"n": "EZ Aqr", "x": 4.11, "y": 4.42, "z": -9.28, "sp": "M5  e", "c": 1, "ly": 11.1}, {"n": "61 Cygni", "x": 1.51, "y": 11.21, "z": -1.15, "sp": "K5V", "c": 2, "ly": 11.4}, {"n": "Procyon", "x": -9.29, "y": -6.2, "z": 2.58, "sp": "F5IV-V", "c": 2, "ly": 11.5}, {"n": "Struve 2398", "x": 0.13, "y": 10.61, "z": 4.78, "sp": "K5", "c": 2, "ly": 11.6}, {"n": "Groombridge 34", "x": -4.98, "y": 9.92, "z": -3.7, "sp": "M1V", "c": 2, "ly": 11.7}, {"n": "Epsilon Indi", "x": 7.23, "y": -3.19, "z": -8.79, "sp": "K5V", "c": 1, "ly": 11.8}, {"n": "Tau Ceti", "x": -3.37, "y": 0.41, "z": -11.41, "sp": "G8V", "c": 1, "ly": 11.9}, {"n": "YZ Ceti", "x": -2.03, "y": 1.18, "z": -11.8, "sp": "M5.5Ve", "c": 1, "ly": 12.0}, {"n": "Luyten's Star", "x": -10.31, "y": -6.53, "z": 2.23, "sp": "M5", "c": 1, "ly": 12.4}, {"n": "Teegarden's Star", "x": -9.39, "y": 3.37, "z": -7.53, "sp": "M7V", "c": 1, "ly": 12.5}, {"n": "Kapteyn's Star", "x": -3.44, "y": -9.74, "z": -7.5, "sp": "M0V", "c": 1, "ly": 12.8}, {"n": "Lacaille 8760", "x": 9.2, "y": 0.63, "z": -8.98, "sp": "M1/M2V", "c": 1, "ly": 12.9}, {"n": "Kruger 60", "x": -3.31, "y": 12.62, "z": -0.0, "sp": "M2V", "c": 2, "ly": 13.0}, {"n": "Ross 614", "x": -11.23, "y": -7.27, "z": -1.45, "sp": "M4.5Ve", "c": 2, "ly": 13.5}, {"n": "Van Maanen's Star", "x": -3.95, "y": 6.35, "z": -11.72, "sp": "DG", "c": 1, "ly": 13.9}, {"n": "Gliese 1061", "x": -2.63, "y": -8.02, "z": -11.16, "sp": "M4.5", "c": 1, "ly": 14.0}, {"n": "Wolf 1061", "x": 12.8, "y": 0.75, "z": 5.62, "sp": "M4", "c": 1, "ly": 14.0}, {"n": "Gliese 687", "x": -1.87, "y": 12.39, "z": 7.82, "sp": "M3.5Vv", "c": 1, "ly": 14.8}, {"n": "Gliese 674", "x": 14.06, "y": -4.3, "z": -1.75, "sp": "K5", "c": 1, "ly": 14.8}, {"n": "Gliese 876", "x": 4.76, "y": 6.09, "z": -13.19, "sp": "M5", "c": 1, "ly": 15.3}, {"n": "Gliese 1002", "x": -0.25, "y": 5.8, "z": -14.18, "sp": "M5-5.5", "c": 1, "ly": 15.3}, {"n": "Gliese 832", "x": 10.95, "y": -2.09, "z": -11.69, "sp": "M1V", "c": 1, "ly": 16.2}, {"n": "40 Eridani", "x": -11.97, "y": -4.54, "z": -10.02, "sp": "K1V", "c": 3, "ly": 16.3}, {"n": "Gliese 682", "x": 15.96, "y": -3.98, "z": -1.91, "sp": "M5", "c": 1, "ly": 16.6}, {"n": "70 Ophiuchi", "x": 14.09, "y": 8.1, "z": 3.27, "sp": "K0V SB", "c": 2, "ly": 16.6}, {"n": "Altair", "x": 11.11, "y": 12.23, "z": -2.59, "sp": "A7IV-V", "c": 1, "ly": 16.7}, {"n": "Gliese 229", "x": -11.77, "y": -13.36, "z": -5.94, "sp": "M1/M2V", "c": 1, "ly": 18.8}, {"n": "Sigma Draconis", "x": -3.41, "y": 17.08, "z": 6.99, "sp": "K0V", "c": 1, "ly": 18.8}, {"n": "36 Ophiuchi", "x": 19.2, "y": -0.58, "z": 2.32, "sp": "K2:III", "c": 3, "ly": 19.4}, {"n": "Eta Cassiopeiae", "x": -10.43, "y": 16.29, "z": -1.71, "sp": "G0V SB", "c": 2, "ly": 19.4}, {"n": "82 Eridani", "x": -3.63, "y": -10.39, "z": -16.36, "sp": "G8V", "c": 1, "ly": 19.7}, {"n": "Delta Pavonis", "x": 14.53, "y": -8.47, "z": -10.68, "sp": "G5IV-V", "c": 1, "ly": 19.9}, {"n": "Gliese 581", "x": 15.44, "y": -1.6, "z": 13.03, "sp": "M5", "c": 1, "ly": 20.3}, {"n": "Xi Bootis", "x": 9.65, "y": 4.11, "z": 19.21, "sp": "G8V + ", "c": 2, "ly": 21.9}, {"n": "Gliese 667", "x": 22.06, "y": -3.16, "z": 0.55, "sp": "K4V", "c": 1, "ly": 22.3}, {"n": "Beta Hydri", "x": 10.66, "y": -15.36, "z": -15.57, "sp": "G2IV", "c": 1, "ly": 24.3}, {"n": "Vega", "x": 9.07, "y": 21.84, "z": 8.25, "sp": "A0Vvar", "c": 1, "ly": 25.0}, {"n": "Fomalhaut", "x": 9.98, "y": 3.73, "z": -22.76, "sp": "A3V", "c": 1, "ly": 25.1}, {"n": "Gliese 713", "x": -5.4, "y": 22.56, "z": 12.36, "sp": "F7Vvar", "c": 1, "ly": 26.3}, {"n": "Gliese 695", "x": 14.9, "y": 19.37, "z": 11.72, "sp": "G5IV", "c": 3, "ly": 27.1}, {"n": "Chara", "x": -5.03, "y": 4.84, "z": 26.63, "sp": "G0V", "c": 1, "ly": 27.5}, {"n": "61 Virginis", "x": 13.37, "y": -14.93, "z": 19.42, "sp": "G5V", "c": 1, "ly": 27.9}, {"n": "Gliese 17", "x": 10.71, "y": -13.55, "z": -22.05, "sp": "F9V", "c": 1, "ly": 28.0}, {"n": "Gliese 222", "x": -27.92, "y": -4.15, "z": -1.35, "sp": "G0V", "c": 1, "ly": 28.3}, {"n": "Gliese 666", "x": 27.23, "y": -8.69, "z": -2.64, "sp": "M0V", "c": 2, "ly": 28.7}, {"n": "Gliese 433", "x": 6.59, "y": -24.8, "z": 13.45, "sp": "M2V", "c": 1, "ly": 29.0}, {"n": "Gliese 785", "x": 24.38, "y": 6.82, "z": -14.27, "sp": "K3V", "c": 1, "ly": 29.1}, {"n": "Gliese 216", "x": -18.17, "y": -19.35, "z": -11.97, "sp": "F7V", "c": 2, "ly": 29.1}, {"n": "Groombridge 1830", "x": -8.12, "y": 1.65, "z": 28.47, "sp": "G8Vp", "c": 2, "ly": 29.7}, {"n": "Gliese 849", "x": 11.68, "y": 17.25, "z": -21.12, "sp": "M3", "c": 1, "ly": 29.7}, {"n": "Gliese 502", "x": 1.73, "y": 1.64, "z": 29.68, "sp": "G0V", "c": 1, "ly": 29.8}, {"n": "Gliese 137", "x": -21.77, "y": 0.68, "z": -20.36, "sp": "G5Vvar", "c": 1, "ly": 29.8}, {"n": "Gliese 442", "x": 9.53, "y": -26.47, "z": 10.64, "sp": "G3/G5V", "c": 2, "ly": 30.1}, {"n": "Gliese 827", "x": 19.57, "y": -12.16, "z": -19.53, "sp": "F6V", "c": 1, "ly": 30.2}, {"n": "Gliese 176", "x": -28.86, "y": -0.01, "z": -9.06, "sp": "M2", "c": 1, "ly": 30.2}, {"n": "Gliese 432", "x": 7.07, "y": -26.79, "z": 14.31, "sp": "K0V", "c": 2, "ly": 31.2}, {"n": "Gliese 434", "x": -8.98, "y": -0.56, "z": 30.03, "sp": "G8Vvar", "c": 1, "ly": 31.3}, {"n": "Gliese 631", "x": 27.17, "y": 6.64, "z": 15.13, "sp": "K2V", "c": 1, "ly": 31.8}, {"n": "Gliese 75", "x": -20.69, "y": 25.48, "z": 0.95, "sp": "K0V", "c": 1, "ly": 32.8}, {"n": "Gliese 436", "x": -7.58, "y": -4.47, "z": 31.88, "sp": "M3", "c": 1, "ly": 33.1}, {"n": "Gliese 231", "x": 7.92, "y": -28.05, "z": -16.02, "sp": "G5V", "c": 1, "ly": 33.3}, {"n": "Gliese 117", "x": -17.37, "y": -3.72, "z": -28.71, "sp": "K1V", "c": 1, "ly": 33.8}, {"n": "Pollux", "x": -30.3, "y": -6.57, "z": 13.42, "sp": "K0IIIv", "c": 1, "ly": 33.8}, {"n": "Alula Australis", "x": -11.62, "y": -3.14, "z": 31.77, "sp": "G0 Ve", "c": 2, "ly": 34.0}, {"n": "Gliese 124", "x": -27.79, "y": 19.75, "z": -4.42, "sp": "G0V", "c": 1, "ly": 34.4}, {"n": "Arcturus", "x": 11.91, "y": 3.2, "z": 32.33, "sp": "K2IIIp", "c": 1, "ly": 34.6, "real": 36.7}, {"n": "TRAPPIST-1", "x": 6.6, "y": 17.84, "z": -28.9, "sp": "M8V", "c": 1, "ly": 34.6, "real": 40.7}, {"n": "Gliese 635", "x": 16.17, "y": 21.19, "z": 22.6, "sp": "F9IV", "c": 2, "ly": 35.0}];
 const FAR_STARS=[{"n": "Achernar", "d": [0.184, -0.484, -0.855], "ly": 139}, {"n": "Polaris", "d": [-0.491, 0.748, 0.446], "ly": 433}, {"n": "Aldebaran", "d": [-0.938, -0.016, -0.346], "ly": 67}, {"n": "Rigel", "d": [-0.789, -0.442, -0.426], "ly": 863}, {"n": "Capella", "d": [-0.951, 0.298, 0.08], "ly": 43}, {"n": "Betelgeuse", "d": [-0.929, -0.334, -0.156], "ly": 498}, {"n": "Canopus", "d": [-0.138, -0.894, -0.427], "ly": 309}, {"n": "Castor", "d": [-0.916, -0.12, 0.382], "ly": 51}, {"n": "Regulus", "d": [-0.453, -0.476, 0.754], "ly": 79}, {"n": "Spica", "d": [0.455, -0.438, 0.775], "ly": 250}, {"n": "Antares", "d": [0.956, -0.135, 0.26], "ly": 554}, {"n": "Deneb", "d": [0.1, 0.994, 0.035], "ly": 1412}];
 
 'use strict';
 // ===================== STARWAKE v2 — STATIC DATA =====================
-const GAME_VERSION = 3;
+const GAME_VERSION = 4;
 const SAVE_FORMAT = 2;
 const START_YEAR = 2326;
 const LENGTHS = {
@@ -367,9 +368,9 @@ const ERAS = [
     {id: 'corporate', name: 'The Corporate Age', text: 'Corporations took over much of what governments once did, from power grids to spaceports.', why: 'Private investment and global markets built up deep reserves of wealth for the journey ahead.', fx: ['+25% credits', '+300 starting credits']},
   ]},
   {years: '2101–2176', name: 'Leaving the Cradle', q: 'How did we spread through the Solar System?', opts: [
-    {id: 'moonmars', name: 'The Moon and Mars', text: 'Mining bases on the Moon and domed settlements on Mars became humanity\'s first homes beyond Earth.', why: 'Both grew from research outposts into permanent settlements.', fx: ['Start with Settlements on the Moon and Mars', 'Mars can grow to 20 million people; the Moon stays small']},
-    {id: 'belt', name: 'The Belt Rush', text: 'Prospectors swarmed the asteroid belt and pushed on to the moons of Saturn.', why: 'Mining crews followed the ice and metal outward as far as Titan.', fx: ['Start with Settlements on Ceres and Titan, plus a mining outpost in the belt', 'All three stay small, but the outpost adds production from the start']},
-    {id: 'venus', name: 'Cloud Cities of Venus', text: 'Floating cities were built in Venus\' upper air, where pressure and temperature are close to Earth\'s.', why: 'The first cloud cities were small, but the upper air of Venus has room for far more.', fx: ['Start with a Settlement floating above Venus', 'It can grow to 40 million people, the most of any starting choice']},
+    {id: 'moonmars', name: 'The Moon and Mars', text: 'Mining bases on the Moon and domed settlements on Mars became humanity\'s first homes beyond Earth.', why: 'Both grew from research outposts into permanent settlements.', fx: ['Start with a small settlement on the Moon and a moderate-sized one on Mars']},
+    {id: 'belt', name: 'The Belt Rush', text: 'Prospectors swarmed the asteroid belt and pushed on to the moons of Saturn.', why: 'Mining crews followed the ice and metal outward as far as Titan.', fx: ['Start with small settlements on Ceres and Titan, plus a mining outpost in the belt']},
+    {id: 'venus', name: 'Cloud Cities of Venus', text: 'Floating cities were built in Venus\' upper air, where pressure and temperature are close to Earth\'s.', why: 'The first cloud cities were small, but the upper air of Venus has room for far more.', fx: ['Start with a large settlement floating above Venus']},
   ]},
   {years: '2176–2251', name: 'The Long Stride', q: 'Where did humanity put its effort?', opts: [
     {id: 'medicine', name: 'Medicine', text: 'Research focused on longer, healthier lives and on self-sufficient habitats.', why: 'Life-support research made sealed farms far more productive.', fx: ['Free tech, Closed Ecology: Harsh and Hostile colonies make 50% more food']},
@@ -378,7 +379,7 @@ const ERAS = [
   ]},
   {years: '2251–2326', name: 'First Light', q: 'What was our first step toward the stars?', opts: [
     {id: 'ark', name: 'The Ark Program', text: 'A great colony ship was completed in orbit.', why: 'It was built before anyone chose where it would go.', fx: ['Start with 1 extra Colony Ship']},
-    {id: 'telescope', name: 'The Great Telescope', text: 'A telescope array mapped the nearby stars and the worlds around them.', why: 'Its main mirror was placed in orbit around Earth and is still in service.', fx: ['A unique building on Earth. Its telescope sees 24 light-years away, and knows worlds within 8.6 light-years of Earth and any signs of life on them']},
+    {id: 'telescope', name: 'The Great Telescope', text: 'A telescope array mapped the nearby stars and the worlds around them.', why: 'Its main mirror was placed in orbit around Earth and is still in service.', fx: ['Start with a unique telescope on Earth that sees 24 light-years and knows the worlds and life within 8.6 light-years']},
     {id: 'probes', name: 'The Pathfinder Probes', text: 'Small, fast probes were built and launched toward the two nearest stars in the early 2300s.', why: 'After a couple of decades in transit, both have now arrived at Alpha Centauri and Barnard\'s Star, and the science vessel built to follow up on their findings is ready at Earth.', fx: ['Start with 2 Pathfinder Probes at Alpha Centauri and Barnard\'s Star, plus a free Science Vessel at Earth']},
   ]},
 ];
@@ -403,35 +404,43 @@ const SOL_BODIES = [
   {name: 'Triton', cls: 'moon', size: 1, temp: 'frozen', atm: 'thin', min: 1, traits: [], of: 'Neptune'},
 ];
 // Known exoplanets (from published discoveries; uncertain details are filled in by the game)
-const KNOWN_PLANETS = {
-  'Alpha Centauri': [['Proxima b', 'rocky', 2, 'temperate', ['locked', 'flares']], ['Proxima d', 'rocky', 1, 'hot', ['flares']]],
+const KNOWN_PLANETS = { // real planets (checked Nov 2026); disputed candidates kept only where noted
+  'Alpha Centauri': [['Proxima b', 'rocky', 2, 'temperate', ['locked', 'flares']], ['Proxima d', 'rocky', 1, 'hot', ['flares']], ['Alpha Centauri A b', 'gasgiant', 5, 'temperate']], // A b: 2025 JWST candidate
   "Barnard's Star": [['b', 'rocky', 1, 'hot'], ['c', 'rocky', 1, 'hot'], ['d', 'rocky', 1, 'hot'], ['e', 'rocky', 1, 'hot']],
   'Lalande 21185': [['b', 'superearth', 3, 'hot'], ['c', 'minineptune', 4, 'cold']],
   'Epsilon Eridani': [['b', 'gasgiant', 5, 'cold'], ['Inner belt', 'belt', 1, 'cold'], ['Outer belt', 'belt', 1, 'frozen']],
-  'Ross 128': [['b', 'superearth', 2, 'temperate', ['locked']]],
-  "Luyten's Star": [['b', 'superearth', 3, 'temperate', ['locked']], ['c', 'superearth', 3, 'hot']],
-  'Tau Ceti': [['g', 'superearth', 2, 'scorching'], ['h', 'superearth', 2, 'hot'], ['e', 'superearth', 3, 'hot'], ['f', 'superearth', 3, 'cold'], ['Debris belt', 'belt', 1, 'frozen']],
-  'Wolf 1061': [['b', 'rocky', 1, 'scorching'], ['c', 'superearth', 3, 'temperate', ['locked']], ['d', 'superearth', 4, 'frozen']],
-  'Gliese 876': [['d', 'superearth', 3, 'scorching'], ['c', 'gasgiant', 5, 'temperate'], ['b', 'gasgiant', 5, 'temperate'], ['e', 'icegiant', 4, 'cold']],
-  'Gliese 581': [['e', 'rocky', 1, 'scorching'], ['b', 'minineptune', 4, 'hot'], ['c', 'superearth', 3, 'hot']],
-  'Gliese 667': [['b', 'superearth', 3, 'scorching'], ['c', 'superearth', 3, 'temperate', ['locked']], ['d', 'superearth', 3, 'cold']],
-  "Teegarden's Star": [['b', 'rocky', 2, 'temperate', ['locked']], ['c', 'rocky', 2, 'cold'], ['d', 'rocky', 2, 'frozen']],
-  'Gliese 1061': [['b', 'rocky', 2, 'hot'], ['c', 'superearth', 2, 'temperate', ['locked']], ['d', 'superearth', 2, 'temperate', ['locked']]],
-  'Gliese 1002': [['b', 'rocky', 2, 'temperate', ['locked']], ['c', 'rocky', 2, 'temperate', ['locked']]],
-  'YZ Ceti': [['b', 'rocky', 1, 'scorching'], ['c', 'rocky', 1, 'hot'], ['d', 'rocky', 1, 'hot']],
   'Lacaille 9352': [['b', 'superearth', 3, 'hot'], ['c', 'superearth', 3, 'hot'], ['d', 'superearth', 3, 'temperate']],
-  'Gliese 687': [['b', 'minineptune', 4, 'cold']],
-  'Gliese 682': [['b', 'superearth', 3, 'temperate'], ['c', 'superearth', 3, 'hot']],
+  'Ross 128': [['b', 'superearth', 2, 'temperate', ['locked']]],
+  'Struve 2398': [['A b', 'superearth', 2, 'hot'], ['B c', 'superearth', 3, 'temperate', ['locked']]],
+  'Groombridge 34': [['Ab', 'superearth', 2, 'hot'], ['Ac', 'icegiant', 4, 'frozen']],
   'Epsilon Indi': [['Ab', 'gasgiant', 5, 'frozen']],
-  'Groombridge 34': [['Ab', 'superearth', 2, 'hot'], ['Ac', 'minineptune', 4, 'cold']],
+  'Gliese 1061': [['b', 'rocky', 2, 'hot'], ['c', 'superearth', 2, 'temperate', ['locked']], ['d', 'superearth', 2, 'temperate', ['locked']]],
+  'YZ Ceti': [['b', 'rocky', 1, 'scorching'], ['c', 'rocky', 1, 'hot'], ['d', 'rocky', 1, 'hot']],
+  "Luyten's Star": [['b', 'superearth', 3, 'temperate', ['locked']], ['c', 'rocky', 2, 'hot']],
+  "Teegarden's Star": [['b', 'rocky', 2, 'temperate', ['locked']], ['c', 'rocky', 2, 'temperate', ['locked']], ['d', 'rocky', 1, 'cold']],
+  'Wolf 1061': [['b', 'rocky', 1, 'scorching'], ['c', 'superearth', 3, 'temperate', ['locked']], ['d', 'superearth', 4, 'cold']],
+  'TZ Arietis': [['b', 'gasgiant', 5, 'cold']],
+  'Gliese 687': [['b', 'minineptune', 4, 'temperate'], ['c', 'minineptune', 4, 'cold']],
+  'Gliese 674': [['b', 'minineptune', 4, 'hot']],
+  'Gliese 876': [['d', 'superearth', 3, 'scorching'], ['c', 'gasgiant', 5, 'temperate'], ['b', 'gasgiant', 5, 'temperate'], ['e', 'icegiant', 4, 'cold']],
+  'Gliese 1002': [['b', 'rocky', 2, 'temperate', ['locked']], ['c', 'rocky', 2, 'temperate', ['locked']]],
   'Gliese 832': [['b', 'gasgiant', 5, 'frozen']],
-  'Gliese 229': [['Ac', 'minineptune', 4, 'hot']],
-  '82 Eridani': [['b', 'superearth', 2, 'scorching'], ['c', 'superearth', 2, 'scorching'], ['d', 'superearth', 3, 'hot']],
+  'Tau Ceti': [['g', 'superearth', 2, 'hot'], ['h', 'superearth', 2, 'hot'], ['f', 'superearth', 3, 'cold'], ['Debris belt', 'belt', 1, 'frozen']], // g, h, f still disputed
+  'Gliese 682': [['b', 'superearth', 3, 'temperate'], ['c', 'superearth', 3, 'hot']], // candidates
+  '82 Eridani': [['b', 'superearth', 2, 'hot'], ['c', 'superearth', 2, 'hot'], ['d', 'superearth', 3, 'temperate']],
+  'Gliese 581': [['e', 'rocky', 1, 'scorching'], ['b', 'minineptune', 4, 'hot'], ['c', 'superearth', 3, 'hot']],
+  'Gliese 667': [['b', 'superearth', 3, 'scorching'], ['c', 'superearth', 3, 'temperate', ['locked']]],
   'Fomalhaut': [['Dust belt', 'belt', 1, 'frozen']],
   'Vega': [['Debris disc', 'belt', 1, 'frozen']],
+  '61 Virginis': [['b', 'superearth', 3, 'hot'], ['c', 'minineptune', 4, 'hot'], ['d', 'minineptune', 4, 'hot'], ['Debris disc', 'belt', 1, 'frozen']],
+  'Gliese 433': [['b', 'superearth', 3, 'hot'], ['d', 'superearth', 3, 'hot'], ['c', 'icegiant', 4, 'cold']],
+  'Gliese 785': [['b', 'minineptune', 4, 'hot'], ['c', 'icegiant', 4, 'cold']],
+  'Gliese 849': [['b', 'gasgiant', 5, 'cold'], ['c', 'gasgiant', 5, 'frozen']],
+  'Gliese 176': [['b', 'superearth', 3, 'hot']],
+  'Gliese 436': [['b', 'minineptune', 4, 'scorching']],
   'Pollux': [['b', 'gasgiant', 5, 'hot']],
   'TRAPPIST-1': [['b', 'rocky', 1, 'scorching', ['locked']], ['c', 'rocky', 1, 'hot', ['locked']], ['d', 'rocky', 1, 'temperate', ['locked']], ['e', 'rocky', 1, 'temperate', ['locked']], ['f', 'rocky', 1, 'temperate', ['locked']], ['g', 'rocky', 1, 'cold', ['locked']], ['h', 'rocky', 1, 'frozen', ['locked']]],
-  'Sirius': [], 'Procyon': [], "Van Maanen's Star": [], 'Altair': [], '61 Cygni': [], 'Arcturus': [],
+  'Sirius': [], 'Procyon': [], "Van Maanen's Star": [], 'Altair': [], '61 Cygni': [], 'Arcturus': [], 'Gliese 229': [], "Kapteyn's Star": [],
 };
 
 // ---------- Anomaly stories (grounded mystery) ----------
@@ -487,6 +496,108 @@ const EVENTS = [
 ];
 // For the end screen and score
 const SCORE_W = {explored: 3, surveyed: 4, microbial: 10, ecosystem: 25, anomaly: 1, breakthrough: 30, tech: 6, settlement: 15, city: 40, core: 100, popLog: 20};
+
+'use strict';
+// ===================== STARWAKE — STAR DESCRIPTIONS =====================
+// What astronomers knew about each star (facts about the star only; planets stay a mystery until revealed).
+const STAR_DESC = {
+  'Sun': 'Our own star, a yellow dwarf about 4.6 billion years old.',
+  'Alpha Centauri': 'The nearest star system: two Sun-like stars that circle each other every 80 years, with the small red dwarf Proxima Centauri far out around them.',
+  "Barnard's Star": 'An old, dim red dwarf that moves across our sky faster than any other star.',
+  'Wolf 359': 'One of the faintest and least massive stars known, a young red dwarf that flares often.',
+  'Lalande 21185': 'A red dwarf just too faint to see without binoculars, one of the brightest red dwarfs in the northern sky.',
+  'Luyten 726-8': 'A pair of tiny red dwarfs. One of them, UV Ceti, gave its name to a whole class of flare stars.',
+  'Sirius': 'The brightest star in the night sky, about twice the Sun\'s mass, with a tiny white dwarf companion, Sirius B.',
+  'Ross 154': 'A young red dwarf that flares often.',
+  'Ross 248': 'A small red dwarf heading our way. In about 36,000 years it will briefly be the closest star to the Sun.',
+  'Epsilon Eridani': 'A young orange star, less than a billion years old, and one of the first stars ever searched for alien radio signals, in 1960.',
+  'Lacaille 9352': 'A red dwarf in the southern sky, bright enough to see with binoculars.',
+  'Ross 128': 'A quiet red dwarf that rarely flares, unlike most of its kind.',
+  'EZ Aqr': 'A triple system of three faint red dwarfs.',
+  '61 Cygni': 'A pair of orange dwarfs, and the first star after the Sun to have its distance measured, by Friedrich Bessel in 1838.',
+  'Procyon': 'One of the brightest stars in the sky, a yellow-white star a little bigger than the Sun, with a white dwarf companion.',
+  'Struve 2398': 'A pair of red dwarfs orbiting each other.',
+  'Groombridge 34': 'A pair of red dwarfs; the smaller one is a flare star.',
+  'Epsilon Indi': 'An orange star with a pair of brown dwarfs, "failed stars", far out in orbit.',
+  'Gliese 1111': 'One of the faintest stars nearby, a tiny flare star.',
+  'Tau Ceti': 'The closest lone Sun-like star, a little smaller and older than the Sun. One of the first stars ever searched for alien radio signals, in 1960.',
+  'YZ Ceti': 'A small red dwarf that flares.',
+  "Luyten's Star": 'A red dwarf named after the astronomer Willem Luyten. In 2017, a radio message was beamed toward it from Earth.',
+  "Teegarden's Star": 'One of the smallest and dimmest stars nearby, only discovered in 2003.',
+  "Kapteyn's Star": 'One of the oldest stars nearby. It orbits the galaxy backwards and probably came from a small galaxy the Milky Way swallowed long ago.',
+  'Lacaille 8760': 'The brightest red dwarf in our sky, just at the edge of what the naked eye can see.',
+  'Kruger 60': 'A pair of red dwarfs; the smaller one flares.',
+  'Ross 614': 'A red dwarf with a tiny companion that was once among the smallest stars known.',
+  "Van Maanen's Star": 'The nearest lone white dwarf: the burnt-out core of a star like the Sun, discovered in 1917.',
+  'Gliese 1061': 'A faint red dwarf, only recognised as one of the Sun\'s close neighbours in 1997.',
+  'Wolf 1061': 'A quiet red dwarf in the constellation Ophiuchus.',
+  'Gliese 473': 'A pair of tiny red dwarfs.',
+  'Gliese 1': 'A red dwarf in the southern sky.',
+  'TZ Arietis': 'A small flare star in the constellation Aries.',
+  'Gliese 687': 'A red dwarf far to the north, in the constellation Draco.',
+  'Gliese 674': 'A small red dwarf in the southern constellation Ara.',
+  'Gliese 876': 'A small red dwarf in the constellation Aquarius.',
+  'Gliese 1002': 'A faint, quiet red dwarf that rarely flares.',
+  'Gliese 832': 'A red dwarf in the southern constellation Grus.',
+  '40 Eridani': 'A triple star: an orange dwarf, a red dwarf and a white dwarf. The white dwarf was one of the first ever found.',
+  'Gliese 682': 'A red dwarf in Scorpius, toward the centre of the Milky Way.',
+  '70 Ophiuchi': 'A pair of orange stars that orbit each other every 88 years.',
+  'Altair': 'One of the brightest stars in the sky. It spins so fast that it bulges at its equator.',
+  'Gliese 229': 'A red dwarf with the first brown dwarf ever confirmed. In 2024 that brown dwarf turned out to be a pair of twins.',
+  'Sigma Draconis': 'A Sun-like orange star far to the north, in Draco.',
+  '36 Ophiuchi': 'A triple system of three orange stars.',
+  'Eta Cassiopeiae': 'A Sun-like yellow star with an orange companion, visible to the naked eye.',
+  '82 Eridani': 'A Sun-like star, older than the Sun, visible to the naked eye.',
+  'Delta Pavonis': 'One of the most Sun-like stars nearby, but older; it is starting to swell into a subgiant.',
+  'Gliese 581': 'A dim red dwarf in Libra. In 2008, a radio message was sent toward it from Earth.',
+  'Xi Bootis': 'A young pair: a yellow star and an orange star in Boötes.',
+  'Gliese 667': 'A triple system in Scorpius: two orange stars and a red dwarf.',
+  'Beta Hydri': 'The nearest subgiant: a Sun-like star older than the Sun, starting to swell.',
+  'Vega': 'One of the brightest stars in the sky, the North Star about 14,000 years ago. It spins very fast.',
+  'Fomalhaut': 'A bright white star in the southern sky, ringed by a wide disc of dust.',
+  'Gliese 713': 'Also known as Chi Draconis: a pair of yellow-white stars far to the north.',
+  'Gliese 695': 'Also known as Mu Herculis: a Sun-like star starting to swell, with a pair of red dwarf companions.',
+  'Chara': 'A star very like the Sun, a favourite target in the search for alien life.',
+  '61 Virginis': 'A star very like the Sun, a little older and visible to the naked eye.',
+  'Gliese 17': 'Also known as Zeta Tucanae: a Sun-like star in the southern sky, a little brighter than the Sun.',
+  'Gliese 222': 'Also known as Chi1 Orionis: a young Sun-like star in Orion.',
+  'Gliese 216': 'Also known as Gamma Leporis: a yellow-white star with an orange companion.',
+  'Groombridge 1830': 'An ancient star from the galaxy\'s outer halo, racing across our sky.',
+  'Gliese 502': 'Also known as Beta Comae Berenices: a Sun-like star, a little bigger and brighter than the Sun.',
+  'Gliese 137': 'Also known as Kappa1 Ceti: a young Sun-like star, studied as a picture of the Sun in its youth.',
+  'Gliese 827': 'Also known as Gamma Pavonis: a yellow-white star in the southern sky.',
+  'Gliese 434': 'Also known as 61 Ursae Majoris: a Sun-like star in the Great Bear.',
+  'Gliese 231': 'Also known as Alpha Mensae: a Sun-like star deep in the southern sky.',
+  'Gliese 635': 'Also known as Zeta Herculis: a pair of stars, one starting to swell into a subgiant.',
+  'Pollux': 'The brightest star in Gemini, an orange giant that has used up the hydrogen in its core.',
+  'Alula Australis': 'One of the first double stars to have its orbit worked out, in 1828.',
+  'Arcturus': 'The brightest star in the northern sky, an orange giant much older than the Sun.',
+  'TRAPPIST-1': 'An ultra-cool red dwarf barely bigger than Jupiter.',
+};
+const STAR_ALIAS = {'Gliese 506': '61 Virginis', 'Gliese 83.1': 'TZ Arietis'};
+const NUMW = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve'];
+const an = p => (/^[aeiou]/i.test(p) ? 'an ' : 'a ') + p;
+const lc = t => t.toLowerCase().replace('sun-', 'Sun-').replace('earth', 'Earth').replace('neptune', 'Neptune');
+function starFact(s) {
+  const t = STAR_DESC[s.name] || STAR_DESC[STAR_ALIAS[s.name]];
+  if (t) return t;
+  const w = lc(starKind(s.sp).word), n = s.cnt || s.c || 1;
+  const a = an(w); return a[0].toUpperCase() + a.slice(1) + (n > 2 ? ' with two companion stars.' : n > 1 ? ' with a companion star.' : '.');
+}
+function worldPhrase(b) {
+  let p = lc(TEMPS[b.temp] + ' ' + PCLASS[b.cls].name);
+  if (lifeKnown(b) && b.life === 'ecosystem') p += ' with a living ecosystem';
+  else if (lifeKnown(b) && b.life === 'microbial') p += ' with microbial life';
+  return an(p);
+}
+function worldsSummary(s) {
+  const all = s.bodies.map(B), bs = all.filter(b => !PCLASS[b.cls].belt);
+  if (!bs.length) return all.length ? 'No planets, only a belt of dust and rock.' : 'No planets.';
+  const rank = b => (lifeKnown(b) ? {ecosystem: 100, microbial: 50}[b.life] || 0 : 0) + ({garden: 40, livable: 30, harsh: 20, hostile: 10}[hab(b)] || 0) + (b.traits.some(t => t === 'rings' || t === 'subocean' || t === 'volcanic') ? 5 : 0) + b.size;
+  const best = bs.slice().sort((a, b) => rank(b) - rank(a))[0], n = bs.length;
+  return n === 1 ? `One world: ${worldPhrase(best)}.` : `${NUMW[n] || n} worlds, including ${worldPhrase(best)}.`;
+}
+function starDesc(s) { return starFact(s) + (s.id !== 0 && worldsKnown(s) ? ' ' + worldsSummary(s) : ''); }
 
 'use strict';
 // ===================== STARWAKE v2 — ENGINE =====================
@@ -576,10 +687,13 @@ function knownSystem(star, list) {
   for (const [nm, cls, size, temp, traits] of list) {
     newBody(star, {name: (nm.length <= 3 ? star.name + ' ' + nm : nm.indexOf(star.name) === 0 ? nm : (/^(Proxima)/.test(nm) ? nm : star.name + ' ' + nm)),
       cls, size, temp, atm: atmFor(cls, temp), min: +wpick(MIN_W), traits: (traits || []).slice()});
+    const b = B(star.bodies[star.bodies.length - 1]); // giants may have an undiscovered moon
+    if ((cls === 'gasgiant' || cls === 'icegiant') && rnd() < 0.4)
+      newBody(star, {name: b.name + ' I', cls: 'moon', size: ri(1, 2), temp: temp === 'temperate' || temp === 'hot' ? temp : 'frozen', atm: rnd() < 0.3 ? 'thin' : 'none', min: +wpick(MIN_W), traits: rnd() < 0.4 ? ['subocean'] : [], of: b.name});
   }
-  if (star.name === 'Alpha Centauri') { // A and B: unknown planets, rolled
-    for (let i = 0; i < ri(1, 3); i++) { const temp = pick(['hot', 'temperate', 'cold', 'frozen']); const cls = temp === 'frozen' ? pick(['gasgiant', 'ice', 'icegiant']) : pick(['rocky', 'superearth', 'ocean']);
-      newBody(star, {name: 'Alpha Centauri ' + ['A', 'B'][i % 2] + ' ' + 'bcd'[Math.floor(i / 2)], cls, size: cls === 'gasgiant' ? 5 : ri(1, 3), temp, atm: atmFor(cls, temp), min: +wpick(MIN_W), traits: []}); }
+  if (star.name === 'Alpha Centauri') { // B: unknown planets, rolled
+    for (let i = 0, n = ri(0, 2); i < n; i++) { const temp = pick(['hot', 'temperate', 'cold', 'frozen']); const cls = temp === 'frozen' ? pick(['gasgiant', 'ice', 'icegiant']) : pick(['rocky', 'superearth', 'ocean']);
+      newBody(star, {name: 'Alpha Centauri B ' + 'bc'[i], cls, size: cls === 'gasgiant' ? 5 : ri(1, 3), temp, atm: atmFor(cls, temp), min: +wpick(MIN_W), traits: []}); }
   }
 }
 function assignLife() {
@@ -1303,6 +1417,7 @@ ACT.colonize = v => {
 function starPanel(sid) {
   const s = ST(sid);
   let h = `<div class="hdr"><div><h2>${esc(s.name)}</h2><div class="dim small">${starTitle(s)}</div></div><button class="x" data-a="close">✕</button></div>`;
+  h += `<div class="sdesc">${esc(starDesc(s))}</div>`;
   if (s.guardKnown) h += `<div class="card" style="border-color:#7a2a2a"><b class="bad">Guardian machines.</b> Ancient automated defenses destroy any ship that enters this system.</div>`;
   if (!worldsKnown(s)) {
     h += `<div class="card dim">Only seen through telescopes. Send any ship here to see its worlds; a ship passing within 1 light-year will do.</div>`;
@@ -1318,7 +1433,7 @@ function starPanel(sid) {
     for (const bid of s.bodies) {
       const b = B(bid), ours = b.owner === 0 && b.col;
       const st = ours ? stageOf(b) : null;
-      h += `<div class="card ${ours && !b.col.outpost ? 'click' : ''}" ${ours && !b.col.outpost ? `data-a="colony" data-v="${b.id}"` : ''}><div class="body">${planetBall(b, 32)}<div style="flex:1;min-width:0"><b>${bodyName(b)}</b><div class="dim small">${sizeWord(b)}${PCLASS[b.cls].name.toLowerCase()}</div>${bodyFacts(b)}
+      h += `<div class="card ${ours && !b.col.outpost ? 'click' : ''}" ${ours && !b.col.outpost ? `data-a="colony" data-v="${b.id}"` : ''}><div class="body">${planetBall(b, 32)}<div style="flex:1;min-width:0"><b>${bodyName(b)}</b><div class="dim small">${sizeWord(b)}${lc(PCLASS[b.cls].name)}</div>${bodyFacts(b)}
         ${ours ? `<div class="row sb small" style="margin-top:5px"><span class="good">Ours · ${STAGES[st].name}${b.col.outpost ? '' : ' · ' + people(b.col.pop)}</span>${b.col.outpost ? '' : '<span class="acc">Manage ▸</span>'}</div>` : ''}
         ${bodyActions(b) ? `<div class="row wrap" style="margin-top:6px;gap:5px">${bodyActions(b)}</div>` : ''}</div></div></div>`;
     }
@@ -1336,7 +1451,7 @@ function colonyPanel(b) {
   const c = b.col, o = colOut(b), st = stageOf(b);
   const cap = o.cap, g = growthRate(b);
   const nextT = {settlement: 0.1, city: 10}[st];
-  let h = `<div class="hdr"><div class="row">${planetBall(b, 42)}<div><h2>${esc(b.name)}</h2><div class="dim small">${STAGES[st].name} · ${HAB[o.hab].name} ${PCLASS[b.cls].name.toLowerCase()}</div></div></div><button class="x" data-a="close">✕</button></div>
+  let h = `<div class="hdr"><div class="row">${planetBall(b, 42)}<div><h2>${esc(b.name)}</h2><div class="dim small">${STAGES[st].name} · ${HAB[o.hab].name} ${lc(PCLASS[b.cls].name)}</div></div></div><button class="x" data-a="close">✕</button></div>
     <div class="small"><a class="acc" style="cursor:pointer" data-a="star" data-v="${b.star}">◂ ${esc(ST(b.star).name)} system</a></div>
     <div class="sec">Population</div>
     <div class="row sb small"><span><b>${people(c.pop)}</b> of ${people(cap)}</span><span class="${ST(b.star).short ? 'bad' : 'good'}">${ST(b.star).short ? 'Shrinking (hunger)' : c.pop >= cap ? 'Full' : '+' + (g * (1 - c.pop / cap) * 100).toFixed(1) + '% per year'}</span></div>
