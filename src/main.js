@@ -32,19 +32,22 @@ async function runEndTurn(skip) {
 }
 ACT.endTurn = () => runEndTurn(false);
 ACT.skip = () => runEndTurn(true);
+const KEY_DO = {endTurn: () => runEndTurn(false), skip: () => runEndTurn(true), idle: () => ACT.attnGo(), research: () => ACT.openResearch(),
+  design: () => ACT.openDesign(), colonies: () => ACT.openColonies(), journal: () => ACT.openJournal(), home: () => centerOn(0)};
 document.addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (UI.keyCap && !modalOpen('hotkeys')) UI.keyCap = null;
+  if (UI.keyCap) { e.preventDefault(); e.stopPropagation(); hotkeyCaptured(e); return; }
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
   if (e.key === 'Escape') { if (modalOpen() && !UI.modalNoClose) ACT.mclose(); else { UI.selFleet = null; closeSide(); } return; }
   if (modalOpen() || $('#title').classList.contains('show') || !S) return;
-  const k = e.key.toLowerCase();
-  if (e.key === 'Enter') { e.preventDefault(); runEndTurn(false); }
-  else if (k === 'f') runEndTurn(true);
-  else if (k === 'r') ACT.openResearch();
-  else if (k === 'd') ACT.openDesign();
-  else if (k === 'c') ACT.openColonies();
-  else if (k === 'j') ACT.openJournal();
-  else if (k === 'h') centerOn(0);
-});
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const act = keyAction(normKey(e.key)); if (!act) return;
+  e.preventDefault(); if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  if (!e.repeat || act === 'idle') KEY_DO[act]();
+}, true);
+// stop Space/Enter from also "clicking" a focused button when they are hotkeys
+document.addEventListener('keyup', e => { if (!UI.keyCap && S && !modalOpen() && keyAction(normKey(e.key)) && e.target.tagName === 'BUTTON') e.preventDefault(); }, true);
+keyTitles();
 function titleBg() {
   const c = $('#titlebg');
   if (c && $('#title').classList.contains('show')) {

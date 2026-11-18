@@ -32,6 +32,18 @@ function habSeen(b) { // before life is known, the rating ignores hidden native 
 }
 const SETTINGS = (() => { try { return Object.assign({near: 3, music: 40, sfx: 60}, JSON.parse(localStorage.getItem('starwake.settings') || '{}')); } catch (e) { return {near: 3, music: 40, sfx: 60}; } })();
 function saveSettings() { try { localStorage.setItem('starwake.settings', JSON.stringify(SETTINGS)); } catch (e) {} }
+// ---------- hotkeys (editable in Settings) ----------
+const HOTKEYS = [['endTurn', 'End the year', 'Enter'], ['skip', 'Skip ahead until something happens', 'f'], ['idle', 'Next idle colony, research or ship', ' '],
+  ['research', 'Research', 'r'], ['design', 'Ship design', 'd'], ['colonies', 'Colonies', 'c'], ['journal', 'Journal', 'j'], ['home', 'Center the map on the Sun', 'h']];
+const normKey = k => k.length === 1 ? k.toLowerCase() : k;
+function hotkey(act) { const s = SETTINGS.keys && SETTINGS.keys[act]; return s != null ? s : HOTKEYS.find(h => h[0] === act)[2]; }
+function keyName(k) { return k === ' ' ? 'Space' : k.length === 1 ? k.toUpperCase() : k.replace(/^Arrow/, '').replace(/^./, c => c.toUpperCase()); }
+function keyAction(k) { const h = HOTKEYS.find(h => hotkey(h[0]) === k); return h ? h[0] : null; }
+function keyTitles() {
+  const a = $('#ffwd'), b = $('#endturn');
+  if (a) a.title = `Skip years until something happens (${keyName(hotkey('skip'))})`;
+  if (b) b.title = `End the year (${keyName(hotkey('endTurn'))})`;
+}
 function nearest3(sid) { const s0 = ST(sid); return S.stars.filter(s => s.id !== sid && S.known[s.id]).map(s => ({s, d: d3(s0, s)})).sort((a, b) => a.d - b.d).slice(0, SETTINGS.near); }
 function lifeKnown(b) { return b.star === 0 || b.owner === 0 || S.surveyed[b.star] || has('biosignatures') || inGreatScope(ST(b.star)); }
 function planetBall(b, px) {
@@ -64,31 +76,43 @@ function idleWorlds() {
     .map(b => ({b, k: o[b.star] * 1000 + ST(b.star).bodies.indexOf(b.id)})).sort((a, b) => a.k - b.k);
 }
 function idleFleets() { return S.fleets.filter(f => f.ships.length && ((f.dest == null && f.star != null && !f.task && !f.auto) || (f.task && f.task.type === 'route' && f.task.warn))).sort((a, b) => a.id - b.id); }
-function attnState() {
-  const w = idleWorlds(); if (w.length) return {kind: 'world', n: w.length, list: w};
-  if (!S.res && availableTechs().length) return {kind: 'research'};
-  const f = idleFleets(); if (f.length) return {kind: 'fleet', n: f.length, list: f};
-  return {kind: 'none'};
+function attnKinds() {
+  const k = [];
+  const w = idleWorlds(); if (w.length) k.push({kind: 'world', n: w.length, list: w});
+  if (!S.res && availableTechs().length) k.push({kind: 'research'});
+  const f = idleFleets(); if (f.length) k.push({kind: 'fleet', n: f.length, list: f});
+  return k;
+}
+// What the next click (or hotkey) goes to: the next idle colony or ship after the last one shown; once past the last of a kind
+// (or after research was opened), it moves on to the next idle kind, wrapping round colonies → research → ships.
+function attnPlan(ks) {
+  if (!ks.length) return null;
+  const i = ks.findIndex(x => x.kind === UI.attnKind);
+  if (i < 0) { // the kind shown last is no longer idle: carry on with the next kind in the cycle
+    const ord = ['world', 'research', 'fleet'], at = ord.indexOf(UI.attnKind);
+    const n = ks.find(x => ord.indexOf(x.kind) > at) || ks[0]; return {a: n, item: n.list ? n.list[0] : null};
+  }
+  const a = ks[i];
+  if (a.kind === 'world') { const j = UI.attnWorld == null ? 0 : a.list.findIndex(x => x.k > UI.attnWorld); if (j >= 0) return {a, item: a.list[j]}; }
+  else if (a.kind === 'fleet') { const f = UI.attnFleet == null ? a.list[0] : a.list.find(f => f.id > UI.attnFleet); if (f) return {a, item: f}; }
+  const n = ks[(i + 1) % ks.length]; return {a: n, item: n.list ? n.list[0] : null};
 }
 function renderAttn() {
   const el = $('#attn'); if (!el || !S) return;
-  const a = attnState();
-  el.innerHTML = a.kind === 'world' ? `<div class="chip click attn" data-a="attnGo" title="Worlds with nothing being built. Click to go to the next one."><span class="bad">Idle colonies (${a.n})</span></div>`
-    : a.kind === 'research' ? `<div class="chip click attn" data-a="attnGo" title="Nothing is being researched. Click to open Research."><span class="bad">Idle research</span></div>`
-    : a.kind === 'fleet' ? `<div class="chip click attn" data-a="attnGo" title="Ships waiting for orders, and freighters whose route is not at full value. Click to go to the next one."><span class="warn">Idle ships (${a.n})</span></div>`
-    : `<div class="chip dim" title="Nothing needs your attention">Nothing idle</div>`;
+  const ks = attnKinds(), p = attnPlan(ks);
+  if (!p) { el.innerHTML = `<div class="chip dim" title="Nothing needs your attention">Nothing idle</div>`; return; }
+  const word = a => a.kind === 'world' ? `${a.n} ${a.n === 1 ? 'colony' : 'colonies'}` : a.kind === 'research' ? 'research' : `${a.n} ${a.n === 1 ? 'ship' : 'ships'}`;
+  const parts = ks.map(a => `<span class="${a.kind === 'fleet' ? 'warn' : 'bad'} ${a === p.a ? 'attnnext' : ''}">${word(a)}</span>`).join('<span class="dim">·</span>');
+  el.innerHTML = `<div class="chip click attn" data-a="attnGo" title="Colonies with nothing being built, research with no topic, and ships waiting for orders (or freighters whose route is not at full value). Click or press ${keyName(hotkey('idle'))} to go to the underlined one; it steps through each, then moves on to the next kind."><span class="k">Idle</span>${parts}</div>`;
 }
 ACT.attnGo = () => {
-  const a = attnState();
-  if (a.kind === 'world') {
-    const last = UI.attnWorld; const i = last == null ? 0 : a.list.findIndex(x => x.k > last);
-    const pick = a.list[i < 0 ? 0 : i]; UI.attnWorld = pick.k;
-    selectColony(pick.b.id); centerOn(pick.b.star);
-  } else if (a.kind === 'research') ACT.openResearch();
-  else if (a.kind === 'fleet') {
-    const last = UI.attnFleet; const pick = (last == null ? null : a.list.find(f => f.id > last)) || a.list[0]; UI.attnFleet = pick.id;
-    selectFleet(pick.id); if (pick.star != null) centerOn(pick.star); else { const [ox, oy] = sideShift(); UI.cam.tx = pick.x + ox; UI.cam.ty = pick.y + oy; UI.cam.tz = 0; UI.dirty = true; }
-  }
+  if (!S) return;
+  const p = attnPlan(attnKinds()); if (!p) return;
+  UI.attnKind = p.a.kind;
+  if (p.a.kind === 'world') { UI.attnWorld = p.item.k; selectColony(p.item.b.id); centerOn(p.item.b.star); }
+  else if (p.a.kind === 'research') ACT.openResearch();
+  else { const f = p.item; UI.attnFleet = f.id; selectFleet(f.id); if (f.star != null) centerOn(f.star); else { const [ox, oy] = sideShift(); UI.cam.tx = f.x + ox; UI.cam.ty = f.y + oy; UI.cam.tz = 0; UI.dirty = true; } }
+  renderAttn();
 };
 
 // ---------- 3D map ----------

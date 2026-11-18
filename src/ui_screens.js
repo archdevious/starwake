@@ -170,10 +170,10 @@ const HELP = `<div class="small" style="line-height:1.65">
 <h3>Settling</h3><p>Colony and Outpost Ships travel between stars. Within your own star systems, use a colony's <b>New colonies</b> tab instead: no ship needed. Settlements grow to Province, then Core World, and <b>projects</b> improve them. <b>Ships</b> need an Orbital Dock (light hulls) or a Shipyard (all hulls).</p>
 <h3>What's shared</h3><p>Production stays with each colony. Research and credits go into one empire-wide total. Food is shared by everything at the same star. Outposts can send their production to a colony in their system.</p>
 <h3>Freighters</h3><p>A trade route between two of your systems carries settlers and food out and brings trade back. Short routes pay best.</p>
-<h3>Staying on top</h3><p>The top-bar button points to idle colonies, then idle research, then idle ships.</p>
+<h3>Staying on top</h3><p>The Idle button in the top bar counts idle colonies, research and ships. Each click (or its hotkey, Space unless changed) goes to the next one: colonies, then research, then ships, and round again.</p>
 <h3>Map controls</h3><p>Drag to rotate, right-drag or Shift-drag to pan, scroll to zoom. Stars sit on pins above or below a flat reference plane through the Sun. Click a star or ship; with a ship selected, click a star to send it.</p>
-<h3>Keys</h3><p>Enter: end the year · F: skip ahead until something happens · R: research · D: ship design · C: colonies · J: journal · Esc: close</p></div>`;
-ACT.openHelp = () => modal({title: 'How to play', w: 760, body: HELP, foot: `<button class="btn primary" data-a="mclose">Got it</button>`});
+<h3>Keys</h3><p>%KEYS% · Esc: close. You can change these in Settings → Hotkeys.</p></div>`;
+ACT.openHelp = () => modal({title: 'How to play', w: 760, body: HELP.replace('%KEYS%', HOTKEYS.map(([a, l]) => keyName(hotkey(a)) + ': ' + l[0].toLowerCase() + l.slice(1)).join(' · ')), foot: `<button class="btn primary" data-a="mclose">Got it</button>`});
 
 // ---------- end screen ----------
 function drawHistChart(cvs) {
@@ -259,7 +259,28 @@ function settingsHTML() {
   return slider('music', 'Music', 'Slow ambient music, generated live as you play.') + slider('sfx', 'Sound effects', 'Buttons, arrivals, discoveries and warnings.') +
     `<div class="setline"><div><b>Nearest systems</b><div class="tiny dim">When you select a star, number its closest systems on the map and list them.</div></div>
     <select data-c="setNear">${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => `<option value="${n}" ${SETTINGS.near === n ? 'selected' : ''}>${n ? n : 'Off'}</option>`).join('')}</select></div>
+    <div class="setline"><div><b>Hotkeys</b><div class="tiny dim">See and change the keyboard shortcuts.</div></div><button class="btn" data-a="openHotkeys">Hotkeys…</button></div>
     <div class="tiny dim" style="margin-top:12px">Settings are kept in this browser and apply to every game. Sound starts after your first click.</div>`;
+}
+function hotkeysHTML() {
+  return HOTKEYS.map(([a, label]) => `<div class="hkrow"><span>${label}</span><button class="btn sm ${UI.keyCap === a ? 'cap' : ''}" data-a="hkSet" data-v="${a}">${UI.keyCap === a ? 'Press a key…' : keyName(hotkey(a))}</button></div>`).join('')
+    + `<div class="hkrow"><span>Close a window</span><span class="dim small">Esc (fixed)</span></div>`
+    + `<div class="small ${UI.keyMsg ? 'warn' : 'dim'}" style="margin-top:10px;min-height:20px">${UI.keyMsg || 'Click a key, then press the new one. Esc cancels.'}</div>`;
+}
+ACT.openHotkeys = () => { UI.keyCap = null; UI.keyMsg = ''; modal({title: 'Hotkeys', kind: 'hotkeys', w: 520, body: hotkeysHTML(), foot: `<button class="btn" data-a="hkReset">Reset to defaults</button><button class="btn primary" data-a="hkDone">Done</button>`}); };
+ACT.hkSet = a => { UI.keyCap = UI.keyCap === a ? null : a; UI.keyMsg = ''; modalBody(hotkeysHTML()); };
+ACT.hkReset = () => { delete SETTINGS.keys; saveSettings(); UI.keyCap = null; UI.keyMsg = 'Hotkeys reset to defaults.'; keyTitles(); renderAttn(); modalBody(hotkeysHTML()); };
+ACT.hkDone = () => { UI.keyCap = null; ACT.openSettings(); };
+function hotkeyCaptured(e) {
+  const a = UI.keyCap, k = normKey(e.key);
+  if (k === 'Escape') { UI.keyCap = null; UI.keyMsg = ''; }
+  else if (['Shift', 'Control', 'Alt', 'Meta', 'CapsLock', 'Dead', 'Unidentified'].includes(k)) return;
+  else {
+    const other = keyAction(k);
+    if (other && other !== a) UI.keyMsg = `${keyName(k)} is already used for ${HOTKEYS.find(h => h[0] === other)[1]}.`;
+    else { SETTINGS.keys = Object.assign({}, SETTINGS.keys, {[a]: k}); saveSettings(); UI.keyCap = null; UI.keyMsg = ''; keyTitles(); renderAttn(); }
+  }
+  if (modalOpen()) modalBody(hotkeysHTML()); else UI.keyCap = null;
 }
 ACT.setVol = (v, el) => { SETTINGS[el.dataset.k] = +v; saveSettings(); audioVolumes(); if (el.dataset.k === 'sfx') sfx('arrive'); modalBody(settingsHTML()); };
 ACT.openSettings = () => modal({title: 'Settings', w: 520, body: settingsHTML(), foot: `<button class="btn primary" data-a="mclose">Done</button>`});
