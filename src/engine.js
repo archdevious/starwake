@@ -122,7 +122,7 @@ function newGame(o) {
   const L = LENGTHS[o.len] || LENGTHS.standard;
   const list = o.len === 'long' ? STARS_LONG : STARS_STD;
   S = {version: GAME_VERSION, format: SAVE_FORMAT, turn: 1, year: START_YEAR, len: o.len, maxTurns: L.turns, radius: L.radius,
-    stars: [], bodies: [], fleets: [], designs: [], techs: {}, res: null, rpBank: 0, bc: 500,
+    stars: [], bodies: [], fleets: [], designs: [], techs: {}, res: null, rpBank: 0, bc: 200,
     known: {}, visited: {}, surveyed: {}, journal: [], hist: [], msgs: [], nextId: 1, story: o.story, empire: {name: o.name || 'United Earth', color: o.color || '#4aa8ff'},
     mods: {prod: 1, rp: 1, bc: 1, growth: 1, earthFood: 0, earthTel: COLONY_TEL}, stats: {anomalies: 0, anomScore: 0, lost: 0}, awakened: false, over: null,
     gameId: Date.now().toString(36) + Math.floor(rnd() * 1e6).toString(36), started: Date.now(), nextDesign: 1};
@@ -517,7 +517,7 @@ function processEconomy() {
     else c.pop -= (c.pop - cap) * 0.1;
     c.pop = Math.max(0.001, c.pop);
     const after = stageOf(b);
-    if (after !== before && STAGE_ORDER.indexOf(after) > STAGE_ORDER.indexOf(before)) { msg(b.name + ' has grown into a ' + STAGES[after].name + '.', b.star, 'stage'); journal(b.name + ' became a ' + STAGES[after].name + '.', b.star); if (after === 'core') budgetEvent('core' + b.id, 1, b.name + ' has become a Core World, proof that humanity can thrive beyond Earth.', b.star); }
+    if (after !== before && STAGE_ORDER.indexOf(after) > STAGE_ORDER.indexOf(before)) { msg(b.name + ' has grown into a ' + STAGES[after].name + '.', b.star, 'stage'); journal(b.name + ' became a ' + STAGES[after].name + '.', b.star); if (after === 'core') budgetEvent('core', 1, b.name + ' has become humanity\'s first Core World beyond Earth, proof that humanity can thrive beyond Earth.', b.star); }
   }
   // research
   if (!S.res) { S.rpBank += rp; }
@@ -585,7 +585,7 @@ function fleetName0(f) { return design(f.ships[0].d).name; }
 // ---------- space budget: Earth's share of its economy given to the space programme ----------
 function spaceBudget() {
   const B0 = S.budget || {perm: 0, temp: []};
-  let v = 10 + B0.perm + (has('stellar_priority') ? 3 : 0) + (has('spacefaring') ? 5 : 0);
+  let v = 10 + B0.perm + (has('stellar_priority') ? 3 : 0) + (has('spacefaring') ? 7 : 0);
   for (const t of B0.temp) if (S.year < t.until) v += t.v;
   return clamp(v, has('spacefaring') ? 20 : 1, 100);
 }

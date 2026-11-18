@@ -1,6 +1,6 @@
 'use strict';
 // ===================== STARWAKE v2 — STATIC DATA =====================
-const GAME_VERSION = 10;
+const GAME_VERSION = 11;
 const SAVE_FORMAT = 2;
 const START_YEAR = 2326;
 const LENGTHS = {
@@ -138,7 +138,7 @@ const TECHS = [
   {id: 'antimatter_production', f: 'phys', cost: 1300, req: ['quantum_computing'], name: 'Antimatter Production', desc: '+10% production everywhere; needed for antimatter drives.'},
   {id: 'exotic_matter', f: 'phys', cost: 3200, req: ['antimatter_production'], name: 'Exotic Matter', desc: 'The physics needed for near-light flight, and perhaps one day more.'},
   {id: 'stellar_priority', f: 'soc', cost: 300, req: [], name: 'Stellar Priority', desc: 'Space budget +3 points: the public wants more of Earth\'s economy spent beyond Earth.'},
-  {id: 'spacefaring', f: 'soc', cost: 1300, req: ['stellar_priority'], name: 'Spacefaring Society', desc: 'Space budget +5 points, and it can never fall below 20%. A generation has grown up with family on other worlds.'},
+  {id: 'spacefaring', f: 'soc', cost: 1300, req: ['stellar_priority'], name: 'Spacefaring Society', desc: 'Space budget +7 points, and it can never fall below 20%. A generation has grown up with family on other worlds.'},
   {id: 'interstellar_commerce', f: 'soc', cost: 300, req: [], name: 'Interstellar Commerce', desc: '+20% credits; Cargo Bays carry twice as much.'},
   {id: 'colonial_charter', f: 'soc', cost: 550, req: [], name: 'Colonial Charters', desc: 'Settlements grow 50% faster.'},
   {id: 'unified_science', f: 'soc', cost: 1300, req: ['quantum_computing'], name: 'Unified Science Academy', desc: '+20% research everywhere.'},

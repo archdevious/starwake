@@ -53,8 +53,43 @@ function renderTop() {
     <div class="chip" title="Population"><span class="k">Population</span><b>${people(t.pop)}</b></div>
     <div class="chip click" data-a="openResearch" title="Research"><span class="k">Research</span>${res ? `<span class="ell" title="${esc(res.name)}">${esc(res.name)}</span><span class="dim">${Math.floor(S.res.prog + S.rpBank)}/${techCost(S.res.tech)}</span>` : (availableTechs().length ? '<span class="warn">Choose research!</span>' : '<span class="dim">All known</span>')}<span class="acc">+${fmt(t.rp)}</span></div>
     ${short.length ? `<div class="chip click" data-a="goStar" data-v="${short[0]}"><span class="bad">Food shortage: ${short.map(s => esc(ST(s).name)).join(', ')}</span></div>` : ''}
-    <div class="chip" title="Top ship speed, as a share of light speed"><span class="k">Top speed</span><b>${pct(topSpeed())}</b></div>`;
+    <div class="chip" title="Top ship speed, as a share of light speed"><span class="k">Top speed</span><b>${pct(topSpeed())}</b></div><span id="attn"></span>`;
+  renderAttn();
 }
+// ---------- "needs attention" button ----------
+const starOrder = () => { const o = {}; S.stars.forEach((s, i) => o[s.id] = i); return o; };
+function idleWorlds() {
+  const o = starOrder();
+  return S.bodies.filter(b => b.owner === 0 && b.col && !b.col.queue.length && !supplyTarget(b))
+    .map(b => ({b, k: o[b.star] * 1000 + ST(b.star).bodies.indexOf(b.id)})).sort((a, b) => a.k - b.k);
+}
+function idleFleets() { return S.fleets.filter(f => f.dest == null && f.star != null && !f.task && !f.auto && f.ships.length).sort((a, b) => a.id - b.id); }
+function attnState() {
+  const w = idleWorlds(); if (w.length) return {kind: 'world', n: w.length, list: w};
+  if (!S.res && availableTechs().length) return {kind: 'research'};
+  const f = idleFleets(); if (f.length) return {kind: 'fleet', n: f.length, list: f};
+  return {kind: 'none'};
+}
+function renderAttn() {
+  const el = $('#attn'); if (!el || !S) return;
+  const a = attnState();
+  el.innerHTML = a.kind === 'world' ? `<div class="chip click attn" data-a="attnGo" title="Worlds with nothing being built. Click to go to the next one."><span class="bad">Idle colonies (${a.n})</span></div>`
+    : a.kind === 'research' ? `<div class="chip click attn" data-a="attnGo" title="Nothing is being researched. Click to open Research."><span class="bad">Idle research</span></div>`
+    : a.kind === 'fleet' ? `<div class="chip click attn" data-a="attnGo" title="Ships waiting at a star. Click to go to the next one."><span class="warn">Orbiting ships (${a.n})</span></div>`
+    : `<div class="chip dim" title="Nothing needs your attention">Nothing idle</div>`;
+}
+ACT.attnGo = () => {
+  const a = attnState();
+  if (a.kind === 'world') {
+    const last = UI.attnWorld; const i = last == null ? 0 : a.list.findIndex(x => x.k > last);
+    const pick = a.list[i < 0 ? 0 : i]; UI.attnWorld = pick.k;
+    selectColony(pick.b.id); centerOn(pick.b.star);
+  } else if (a.kind === 'research') ACT.openResearch();
+  else if (a.kind === 'fleet') {
+    const last = UI.attnFleet; const pick = (last == null ? null : a.list.find(f => f.id > last)) || a.list[0]; UI.attnFleet = pick.id;
+    selectFleet(pick.id); centerOn(pick.star);
+  }
+};
 
 // ---------- 3D map ----------
 const cv = () => $('#map');
@@ -79,6 +114,27 @@ function farField() {
   return FAR;
 }
 function fleetsAtStar(sid) { return S.fleets.filter(f => f.star === sid && f.dest == null); }
+// where a travelling ship's icon is drawn: kept clear of nearby stars so stars stay easy to click.
+// A ship still at its starting star is pushed out along its route, so it sits on its own path line.
+function movePos(f) {
+  const p = proj(f.x, f.y, f.z), d = ST(f.dest), q = proj(d.x, d.y, d.z);
+  const ang = Math.atan2(q[1] - p[1], q[0] - p[0]);
+  let px = p[0], py = p[1];
+  for (const sp of UI.pts) {
+    const dx = px - sp.x, dy = py - sp.y, dd = Math.hypot(dx, dy); if (dd >= 38) continue;
+    const ux = dd > 0.5 ? dx / dd : Math.cos(ang), uy = dd > 0.5 ? dy / dd : Math.sin(ang);
+    px = sp.x + ux * 38; py = sp.y + uy * 38;
+    if (dd <= 0.5) {
+      // also slide clear of the ships parked in orbit at this star
+      const n = S.fleets.filter(o => o.star === sp.id && o.dest == null).length, top = sp.y - (n - 1) * 13.5;
+      for (let k = 0; k < 20; k++) {
+        let hit = false; for (let i = 0; i < n; i++) if (Math.hypot(px - (sp.x + 42), py - (top + i * 27)) < 24) { hit = true; break; }
+        if (!hit) break; px += ux * 6; py += uy * 6;
+      }
+    }
+  }
+  return {px, py, ang};
+}
 function drawMap() {
   const c = cv(); if (!c || !S) return;
   const dpr = window.devicePixelRatio || 1, {w, h} = mapSize();
@@ -140,7 +196,7 @@ function drawMap() {
     });
   }
   // fleets in transit (drawn over the nearest-system guides so paths always show)
-  for (const f of S.fleets) { if (f.dest == null) continue; const d = ST(f.dest); const [ax, ay] = proj(f.x, f.y, f.z), [bx, by] = proj(d.x, d.y, d.z); x.strokeStyle = f.task && f.task.type === 'route' ? 'rgba(255,200,90,.45)' : 'rgba(127,224,255,.6)'; x.setLineDash([5, 5]); x.lineWidth = 1.6; x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, by); x.stroke(); x.setLineDash([]); }
+  for (const f of S.fleets) { if (f.dest == null) continue; const d = ST(f.dest); const mp = movePos(f), ax = mp.px, ay = mp.py, [bx, by] = proj(d.x, d.y, d.z); x.strokeStyle = f.task && f.task.type === 'route' ? 'rgba(255,200,90,.45)' : 'rgba(127,224,255,.6)'; x.setLineDash([5, 5]); x.lineWidth = 1.6; x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, by); x.stroke(); x.setLineDash([]); }
   // labels with de-cluttering
   const boxes = []; x.textAlign = 'center';
   const dots = LABELS.map(L => ({x: L.p[0] - L.rr, y: L.p[1] - L.rr, w: L.rr * 2, h: L.rr * 2}));
@@ -157,12 +213,7 @@ function drawMap() {
   const byStar = {}, moving = [];
   for (const f of S.fleets) {
     if (f.dest == null && f.star != null) { (byStar[f.star] = byStar[f.star] || []).push(f); continue; }
-    const p = proj(f.x, f.y, f.z), d = ST(f.dest), q = proj(d.x, d.y, d.z);
-    const ang = Math.atan2(q[1] - p[1], q[0] - p[0]);
-    let px = p[0], py = p[1];
-    // keep icons clear of nearby stars so stars stay easy to click
-    for (const sp of UI.pts) { const dx = px - sp.x, dy = py - sp.y, dd = Math.hypot(dx, dy); if (dd < 38) { const ux = dd > 0.5 ? dx / dd : -Math.sin(ang), uy = dd > 0.5 ? dy / dd : Math.cos(ang); px = sp.x + ux * 38; py = sp.y + uy * 38; } }
-    moving.push({f, px, py, ang});
+    const mp = movePos(f); moving.push({f, px: mp.px, py: mp.py, ang: mp.ang});
   }
   // spread ships that would sit on top of each other
   const groups = [];

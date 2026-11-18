@@ -230,7 +230,7 @@ const FAR_STARS=[{"n": "Achernar", "d": [0.184, -0.484, -0.855], "ly": 139}, {"n
 
 'use strict';
 // ===================== STARWAKE v2 — STATIC DATA =====================
-const GAME_VERSION = 10;
+const GAME_VERSION = 11;
 const SAVE_FORMAT = 2;
 const START_YEAR = 2326;
 const LENGTHS = {
@@ -368,7 +368,7 @@ const TECHS = [
   {id: 'antimatter_production', f: 'phys', cost: 1300, req: ['quantum_computing'], name: 'Antimatter Production', desc: '+10% production everywhere; needed for antimatter drives.'},
   {id: 'exotic_matter', f: 'phys', cost: 3200, req: ['antimatter_production'], name: 'Exotic Matter', desc: 'The physics needed for near-light flight, and perhaps one day more.'},
   {id: 'stellar_priority', f: 'soc', cost: 300, req: [], name: 'Stellar Priority', desc: 'Space budget +3 points: the public wants more of Earth\'s economy spent beyond Earth.'},
-  {id: 'spacefaring', f: 'soc', cost: 1300, req: ['stellar_priority'], name: 'Spacefaring Society', desc: 'Space budget +5 points, and it can never fall below 20%. A generation has grown up with family on other worlds.'},
+  {id: 'spacefaring', f: 'soc', cost: 1300, req: ['stellar_priority'], name: 'Spacefaring Society', desc: 'Space budget +7 points, and it can never fall below 20%. A generation has grown up with family on other worlds.'},
   {id: 'interstellar_commerce', f: 'soc', cost: 300, req: [], name: 'Interstellar Commerce', desc: '+20% credits; Cargo Bays carry twice as much.'},
   {id: 'colonial_charter', f: 'soc', cost: 550, req: [], name: 'Colonial Charters', desc: 'Settlements grow 50% faster.'},
   {id: 'unified_science', f: 'soc', cost: 1300, req: ['quantum_computing'], name: 'Unified Science Academy', desc: '+20% research everywhere.'},
@@ -751,7 +751,7 @@ function newGame(o) {
   const L = LENGTHS[o.len] || LENGTHS.standard;
   const list = o.len === 'long' ? STARS_LONG : STARS_STD;
   S = {version: GAME_VERSION, format: SAVE_FORMAT, turn: 1, year: START_YEAR, len: o.len, maxTurns: L.turns, radius: L.radius,
-    stars: [], bodies: [], fleets: [], designs: [], techs: {}, res: null, rpBank: 0, bc: 500,
+    stars: [], bodies: [], fleets: [], designs: [], techs: {}, res: null, rpBank: 0, bc: 200,
     known: {}, visited: {}, surveyed: {}, journal: [], hist: [], msgs: [], nextId: 1, story: o.story, empire: {name: o.name || 'United Earth', color: o.color || '#4aa8ff'},
     mods: {prod: 1, rp: 1, bc: 1, growth: 1, earthFood: 0, earthTel: COLONY_TEL}, stats: {anomalies: 0, anomScore: 0, lost: 0}, awakened: false, over: null,
     gameId: Date.now().toString(36) + Math.floor(rnd() * 1e6).toString(36), started: Date.now(), nextDesign: 1};
@@ -1146,7 +1146,7 @@ function processEconomy() {
     else c.pop -= (c.pop - cap) * 0.1;
     c.pop = Math.max(0.001, c.pop);
     const after = stageOf(b);
-    if (after !== before && STAGE_ORDER.indexOf(after) > STAGE_ORDER.indexOf(before)) { msg(b.name + ' has grown into a ' + STAGES[after].name + '.', b.star, 'stage'); journal(b.name + ' became a ' + STAGES[after].name + '.', b.star); if (after === 'core') budgetEvent('core' + b.id, 1, b.name + ' has become a Core World, proof that humanity can thrive beyond Earth.', b.star); }
+    if (after !== before && STAGE_ORDER.indexOf(after) > STAGE_ORDER.indexOf(before)) { msg(b.name + ' has grown into a ' + STAGES[after].name + '.', b.star, 'stage'); journal(b.name + ' became a ' + STAGES[after].name + '.', b.star); if (after === 'core') budgetEvent('core', 1, b.name + ' has become humanity\'s first Core World beyond Earth, proof that humanity can thrive beyond Earth.', b.star); }
   }
   // research
   if (!S.res) { S.rpBank += rp; }
@@ -1214,7 +1214,7 @@ function fleetName0(f) { return design(f.ships[0].d).name; }
 // ---------- space budget: Earth's share of its economy given to the space programme ----------
 function spaceBudget() {
   const B0 = S.budget || {perm: 0, temp: []};
-  let v = 10 + B0.perm + (has('stellar_priority') ? 3 : 0) + (has('spacefaring') ? 5 : 0);
+  let v = 10 + B0.perm + (has('stellar_priority') ? 3 : 0) + (has('spacefaring') ? 7 : 0);
   for (const t of B0.temp) if (S.year < t.until) v += t.v;
   return clamp(v, has('spacefaring') ? 20 : 1, 100);
 }
@@ -1315,8 +1315,43 @@ function renderTop() {
     <div class="chip" title="Population"><span class="k">Population</span><b>${people(t.pop)}</b></div>
     <div class="chip click" data-a="openResearch" title="Research"><span class="k">Research</span>${res ? `<span class="ell" title="${esc(res.name)}">${esc(res.name)}</span><span class="dim">${Math.floor(S.res.prog + S.rpBank)}/${techCost(S.res.tech)}</span>` : (availableTechs().length ? '<span class="warn">Choose research!</span>' : '<span class="dim">All known</span>')}<span class="acc">+${fmt(t.rp)}</span></div>
     ${short.length ? `<div class="chip click" data-a="goStar" data-v="${short[0]}"><span class="bad">Food shortage: ${short.map(s => esc(ST(s).name)).join(', ')}</span></div>` : ''}
-    <div class="chip" title="Top ship speed, as a share of light speed"><span class="k">Top speed</span><b>${pct(topSpeed())}</b></div>`;
+    <div class="chip" title="Top ship speed, as a share of light speed"><span class="k">Top speed</span><b>${pct(topSpeed())}</b></div><span id="attn"></span>`;
+  renderAttn();
 }
+// ---------- "needs attention" button ----------
+const starOrder = () => { const o = {}; S.stars.forEach((s, i) => o[s.id] = i); return o; };
+function idleWorlds() {
+  const o = starOrder();
+  return S.bodies.filter(b => b.owner === 0 && b.col && !b.col.queue.length && !supplyTarget(b))
+    .map(b => ({b, k: o[b.star] * 1000 + ST(b.star).bodies.indexOf(b.id)})).sort((a, b) => a.k - b.k);
+}
+function idleFleets() { return S.fleets.filter(f => f.dest == null && f.star != null && !f.task && !f.auto && f.ships.length).sort((a, b) => a.id - b.id); }
+function attnState() {
+  const w = idleWorlds(); if (w.length) return {kind: 'world', n: w.length, list: w};
+  if (!S.res && availableTechs().length) return {kind: 'research'};
+  const f = idleFleets(); if (f.length) return {kind: 'fleet', n: f.length, list: f};
+  return {kind: 'none'};
+}
+function renderAttn() {
+  const el = $('#attn'); if (!el || !S) return;
+  const a = attnState();
+  el.innerHTML = a.kind === 'world' ? `<div class="chip click attn" data-a="attnGo" title="Worlds with nothing being built. Click to go to the next one."><span class="bad">Idle colonies (${a.n})</span></div>`
+    : a.kind === 'research' ? `<div class="chip click attn" data-a="attnGo" title="Nothing is being researched. Click to open Research."><span class="bad">Idle research</span></div>`
+    : a.kind === 'fleet' ? `<div class="chip click attn" data-a="attnGo" title="Ships waiting at a star. Click to go to the next one."><span class="warn">Orbiting ships (${a.n})</span></div>`
+    : `<div class="chip dim" title="Nothing needs your attention">Nothing idle</div>`;
+}
+ACT.attnGo = () => {
+  const a = attnState();
+  if (a.kind === 'world') {
+    const last = UI.attnWorld; const i = last == null ? 0 : a.list.findIndex(x => x.k > last);
+    const pick = a.list[i < 0 ? 0 : i]; UI.attnWorld = pick.k;
+    selectColony(pick.b.id); centerOn(pick.b.star);
+  } else if (a.kind === 'research') ACT.openResearch();
+  else if (a.kind === 'fleet') {
+    const last = UI.attnFleet; const pick = (last == null ? null : a.list.find(f => f.id > last)) || a.list[0]; UI.attnFleet = pick.id;
+    selectFleet(pick.id); centerOn(pick.star);
+  }
+};
 
 // ---------- 3D map ----------
 const cv = () => $('#map');
@@ -1341,6 +1376,27 @@ function farField() {
   return FAR;
 }
 function fleetsAtStar(sid) { return S.fleets.filter(f => f.star === sid && f.dest == null); }
+// where a travelling ship's icon is drawn: kept clear of nearby stars so stars stay easy to click.
+// A ship still at its starting star is pushed out along its route, so it sits on its own path line.
+function movePos(f) {
+  const p = proj(f.x, f.y, f.z), d = ST(f.dest), q = proj(d.x, d.y, d.z);
+  const ang = Math.atan2(q[1] - p[1], q[0] - p[0]);
+  let px = p[0], py = p[1];
+  for (const sp of UI.pts) {
+    const dx = px - sp.x, dy = py - sp.y, dd = Math.hypot(dx, dy); if (dd >= 38) continue;
+    const ux = dd > 0.5 ? dx / dd : Math.cos(ang), uy = dd > 0.5 ? dy / dd : Math.sin(ang);
+    px = sp.x + ux * 38; py = sp.y + uy * 38;
+    if (dd <= 0.5) {
+      // also slide clear of the ships parked in orbit at this star
+      const n = S.fleets.filter(o => o.star === sp.id && o.dest == null).length, top = sp.y - (n - 1) * 13.5;
+      for (let k = 0; k < 20; k++) {
+        let hit = false; for (let i = 0; i < n; i++) if (Math.hypot(px - (sp.x + 42), py - (top + i * 27)) < 24) { hit = true; break; }
+        if (!hit) break; px += ux * 6; py += uy * 6;
+      }
+    }
+  }
+  return {px, py, ang};
+}
 function drawMap() {
   const c = cv(); if (!c || !S) return;
   const dpr = window.devicePixelRatio || 1, {w, h} = mapSize();
@@ -1402,7 +1458,7 @@ function drawMap() {
     });
   }
   // fleets in transit (drawn over the nearest-system guides so paths always show)
-  for (const f of S.fleets) { if (f.dest == null) continue; const d = ST(f.dest); const [ax, ay] = proj(f.x, f.y, f.z), [bx, by] = proj(d.x, d.y, d.z); x.strokeStyle = f.task && f.task.type === 'route' ? 'rgba(255,200,90,.45)' : 'rgba(127,224,255,.6)'; x.setLineDash([5, 5]); x.lineWidth = 1.6; x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, by); x.stroke(); x.setLineDash([]); }
+  for (const f of S.fleets) { if (f.dest == null) continue; const d = ST(f.dest); const mp = movePos(f), ax = mp.px, ay = mp.py, [bx, by] = proj(d.x, d.y, d.z); x.strokeStyle = f.task && f.task.type === 'route' ? 'rgba(255,200,90,.45)' : 'rgba(127,224,255,.6)'; x.setLineDash([5, 5]); x.lineWidth = 1.6; x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, by); x.stroke(); x.setLineDash([]); }
   // labels with de-cluttering
   const boxes = []; x.textAlign = 'center';
   const dots = LABELS.map(L => ({x: L.p[0] - L.rr, y: L.p[1] - L.rr, w: L.rr * 2, h: L.rr * 2}));
@@ -1419,12 +1475,7 @@ function drawMap() {
   const byStar = {}, moving = [];
   for (const f of S.fleets) {
     if (f.dest == null && f.star != null) { (byStar[f.star] = byStar[f.star] || []).push(f); continue; }
-    const p = proj(f.x, f.y, f.z), d = ST(f.dest), q = proj(d.x, d.y, d.z);
-    const ang = Math.atan2(q[1] - p[1], q[0] - p[0]);
-    let px = p[0], py = p[1];
-    // keep icons clear of nearby stars so stars stay easy to click
-    for (const sp of UI.pts) { const dx = px - sp.x, dy = py - sp.y, dd = Math.hypot(dx, dy); if (dd < 38) { const ux = dd > 0.5 ? dx / dd : -Math.sin(ang), uy = dd > 0.5 ? dy / dd : Math.cos(ang); px = sp.x + ux * 38; py = sp.y + uy * 38; } }
-    moving.push({f, px, py, ang});
+    const mp = movePos(f); moving.push({f, px: mp.px, py: mp.py, ang: mp.ang});
   }
   // spread ships that would sit on top of each other
   const groups = [];
@@ -1703,6 +1754,7 @@ function newsSound(msgs) {
 'use strict';
 // ===================== STARWAKE v2 — SIDE PANELS =====================
 function renderSide() {
+  renderAttn();
   const el = $('#side');
   if (!S || !UI.view) { el.classList.remove('show'); return; }
   let html = '';
@@ -2025,19 +2077,19 @@ function openEvent(f) {
 // ---------- research ----------
 function researchHTML() {
   const t = totals();
-  let h = `<div class="row sb" style="margin-bottom:10px"><div>Research: <b class="acc">+${fmt(t.rp)}</b> per year${S.rpBank ? ` · <span class="dim">${Math.floor(S.rpBank)} banked</span>` : ''}</div><div class="small dim">Every technology can be learned eventually. The order is up to you.</div></div>`;
+  let h = `<div class="row sb" style="margin-bottom:10px"><div>Research: <b class="acc">+${fmt(t.rp)}</b> per year${S.rpBank ? ` · <span class="dim">${Math.floor(S.rpBank)} banked</span>` : ''}</div></div>`;
   if (S.res) { const c = techCost(S.res.tech); h += `<div class="card"><div class="row sb"><span>Researching <b class="amber">${TECH[S.res.tech].name}</b></span><span class="dim small">${Math.floor(S.res.prog + S.rpBank)} / ${c} · ${t.rp > 0 ? Math.max(1, Math.ceil((c - S.res.prog - S.rpBank) / t.rp)) : '∞'} years</span></div><div class="bar a" style="margin-top:5px"><i style="width:${Math.min(100, (S.res.prog + S.rpBank) / c * 100)}%"></i></div></div>`; }
   h += `<div class="tgrid">`;
   for (const fk in FIELDS) {
     h += `<div class="tcol"><div class="rname" style="border-color:${FIELDS[fk].color};width:auto"><b>${FIELDS[fk].name}</b></div>`;
-    for (const tk of TECHS.filter(x => x.f === fk)) {
+    for (const tk of TECHS.filter(x => x.f === fk).sort((a, b) => a.cost - b.cost)) {
       const known = has(tk.id), cur = S.res && S.res.tech === tk.id, ok = tk.req.every(has);
       const cls = known ? 'known' : cur ? 'res' : ok ? 'avail' : 'lock';
       h += `<div class="tech ${cls}" ${cls === 'avail' ? `data-a="pickTech" data-v="${tk.id}"` : ''}><b>${tk.name}</b> <span class="faint tiny">${known ? '✓' : techCost(tk.id)}</span><div class="d">${esc(tk.desc)}</div>${!ok && !known ? `<div class="req">Needs ${tk.req.filter(r => !has(r)).map(r => TECH[r].name).join(', ')}</div>` : ''}</div>`;
     }
     h += `</div>`;
   }
-  h += `</div><div class="sec">Breakthroughs (found only by exploring)</div><div class="row wrap" style="gap:6px">${Object.keys(BREAKTHROUGHS).map(k => has(k) ? `<div class="tech known" style="max-width:260px"><b>${BREAKTHROUGHS[k].name}</b><div class="d">${esc(BREAKTHROUGHS[k].desc)}</div></div>` : `<div class="tech lock" style="max-width:260px"><b>???</b><div class="d">Not yet discovered</div></div>`).join('')}</div>`;
+  h += `</div><div class="sec">Breakthroughs (found only by exploring)</div><div class="row wrap" style="gap:6px">${Object.keys(BREAKTHROUGHS).filter(has).map(k => `<div class="tech known" style="max-width:260px"><b>${BREAKTHROUGHS[k].name}</b><div class="d">${esc(BREAKTHROUGHS[k].desc)}</div></div>`).join('') || '<div class="small dim">None found yet. Exploring may turn some up.</div>'}</div>`;
   return h;
 }
 ACT.openResearch = () => modal({title: 'Research', w: 1300, kind: 'research', body: researchHTML(), foot: `<button class="btn primary" data-a="mclose">Done</button>`}).then(() => renderTop());
@@ -2116,7 +2168,7 @@ function saveTo(slot) {
   } catch (e) { console.warn('save failed', e); return false; }
 }
 function autosave() { if (S && !S.over) saveTo('auto'); }
-function migrateSave(d) { d.version = GAME_VERSION; if (!d.budget) d.budget = {perm: 0, temp: [], seen: {}}; d.newsLog = d.newsLog || []; for (const x of d.designs || []) if (x.id === 'scout' && x.mods.length === 1 && x.mods[0] === 'tel_m') x.mods.push('booster'); for (const b of d.bodies || []) if (b.col && b.col.outpost && !b.col.mode) b.col.mode = 'build'; if ((d.designs || []).some(x => x.id === 'probe')) { for (const f of d.fleets || []) for (const sh of f.ships) if (sh.d === 'probe') sh.d = 'scout'; d.designs = d.designs.filter(x => x.id !== 'probe'); }
+function migrateSave(d) { d.version = GAME_VERSION; if (!d.budget) d.budget = {perm: 0, temp: [], seen: {}}; { const ck = Object.keys(d.budget.seen || {}).filter(k => /^core\d+$/.test(k)); if (ck.length) { d.budget.perm -= ck.length - 1; ck.forEach(k => delete d.budget.seen[k]); d.budget.seen.core = 1; } } d.newsLog = d.newsLog || []; for (const x of d.designs || []) if (x.id === 'scout' && x.mods.length === 1 && x.mods[0] === 'tel_m') x.mods.push('booster'); for (const b of d.bodies || []) if (b.col && b.col.outpost && !b.col.mode) b.col.mode = 'build'; if ((d.designs || []).some(x => x.id === 'probe')) { for (const f of d.fleets || []) for (const sh of f.ships) if (sh.d === 'probe') sh.d = 'scout'; d.designs = d.designs.filter(x => x.id !== 'probe'); }
   for (const x of d.designs || []) delete x.obsolete; fixDesignIcons(d.designs || []); d.msgs = d.msgs || []; d.journal = d.journal || []; d.hist = d.hist || []; return d; }
 function loadFrom(slot) { const r = readSlot(slot); if (!r) return false; try { S = migrateSave(JSON.parse(r.data)); } catch (e) { toast('That save could not be read.'); return false; } startPlaying(false); return true; }
 function savesHTML(canSave) {

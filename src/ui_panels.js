@@ -1,6 +1,7 @@
 'use strict';
 // ===================== STARWAKE v2 — SIDE PANELS =====================
 function renderSide() {
+  renderAttn();
   const el = $('#side');
   if (!S || !UI.view) { el.classList.remove('show'); return; }
   let html = '';

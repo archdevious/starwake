@@ -46,19 +46,19 @@ function openEvent(f) {
 // ---------- research ----------
 function researchHTML() {
   const t = totals();
-  let h = `<div class="row sb" style="margin-bottom:10px"><div>Research: <b class="acc">+${fmt(t.rp)}</b> per year${S.rpBank ? ` · <span class="dim">${Math.floor(S.rpBank)} banked</span>` : ''}</div><div class="small dim">Every technology can be learned eventually. The order is up to you.</div></div>`;
+  let h = `<div class="row sb" style="margin-bottom:10px"><div>Research: <b class="acc">+${fmt(t.rp)}</b> per year${S.rpBank ? ` · <span class="dim">${Math.floor(S.rpBank)} banked</span>` : ''}</div></div>`;
   if (S.res) { const c = techCost(S.res.tech); h += `<div class="card"><div class="row sb"><span>Researching <b class="amber">${TECH[S.res.tech].name}</b></span><span class="dim small">${Math.floor(S.res.prog + S.rpBank)} / ${c} · ${t.rp > 0 ? Math.max(1, Math.ceil((c - S.res.prog - S.rpBank) / t.rp)) : '∞'} years</span></div><div class="bar a" style="margin-top:5px"><i style="width:${Math.min(100, (S.res.prog + S.rpBank) / c * 100)}%"></i></div></div>`; }
   h += `<div class="tgrid">`;
   for (const fk in FIELDS) {
     h += `<div class="tcol"><div class="rname" style="border-color:${FIELDS[fk].color};width:auto"><b>${FIELDS[fk].name}</b></div>`;
-    for (const tk of TECHS.filter(x => x.f === fk)) {
+    for (const tk of TECHS.filter(x => x.f === fk).sort((a, b) => a.cost - b.cost)) {
       const known = has(tk.id), cur = S.res && S.res.tech === tk.id, ok = tk.req.every(has);
       const cls = known ? 'known' : cur ? 'res' : ok ? 'avail' : 'lock';
       h += `<div class="tech ${cls}" ${cls === 'avail' ? `data-a="pickTech" data-v="${tk.id}"` : ''}><b>${tk.name}</b> <span class="faint tiny">${known ? '✓' : techCost(tk.id)}</span><div class="d">${esc(tk.desc)}</div>${!ok && !known ? `<div class="req">Needs ${tk.req.filter(r => !has(r)).map(r => TECH[r].name).join(', ')}</div>` : ''}</div>`;
     }
     h += `</div>`;
   }
-  h += `</div><div class="sec">Breakthroughs (found only by exploring)</div><div class="row wrap" style="gap:6px">${Object.keys(BREAKTHROUGHS).map(k => has(k) ? `<div class="tech known" style="max-width:260px"><b>${BREAKTHROUGHS[k].name}</b><div class="d">${esc(BREAKTHROUGHS[k].desc)}</div></div>` : `<div class="tech lock" style="max-width:260px"><b>???</b><div class="d">Not yet discovered</div></div>`).join('')}</div>`;
+  h += `</div><div class="sec">Breakthroughs (found only by exploring)</div><div class="row wrap" style="gap:6px">${Object.keys(BREAKTHROUGHS).filter(has).map(k => `<div class="tech known" style="max-width:260px"><b>${BREAKTHROUGHS[k].name}</b><div class="d">${esc(BREAKTHROUGHS[k].desc)}</div></div>`).join('') || '<div class="small dim">None found yet. Exploring may turn some up.</div>'}</div>`;
   return h;
 }
 ACT.openResearch = () => modal({title: 'Research', w: 1300, kind: 'research', body: researchHTML(), foot: `<button class="btn primary" data-a="mclose">Done</button>`}).then(() => renderTop());
@@ -137,7 +137,7 @@ function saveTo(slot) {
   } catch (e) { console.warn('save failed', e); return false; }
 }
 function autosave() { if (S && !S.over) saveTo('auto'); }
-function migrateSave(d) { d.version = GAME_VERSION; if (!d.budget) d.budget = {perm: 0, temp: [], seen: {}}; d.newsLog = d.newsLog || []; for (const x of d.designs || []) if (x.id === 'scout' && x.mods.length === 1 && x.mods[0] === 'tel_m') x.mods.push('booster'); for (const b of d.bodies || []) if (b.col && b.col.outpost && !b.col.mode) b.col.mode = 'build'; if ((d.designs || []).some(x => x.id === 'probe')) { for (const f of d.fleets || []) for (const sh of f.ships) if (sh.d === 'probe') sh.d = 'scout'; d.designs = d.designs.filter(x => x.id !== 'probe'); }
+function migrateSave(d) { d.version = GAME_VERSION; if (!d.budget) d.budget = {perm: 0, temp: [], seen: {}}; { const ck = Object.keys(d.budget.seen || {}).filter(k => /^core\d+$/.test(k)); if (ck.length) { d.budget.perm -= ck.length - 1; ck.forEach(k => delete d.budget.seen[k]); d.budget.seen.core = 1; } } d.newsLog = d.newsLog || []; for (const x of d.designs || []) if (x.id === 'scout' && x.mods.length === 1 && x.mods[0] === 'tel_m') x.mods.push('booster'); for (const b of d.bodies || []) if (b.col && b.col.outpost && !b.col.mode) b.col.mode = 'build'; if ((d.designs || []).some(x => x.id === 'probe')) { for (const f of d.fleets || []) for (const sh of f.ships) if (sh.d === 'probe') sh.d = 'scout'; d.designs = d.designs.filter(x => x.id !== 'probe'); }
   for (const x of d.designs || []) delete x.obsolete; fixDesignIcons(d.designs || []); d.msgs = d.msgs || []; d.journal = d.journal || []; d.hist = d.hist || []; return d; }
 function loadFrom(slot) { const r = readSlot(slot); if (!r) return false; try { S = migrateSave(JSON.parse(r.data)); } catch (e) { toast('That save could not be read.'); return false; } startPlaying(false); return true; }
 function savesHTML(canSave) {
