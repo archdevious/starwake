@@ -26,7 +26,7 @@ function bodyColor(b) {
   if (b.temp === 'scorching' && b.cls !== 'molten') return ['#e0a070', '#7a3a1a'];
   return m;
 }
-function lifeKnown(b) { return b.star === 0 || b.owner === 0 || S.surveyed[b.star] || has('biosignatures'); }
+function lifeKnown(b) { return b.star === 0 || b.owner === 0 || S.surveyed[b.star] || has('biosignatures') || inGreatScope(ST(b.star)); }
 function planetBall(b, px) {
   px = px || 30; const [c1, c2] = bodyColor(b);
   const bg = b.cls === 'belt' ? `radial-gradient(circle at 30% 30%,#aaa 0 10%,transparent 11%),radial-gradient(circle at 70% 60%,#888 0 12%,transparent 13%),radial-gradient(circle at 45% 75%,#999 0 9%,transparent 10%),radial-gradient(circle at 60% 25%,#777 0 7%,transparent 8%)`
@@ -41,12 +41,12 @@ function renderTop() {
   const t = totals(); const res = S.res ? TECH[S.res.tech] : null;
   const short = colonyStars().filter(s => ST(s).short);
   $('#res').innerHTML = `
-    <div class="chip"><span class="k">Year</span><b>${S.year}</b><span class="dim small">${S.turn}/${S.maxTurns}</span></div>
-    <div class="chip" title="Income minus ship upkeep"><span class="k">Credits</span><b>${fmt(Math.floor(S.bc))}</b><span class="${t.net >= 0 ? 'good' : 'bad'}">${sgn(t.net)}</span></div>
-    <div class="chip"><span class="k">Population</span><b>${people(t.pop)}</b></div>
-    <div class="chip click" data-a="openResearch"><span class="k">Research</span>${res ? `<span class="ell" title="${esc(res.name)}">${esc(res.name)}</span><span class="dim">${Math.floor(S.res.prog + S.rpBank)}/${techCost(S.res.tech)}</span>` : (availableTechs().length ? '<span class="warn">Choose research!</span>' : '<span class="dim">All known</span>')}<span class="acc">+${fmt(t.rp)}</span></div>
+    <div class="chip" title="Year (turn)"><span class="k">Year</span><b>${S.year}</b><span class="dim small">${S.turn}/${S.maxTurns}</span></div>
+    <div class="chip" title="Credits (income minus ship upkeep)"><span class="k">Credits</span><b>${fmt(Math.floor(S.bc))}</b><span class="${t.net >= 0 ? 'good' : 'bad'}">${sgn(t.net)}</span></div>
+    <div class="chip" title="Population"><span class="k">Population</span><b>${people(t.pop)}</b></div>
+    <div class="chip click" data-a="openResearch" title="Research"><span class="k">Research</span>${res ? `<span class="ell" title="${esc(res.name)}">${esc(res.name)}</span><span class="dim">${Math.floor(S.res.prog + S.rpBank)}/${techCost(S.res.tech)}</span>` : (availableTechs().length ? '<span class="warn">Choose research!</span>' : '<span class="dim">All known</span>')}<span class="acc">+${fmt(t.rp)}</span></div>
     ${short.length ? `<div class="chip click" data-a="goStar" data-v="${short[0]}"><span class="bad">Food shortage: ${short.map(s => esc(ST(s).name)).join(', ')}</span></div>` : ''}
-    <div class="chip"><span class="k">Top speed</span><b>${pct(topSpeed())}</b></div>`;
+    <div class="chip" title="Top ship speed, as a share of light speed"><span class="k">Top speed</span><b>${pct(topSpeed())}</b></div>`;
 }
 
 // ---------- 3D map ----------
@@ -124,6 +124,7 @@ function drawMap() {
   }
   // labels with de-cluttering
   const boxes = []; x.textAlign = 'center';
+  const dots = LABELS.map(L => ({x: L.p[0] - L.rr, y: L.p[1] - L.rr, w: L.rr * 2, h: L.rr * 2}));
   for (const L of LABELS.sort((a, b) => b.pri - a.pri)) {
     const {s, p, rr} = L; const vis = !!S.visited[s.id];
     x.font = (vis ? '600 ' : '') + '11.5px Segoe UI, sans-serif';
@@ -131,6 +132,7 @@ function drawMap() {
     if (L.pri < 3 && boxes.some(o => bx.x < o.x + o.w && bx.x + bx.w > o.x && bx.y < o.y + o.h && bx.y + bx.h > o.y)) continue;
     boxes.push(bx); x.fillStyle = s.bodies.some(bid => B(bid).owner === 0) ? '#8ccaff' : vis ? '#e8eef8' : '#8a94aa'; x.fillText(s.name, p[0], p[1] + rr + 13);
   }
+  boxes.push(...dots);
   // fleets
   UI.fleetBoxes = [];
   const byStar = {};
@@ -139,7 +141,12 @@ function drawMap() {
     const p = proj(f.x, f.y, f.z), d = ST(f.dest), q = proj(d.x, d.y, d.z);
     const ang = Math.atan2(q[1] - p[1], q[0] - p[0]);
     drawShipIcon(x, p[0], p[1], f, ang, UI.selFleet === f.id);
-    if (!(f.task && f.task.type === 'route')) { x.fillStyle = '#a8dcff'; x.font = '10.5px Segoe UI, sans-serif'; x.textAlign = 'left'; x.fillText(etaTo(f, f.dest) + ' yr', p[0] + 9, p[1] - 6); }
+    if (!(f.task && f.task.type === 'route')) {
+      x.font = '10.5px Segoe UI, sans-serif'; const t = etaTo(f, f.dest) + ' yr', tw = x.measureText(t).width + 4;
+      const cands = [[9, -15], [9, 3], [-9 - tw, -15], [-9 - tw, 3]].map(([dx, dy]) => ({x: p[0] + dx, y: p[1] + dy, w: tw, h: 12}));
+      const free = cands.find(b => !boxes.some(o => b.x < o.x + o.w && b.x + b.w > o.x && b.y < o.y + o.h && b.y + b.h > o.y)) || (UI.selFleet === f.id ? cands[0] : null);
+      if (free) { boxes.push(free); x.fillStyle = '#a8dcff'; x.textAlign = 'left'; x.fillText(t, free.x + 2, free.y + 10); }
+    }
     UI.fleetBoxes.push({x: p[0] - 9, y: p[1] - 9, w: 18, h: 18, f: f.id});
   }
   for (const sid in byStar) {

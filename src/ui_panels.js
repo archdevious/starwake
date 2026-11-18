@@ -50,11 +50,12 @@ function starPanel(sid) {
   const s = ST(sid);
   let h = `<div class="hdr"><div><h2>${esc(s.name)}</h2><div class="dim small">${starTitle(s)}</div></div><button class="x" data-a="close">✕</button></div>`;
   if (s.guardKnown) h += `<div class="card" style="border-color:#7a2a2a"><b class="bad">Guardian machines.</b> Ancient automated defenses destroy any ship that enters this system.</div>`;
-  if (!S.visited[sid]) {
+  if (!worldsKnown(s)) {
     h += `<div class="card dim">Only seen through telescopes. Send any ship here to see its worlds; a ship passing within 1 light-year will do.</div>`;
     if (lifeVisible(s)) { const eco = s.bodies.map(B).some(b => b.life === 'ecosystem'), mic = s.bodies.map(B).some(b => b.life === 'microbial'); h += `<div class="card small">Biosignatures: ${eco ? '<span class="good">signs of a living ecosystem</span>' : mic ? '<span class="acc">faint signs of microbial life</span>' : '<span class="dim">no signs of life</span>'}</div>`; }
   } else {
-    if (s.anom && !s.anomDone) {
+    if (!S.visited[sid]) h += `<div class="card small dim">Mapped by the Great Telescope. No ship has been here yet.</div>`;
+    if (s.anom && !s.anomDone && S.visited[sid]) {
       const sci = S.fleets.find(f => f.star === sid && f.dest == null && fleetHas(f, 'lab'));
       h += `<div class="card" style="border-color:#6a5020"><b class="amber">◆ Strange readings</b><div class="small dim" style="margin-top:3px">Something here is worth a closer look. A ship with a Science Lab can investigate.</div>${sci ? `<button class="btn sm amber" style="margin-top:6px" data-a="investigate" data-v="${sci.id}">Investigate</button>` : ''}</div>`;
     }
@@ -104,7 +105,7 @@ function colonyPanel(b) {
   h += `<div class="row" style="margin:8px 0 4px;gap:4px"><button class="btn sm ${tab === 'proj' ? 'on' : ''}" data-a="btab" data-v="proj">Projects</button><button class="btn sm ${tab === 'ship' ? 'on' : ''}" data-a="btab" data-v="ship">Ships</button></div>`;
   if (tab === 'proj') {
     for (const id in PROJECTS) {
-      const P = PROJECTS[id]; if (P.tech && !has(P.tech)) continue; if (c.proj[id] && !P.repeat) continue;
+      const P = PROJECTS[id]; if (P.unique || (P.tech && !has(P.tech))) continue; if (c.proj[id] && !P.repeat) continue;
       const why = projReason(b, id), cost = projCost(id);
       h += `<div class="opt" ${why ? `style="opacity:.45;cursor:default"` : `data-a="qadd" data-v="${b.id}:proj:${id}"`}><span class="nm">${P.name}<div class="tiny dim">${esc(why || P.desc)}</div></span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`;
     }

@@ -172,6 +172,10 @@ table.list tr.click{cursor:pointer}table.list tr.click:hover td{background:#121d
 
 .chip .ell{max-width:150px;overflow:hidden;text-overflow:ellipsis}
 @media (max-width:1700px){.chip .k{font-size:10px;letter-spacing:.04em}.chip{padding:3px 7px;gap:5px}}
+.eraopt p.why{font-style:italic;color:#9fb0cc}
+@media (max-width:1560px){#topbar .brand{display:none}}
+@media (max-width:1440px){.tbtns .btn{padding:5px 8px;font-size:12.5px}.tbtns{gap:4px}#topbar{gap:8px}.chip .ell{max-width:110px}}
+@media (max-width:1300px){.chip .k{display:none}.chip{padding:3px 6px}#res{gap:4px}}
 
 </style>
 </head>
@@ -209,7 +213,7 @@ const FAR_STARS=[{"n": "Achernar", "d": [0.184, -0.484, -0.855], "ly": 139}, {"n
 
 'use strict';
 // ===================== STARWAKE v2 — STATIC DATA =====================
-const GAME_VERSION = 2;
+const GAME_VERSION = 3;
 const SAVE_FORMAT = 2;
 const START_YEAR = 2326;
 const LENGTHS = {
@@ -279,6 +283,7 @@ const PROJECTS = {
   agridomes:   {name: 'Agri-Domes',           cost: 120, stage: 'settlement', desc: '+3 food, plus 3 more for each stage above Settlement.'},
   habitat:     {name: 'Habitat Expansion',    cost: 250, stage: 'settlement', desc: '+50% population capacity here.'},
   elevator:    {name: 'Space Elevator',       cost: 400, stage: 'city', tech: 'space_elevator', desc: 'Ships built here cost 25% less.'},
+  greatscope:  {name: 'The Great Telescope',  cost: 0, stage: 'settlement', unique: true, desc: 'Unique. Earth\'s telescope sees 24 light-years away, and knows worlds within 8.6 light-years of Earth and any signs of life on them.'},
   observatory: {name: 'Deep Sky Observatory', cost: 300, stage: 'settlement', tech: 'deep_sky', desc: 'Telescopes here see 24 light-years instead of 16.'},
   terraform:   {name: 'Terraforming',         cost: 600, stage: 'settlement', tech: 'terraforming', repeat: true, desc: 'Improves habitability one step (Hostile → Harsh → Livable → Garden). Destroys any native ecosystem.'},
 };
@@ -356,25 +361,25 @@ for (const k in BREAKTHROUGHS) TECH[k] = Object.assign({id: k, f: 'bt', cost: 0,
 
 // ---------- Backstory (2026–2326) ----------
 const ERAS = [
-  {years: '2026–2101', name: 'The Crisis Century', q: 'How did humanity get through its own crises?', opts: [
-    {id: 'green', name: 'The Green Accord', text: 'Nations bound themselves to repair the planet. Earth emerged cleaner, fertile and crowded with life.', fx: ['+20 food on Earth', 'Population grows 10% faster']},
-    {id: 'fortress', name: 'Fortress Nations', text: 'Walls went up and every bloc built for itself. Industry boomed; billions were lost along the way.', fx: ['+15% production', 'Earth starts with 1.5 billion fewer people']},
-    {id: 'corporate', name: 'Corporate Ascendancy', text: 'Megacorporations filled the gaps governments left. Wealth flowed, unevenly.', fx: ['+25% credits', '+300 starting credits']},
+  {years: '2026–2101', name: 'A New Order', q: 'How did humanity organise itself?', opts: [
+    {id: 'united', name: 'United Earth', text: 'The nations joined under a single world government that set policy for the whole planet.', why: 'The united government organised emigration on a planetary scale, through incentives and quotas.', fx: ['Colony Ships carry 50% more settlers']},
+    {id: 'blocs', name: 'Rival Blocs', text: 'A few large blocs of nations competed for resources, influence and a foothold in space.', why: 'The race between them kept every bloc\'s factories running at full stretch.', fx: ['+15% production']},
+    {id: 'corporate', name: 'The Corporate Age', text: 'Corporations took over much of what governments once did, from power grids to spaceports.', why: 'Private investment and global markets built up deep reserves of wealth for the journey ahead.', fx: ['+25% credits', '+300 starting credits']},
   ]},
   {years: '2101–2176', name: 'Leaving the Cradle', q: 'How did we spread through the Solar System?', opts: [
-    {id: 'moonmars', name: 'The Moon and Mars', text: 'Lunar mining towns and the domes of Mars became humanity\'s first homes beyond Earth.', fx: ['Start with Settlements on the Moon and Mars']},
-    {id: 'belt', name: 'The Belt Rush', text: 'Prospectors swarmed the asteroid belt and Ceres became its capital.', fx: ['Start with a Settlement on Ceres and a mining outpost in the belt', '+10% production']},
-    {id: 'venus', name: 'Cloud Cities of Venus', text: 'Floating cities drift in Venus\' upper air, where pressure and temperature feel almost like home.', fx: ['Start with a City floating above Venus', '+10% research']},
+    {id: 'moonmars', name: 'The Moon and Mars', text: 'Mining bases on the Moon and domed settlements on Mars became humanity\'s first homes beyond Earth.', why: 'Both grew from research outposts into permanent settlements.', fx: ['Start with Settlements on the Moon and Mars', 'Mars can grow to 20 million people; the Moon stays small']},
+    {id: 'belt', name: 'The Belt Rush', text: 'Prospectors swarmed the asteroid belt and pushed on to the moons of Saturn.', why: 'Mining crews followed the ice and metal outward as far as Titan.', fx: ['Start with Settlements on Ceres and Titan, plus a mining outpost in the belt', 'All three stay small, but the outpost adds production from the start']},
+    {id: 'venus', name: 'Cloud Cities of Venus', text: 'Floating cities were built in Venus\' upper air, where pressure and temperature are close to Earth\'s.', why: 'The first cloud cities were small, but the upper air of Venus has room for far more.', fx: ['Start with a Settlement floating above Venus', 'It can grow to 40 million people, the most of any starting choice']},
   ]},
-  {years: '2176–2251', name: 'The Great Divide', q: 'How did humanity organise itself?', opts: [
-    {id: 'unity', name: 'Unity', text: 'A single world government, slow but steady.', fx: ['+15% credits', 'Population grows 10% faster']},
-    {id: 'fracture', name: 'Fracture', text: 'Rival blocs raced each other outward, all the way to Saturn.', fx: ['+15% production', 'Start with a Settlement on Titan']},
-    {id: 'transcend', name: 'Transcendence', text: 'Genetic and cybernetic enhancement remade what it means to be human.', fx: ['+20% research']},
+  {years: '2176–2251', name: 'The Long Stride', q: 'Where did humanity put its effort?', opts: [
+    {id: 'medicine', name: 'Medicine', text: 'Research focused on longer, healthier lives and on self-sufficient habitats.', why: 'Life-support research made sealed farms far more productive.', fx: ['Free tech, Closed Ecology: Harsh and Hostile colonies make 50% more food']},
+    {id: 'outer', name: 'The Outer Planets', text: 'Shipyards around Jupiter built the first truly large spacecraft.', why: 'Building in orbit, free of Earth\'s gravity, made every hull cheaper.', fx: ['Free tech, Orbital Construction: ships cost 15% less']},
+    {id: 'transcend', name: 'Transcendence', text: 'Genetic and cybernetic enhancement changed what it means to be human.', why: 'Adapted people settled worlds too harsh for unaltered humans.', fx: ['Free tech, Genetic Adaptation: Harsh worlds hold 50% more people and grow 50% faster']},
   ]},
   {years: '2251–2326', name: 'First Light', q: 'What was our first step toward the stars?', opts: [
-    {id: 'ark', name: 'The Ark Program', text: 'Two great colony ships stand finished in orbit, waiting for a destination.', fx: ['Start with 2 extra Colony Ships']},
-    {id: 'telescope', name: 'The Great Telescope', text: 'A telescope array spanning the Solar System has mapped the nearby stars.', fx: ['Earth\'s telescopes see 24 light-years', 'Start knowing Biosignature Spectroscopy']},
-    {id: 'probes', name: 'The Probe Swarm', text: 'Decades ago, small fast probes were launched toward the nearest stars. They are about to arrive.', fx: ['4 probes are already arriving at nearby stars']},
+    {id: 'ark', name: 'The Ark Program', text: 'A great colony ship was completed in orbit.', why: 'It was built before anyone chose where it would go.', fx: ['Start with 1 extra Colony Ship']},
+    {id: 'telescope', name: 'The Great Telescope', text: 'A telescope array mapped the nearby stars and the worlds around them.', why: 'Its main mirror was placed in orbit around Earth and is still in service.', fx: ['A unique building on Earth. Its telescope sees 24 light-years away, and knows worlds within 8.6 light-years of Earth and any signs of life on them']},
+    {id: 'probes', name: 'The Pathfinder Probes', text: 'Small, fast probes were built and launched toward the two nearest stars in the early 2300s.', why: 'After a couple of decades in transit, both have now arrived at Alpha Centauri and Barnard\'s Star, and the science vessel built to follow up on their findings is ready at Earth.', fx: ['Start with 2 Pathfinder Probes at Alpha Centauri and Barnard\'s Star, plus a free Science Vessel at Earth']},
   ]},
 ];
 
@@ -621,7 +626,7 @@ function newGame(o) {
   for (const s of shuffle(S.stars.filter(s => s.id !== 0 && !s.guard))) { if (rnd() < 0.38) { s.anom = ev[k % ev.length]; k++; } }
   // designs
   for (const d of DEFAULT_DESIGNS) S.designs.push(Object.assign({}, d, {mods: d.mods.slice(), std: true}));
-  S.designs.push({id: 'probe', name: 'Starshot Probe', hull: 'light', mods: ['tel_m'], std: true, hidden: true});
+  S.designs.push({id: 'probe', name: 'Pathfinder Probe', hull: 'light', mods: ['tel_m'], std: true, hidden: true});
   // backstory
   const st = o.story || {};
   const sun = S.stars[0];
@@ -630,22 +635,22 @@ function newGame(o) {
   earth.col = {pop: 9500, focus: 'balanced', proj: {shipyard: 1}, queue: [], prog: 0, home: true, founded: START_YEAR};
   earth.owner = 0;
   const settle = (n, pop) => { const b = body(n); b.owner = 0; b.col = {pop, focus: 'balanced', proj: {}, queue: [], prog: 0, founded: START_YEAR - 60}; return b; };
-  if (st.e0 === 'green') { S.mods.earthFood += 20; S.mods.growth += 0.1; }
-  if (st.e0 === 'fortress') { S.mods.prod += 0.15; earth.col.pop -= 1500; }
+  if (st.e0 === 'united') S.mods.settlers = 1.5;
+  if (st.e0 === 'blocs') S.mods.prod += 0.15;
   if (st.e0 === 'corporate') { S.mods.bc += 0.25; S.bc += 300; }
   if (st.e1 === 'moonmars') { settle('Moon', 0.08); settle('Mars', 0.09); }
-  if (st.e1 === 'belt') { settle('Ceres', 0.07); const ab = body('Asteroid belt'); ab.owner = 0; ab.col = {pop: 0, outpost: true, focus: 'balanced', proj: {}, queue: [], prog: 0}; S.mods.prod += 0.1; }
-  if (st.e1 === 'venus') { const v = settle('Venus', 2.5); v.clouds = true; S.mods.rp += 0.1; }
-  if (st.e2 === 'unity') { S.mods.bc += 0.15; S.mods.growth += 0.1; }
-  if (st.e2 === 'fracture') { S.mods.prod += 0.15; settle('Titan', 0.04); }
-  if (st.e2 === 'transcend') { S.mods.rp += 0.2; }
+  if (st.e1 === 'belt') { settle('Ceres', 0.07); settle('Titan', 0.05); const ab = body('Asteroid belt'); ab.owner = 0; ab.col = {pop: 0, outpost: true, focus: 'balanced', proj: {}, queue: [], prog: 0}; }
+  if (st.e1 === 'venus') { const v = settle('Venus', 0.09); v.clouds = true; }
+  if (st.e2 === 'medicine') S.techs.closed_ecology = 1;
+  if (st.e2 === 'outer') S.techs.orbital_construction = 1;
+  if (st.e2 === 'transcend') S.techs.gene_adaptation = 1;
   const home = s => newFleetAt(0, s);
   home('scout'); home('science'); home('colony');
-  if (st.e3 === 'ark') { home('colony'); home('colony'); }
-  if (st.e3 === 'telescope') { S.mods.earthTel = 24; S.techs.biosignatures = 1; }
+  if (st.e3 === 'ark') home('colony');
+  if (st.e3 === 'telescope') { earth.col.proj.greatscope = 1; S.mods.greatScope = 1; S.mods.earthTel = 24; }
   if (st.e3 === 'probes') {
-    const near = S.stars.filter(s => s.id !== 0).sort((a, b) => a.ly - b.ly).slice(0, 6);
-    shuffle(near).slice(0, 4).forEach((t, i) => { const f = newFleetAt(0, 'probe'); const k2 = 1 - (1 + i * 0.5) * 0.3 / Math.max(1, t.ly); f.star = null; f.x = t.x * k2; f.y = t.y * k2; f.z = t.z * k2; f.dest = t.id; });
+    for (const n of ['Alpha Centauri', "Barnard's Star"]) { const t = S.stars.find(x => x.name === n); if (t) newFleetAt(t.id, 'probe'); }
+    home('science');
   }
   for (const s of sun.bodies.map(B)) S.visited[0] = S.surveyed[0] = S.known[0] = 1;
   updateKnowledge();
@@ -763,6 +768,7 @@ function itemCost(b, it) { return it.kind === 'proj' ? projCost(it.id) : shipCos
 function itemName(it) { return it.kind === 'proj' ? PROJECTS[it.id].name : design(it.id).name; }
 function projReason(b, id) {
   const P = PROJECTS[id], c = b.col;
+  if (P.unique) return 'Unique';
   if (c.outpost) return 'Outposts cannot build';
   if (P.tech && !has(P.tech)) return 'Needs ' + TECH[P.tech].name;
   if (c.proj[id] && !P.repeat) return 'Already built';
@@ -786,7 +792,7 @@ function completeItem(b, it) {
     msg(b.name + ' launched a ' + design(it.id).name + '.', b.star, 'ship');
   }
 }
-function settlerCount() { return has('hibernation') ? 0.04 : 0.02; }
+function settlerCount() { return (has('hibernation') ? 0.04 : 0.02) * (S.mods.settlers || 1); }
 function colonizeCheck(f, b, kind) {
   if (f.star !== b.star || f.dest != null) return 'The ship must be in orbit';
   if (kind === 'colony') {
@@ -846,7 +852,9 @@ function visit(s) {
   msg('Our ship reached ' + s.name + ': ' + (n ? n + ' world' + (n > 1 ? 's' : '') + ' found' : 'no planets') + (s.anom ? '. Strange readings detected!' : '.'), s.id, 'arrive');
   journal('First visit to ' + s.name + (s.anom ? ' (strange readings)' : '') + '.', s.id);
 }
-function lifeVisible(s) { return S.surveyed[s.id] || (has('biosignatures') && S.known[s.id]); }
+function inGreatScope(s) { return !!(S.mods.greatScope && d3(s, S.stars[0]) <= 8.65); }
+function worldsKnown(s) { return !!(S.visited[s.id] || inGreatScope(s)); }
+function lifeVisible(s) { return S.surveyed[s.id] || inGreatScope(s) || (has('biosignatures') && S.known[s.id]); }
 
 // ---------- anomalies ----------
 function eventOf(s) { return EVENTS.find(e => e.id === s.anom); }
@@ -1032,7 +1040,7 @@ function bodyColor(b) {
   if (b.temp === 'scorching' && b.cls !== 'molten') return ['#e0a070', '#7a3a1a'];
   return m;
 }
-function lifeKnown(b) { return b.star === 0 || b.owner === 0 || S.surveyed[b.star] || has('biosignatures'); }
+function lifeKnown(b) { return b.star === 0 || b.owner === 0 || S.surveyed[b.star] || has('biosignatures') || inGreatScope(ST(b.star)); }
 function planetBall(b, px) {
   px = px || 30; const [c1, c2] = bodyColor(b);
   const bg = b.cls === 'belt' ? `radial-gradient(circle at 30% 30%,#aaa 0 10%,transparent 11%),radial-gradient(circle at 70% 60%,#888 0 12%,transparent 13%),radial-gradient(circle at 45% 75%,#999 0 9%,transparent 10%),radial-gradient(circle at 60% 25%,#777 0 7%,transparent 8%)`
@@ -1047,12 +1055,12 @@ function renderTop() {
   const t = totals(); const res = S.res ? TECH[S.res.tech] : null;
   const short = colonyStars().filter(s => ST(s).short);
   $('#res').innerHTML = `
-    <div class="chip"><span class="k">Year</span><b>${S.year}</b><span class="dim small">${S.turn}/${S.maxTurns}</span></div>
-    <div class="chip" title="Income minus ship upkeep"><span class="k">Credits</span><b>${fmt(Math.floor(S.bc))}</b><span class="${t.net >= 0 ? 'good' : 'bad'}">${sgn(t.net)}</span></div>
-    <div class="chip"><span class="k">Population</span><b>${people(t.pop)}</b></div>
-    <div class="chip click" data-a="openResearch"><span class="k">Research</span>${res ? `<span class="ell" title="${esc(res.name)}">${esc(res.name)}</span><span class="dim">${Math.floor(S.res.prog + S.rpBank)}/${techCost(S.res.tech)}</span>` : (availableTechs().length ? '<span class="warn">Choose research!</span>' : '<span class="dim">All known</span>')}<span class="acc">+${fmt(t.rp)}</span></div>
+    <div class="chip" title="Year (turn)"><span class="k">Year</span><b>${S.year}</b><span class="dim small">${S.turn}/${S.maxTurns}</span></div>
+    <div class="chip" title="Credits (income minus ship upkeep)"><span class="k">Credits</span><b>${fmt(Math.floor(S.bc))}</b><span class="${t.net >= 0 ? 'good' : 'bad'}">${sgn(t.net)}</span></div>
+    <div class="chip" title="Population"><span class="k">Population</span><b>${people(t.pop)}</b></div>
+    <div class="chip click" data-a="openResearch" title="Research"><span class="k">Research</span>${res ? `<span class="ell" title="${esc(res.name)}">${esc(res.name)}</span><span class="dim">${Math.floor(S.res.prog + S.rpBank)}/${techCost(S.res.tech)}</span>` : (availableTechs().length ? '<span class="warn">Choose research!</span>' : '<span class="dim">All known</span>')}<span class="acc">+${fmt(t.rp)}</span></div>
     ${short.length ? `<div class="chip click" data-a="goStar" data-v="${short[0]}"><span class="bad">Food shortage: ${short.map(s => esc(ST(s).name)).join(', ')}</span></div>` : ''}
-    <div class="chip"><span class="k">Top speed</span><b>${pct(topSpeed())}</b></div>`;
+    <div class="chip" title="Top ship speed, as a share of light speed"><span class="k">Top speed</span><b>${pct(topSpeed())}</b></div>`;
 }
 
 // ---------- 3D map ----------
@@ -1130,6 +1138,7 @@ function drawMap() {
   }
   // labels with de-cluttering
   const boxes = []; x.textAlign = 'center';
+  const dots = LABELS.map(L => ({x: L.p[0] - L.rr, y: L.p[1] - L.rr, w: L.rr * 2, h: L.rr * 2}));
   for (const L of LABELS.sort((a, b) => b.pri - a.pri)) {
     const {s, p, rr} = L; const vis = !!S.visited[s.id];
     x.font = (vis ? '600 ' : '') + '11.5px Segoe UI, sans-serif';
@@ -1137,6 +1146,7 @@ function drawMap() {
     if (L.pri < 3 && boxes.some(o => bx.x < o.x + o.w && bx.x + bx.w > o.x && bx.y < o.y + o.h && bx.y + bx.h > o.y)) continue;
     boxes.push(bx); x.fillStyle = s.bodies.some(bid => B(bid).owner === 0) ? '#8ccaff' : vis ? '#e8eef8' : '#8a94aa'; x.fillText(s.name, p[0], p[1] + rr + 13);
   }
+  boxes.push(...dots);
   // fleets
   UI.fleetBoxes = [];
   const byStar = {};
@@ -1145,7 +1155,12 @@ function drawMap() {
     const p = proj(f.x, f.y, f.z), d = ST(f.dest), q = proj(d.x, d.y, d.z);
     const ang = Math.atan2(q[1] - p[1], q[0] - p[0]);
     drawShipIcon(x, p[0], p[1], f, ang, UI.selFleet === f.id);
-    if (!(f.task && f.task.type === 'route')) { x.fillStyle = '#a8dcff'; x.font = '10.5px Segoe UI, sans-serif'; x.textAlign = 'left'; x.fillText(etaTo(f, f.dest) + ' yr', p[0] + 9, p[1] - 6); }
+    if (!(f.task && f.task.type === 'route')) {
+      x.font = '10.5px Segoe UI, sans-serif'; const t = etaTo(f, f.dest) + ' yr', tw = x.measureText(t).width + 4;
+      const cands = [[9, -15], [9, 3], [-9 - tw, -15], [-9 - tw, 3]].map(([dx, dy]) => ({x: p[0] + dx, y: p[1] + dy, w: tw, h: 12}));
+      const free = cands.find(b => !boxes.some(o => b.x < o.x + o.w && b.x + b.w > o.x && b.y < o.y + o.h && b.y + b.h > o.y)) || (UI.selFleet === f.id ? cands[0] : null);
+      if (free) { boxes.push(free); x.fillStyle = '#a8dcff'; x.textAlign = 'left'; x.fillText(t, free.x + 2, free.y + 10); }
+    }
     UI.fleetBoxes.push({x: p[0] - 9, y: p[1] - 9, w: 18, h: 18, f: f.id});
   }
   for (const sid in byStar) {
@@ -1289,11 +1304,12 @@ function starPanel(sid) {
   const s = ST(sid);
   let h = `<div class="hdr"><div><h2>${esc(s.name)}</h2><div class="dim small">${starTitle(s)}</div></div><button class="x" data-a="close">✕</button></div>`;
   if (s.guardKnown) h += `<div class="card" style="border-color:#7a2a2a"><b class="bad">Guardian machines.</b> Ancient automated defenses destroy any ship that enters this system.</div>`;
-  if (!S.visited[sid]) {
+  if (!worldsKnown(s)) {
     h += `<div class="card dim">Only seen through telescopes. Send any ship here to see its worlds; a ship passing within 1 light-year will do.</div>`;
     if (lifeVisible(s)) { const eco = s.bodies.map(B).some(b => b.life === 'ecosystem'), mic = s.bodies.map(B).some(b => b.life === 'microbial'); h += `<div class="card small">Biosignatures: ${eco ? '<span class="good">signs of a living ecosystem</span>' : mic ? '<span class="acc">faint signs of microbial life</span>' : '<span class="dim">no signs of life</span>'}</div>`; }
   } else {
-    if (s.anom && !s.anomDone) {
+    if (!S.visited[sid]) h += `<div class="card small dim">Mapped by the Great Telescope. No ship has been here yet.</div>`;
+    if (s.anom && !s.anomDone && S.visited[sid]) {
       const sci = S.fleets.find(f => f.star === sid && f.dest == null && fleetHas(f, 'lab'));
       h += `<div class="card" style="border-color:#6a5020"><b class="amber">◆ Strange readings</b><div class="small dim" style="margin-top:3px">Something here is worth a closer look. A ship with a Science Lab can investigate.</div>${sci ? `<button class="btn sm amber" style="margin-top:6px" data-a="investigate" data-v="${sci.id}">Investigate</button>` : ''}</div>`;
     }
@@ -1343,7 +1359,7 @@ function colonyPanel(b) {
   h += `<div class="row" style="margin:8px 0 4px;gap:4px"><button class="btn sm ${tab === 'proj' ? 'on' : ''}" data-a="btab" data-v="proj">Projects</button><button class="btn sm ${tab === 'ship' ? 'on' : ''}" data-a="btab" data-v="ship">Ships</button></div>`;
   if (tab === 'proj') {
     for (const id in PROJECTS) {
-      const P = PROJECTS[id]; if (P.tech && !has(P.tech)) continue; if (c.proj[id] && !P.repeat) continue;
+      const P = PROJECTS[id]; if (P.unique || (P.tech && !has(P.tech))) continue; if (c.proj[id] && !P.repeat) continue;
       const why = projReason(b, id), cost = projCost(id);
       h += `<div class="opt" ${why ? `style="opacity:.45;cursor:default"` : `data-a="qadd" data-v="${b.id}:proj:${id}"`}><span class="nm">${P.name}<div class="tiny dim">${esc(why || P.desc)}</div></span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`;
     }
@@ -1529,7 +1545,7 @@ function saveTo(slot) {
   } catch (e) { console.warn('save failed', e); return false; }
 }
 function autosave() { if (S && !S.over) saveTo('auto'); }
-function migrateSave(d) { d.version = GAME_VERSION; d.msgs = d.msgs || []; d.journal = d.journal || []; d.hist = d.hist || []; return d; }
+function migrateSave(d) { d.version = GAME_VERSION; for (const x of d.designs || []) if (x.id === 'probe') x.name = 'Pathfinder Probe'; d.msgs = d.msgs || []; d.journal = d.journal || []; d.hist = d.hist || []; return d; }
 function loadFrom(slot) { const r = readSlot(slot); if (!r) return false; try { S = migrateSave(JSON.parse(r.data)); } catch (e) { toast('That save could not be read.'); return false; } startPlaying(false); return true; }
 function savesHTML(canSave) {
   let h = `<table class="list"><tr><th>Slot</th><th>Civilisation</th><th>Year</th><th>Saved</th><th></th></tr>`;
@@ -1621,7 +1637,7 @@ function renderNewGame() {
   if (NG.step < 4) {
     const e = ERAS[NG.step];
     h += `<div class="era"><div class="sub" style="margin:10px 0 2px">${e.years}</div><h2 style="text-align:center;font-size:24px">${e.name}</h2><p style="text-align:center" class="dim">${e.q}</p>
-      <div class="eraopts">${e.opts.map(o => `<div class="eraopt ${NG.story['e' + NG.step] === o.id ? 'sel' : ''}" data-a="ngPick" data-v="${o.id}"><h3>${o.name}</h3><p>${o.text}</p><ul>${o.fx.map(f => `<li>${f}</li>`).join('')}</ul></div>`).join('')}</div>
+      <div class="eraopts">${e.opts.map(o => `<div class="eraopt ${NG.story['e' + NG.step] === o.id ? 'sel' : ''}" data-a="ngPick" data-v="${o.id}"><h3>${o.name}</h3><p>${o.text}</p>${o.why ? `<p class="why">${o.why}</p>` : ''}<ul>${o.fx.map(f => `<li>${f}</li>`).join('')}</ul></div>`).join('')}</div>
       <div class="row" style="gap:10px;margin-top:22px;justify-content:center"><button class="btn" data-a="tBack">Back</button></div></div>`;
   } else {
     h += `<div class="era"><h2 style="text-align:center;font-size:24px;margin-top:10px">${START_YEAR}: First Light</h2><div class="card" style="margin-top:12px">${ERAS.map((e, i) => { const o = e.opts.find(x => x.id === NG.story['e' + i]); return `<div style="margin:4px 0"><span class="dim">${e.years}</span> · <b>${o.name}</b> <span class="small dim">${o.text}</span></div>`; }).join('')}</div>

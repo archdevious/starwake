@@ -136,7 +136,7 @@ function newGame(o) {
   for (const s of shuffle(S.stars.filter(s => s.id !== 0 && !s.guard))) { if (rnd() < 0.38) { s.anom = ev[k % ev.length]; k++; } }
   // designs
   for (const d of DEFAULT_DESIGNS) S.designs.push(Object.assign({}, d, {mods: d.mods.slice(), std: true}));
-  S.designs.push({id: 'probe', name: 'Starshot Probe', hull: 'light', mods: ['tel_m'], std: true, hidden: true});
+  S.designs.push({id: 'probe', name: 'Pathfinder Probe', hull: 'light', mods: ['tel_m'], std: true, hidden: true});
   // backstory
   const st = o.story || {};
   const sun = S.stars[0];
@@ -145,22 +145,22 @@ function newGame(o) {
   earth.col = {pop: 9500, focus: 'balanced', proj: {shipyard: 1}, queue: [], prog: 0, home: true, founded: START_YEAR};
   earth.owner = 0;
   const settle = (n, pop) => { const b = body(n); b.owner = 0; b.col = {pop, focus: 'balanced', proj: {}, queue: [], prog: 0, founded: START_YEAR - 60}; return b; };
-  if (st.e0 === 'green') { S.mods.earthFood += 20; S.mods.growth += 0.1; }
-  if (st.e0 === 'fortress') { S.mods.prod += 0.15; earth.col.pop -= 1500; }
+  if (st.e0 === 'united') S.mods.settlers = 1.5;
+  if (st.e0 === 'blocs') S.mods.prod += 0.15;
   if (st.e0 === 'corporate') { S.mods.bc += 0.25; S.bc += 300; }
   if (st.e1 === 'moonmars') { settle('Moon', 0.08); settle('Mars', 0.09); }
-  if (st.e1 === 'belt') { settle('Ceres', 0.07); const ab = body('Asteroid belt'); ab.owner = 0; ab.col = {pop: 0, outpost: true, focus: 'balanced', proj: {}, queue: [], prog: 0}; S.mods.prod += 0.1; }
-  if (st.e1 === 'venus') { const v = settle('Venus', 2.5); v.clouds = true; S.mods.rp += 0.1; }
-  if (st.e2 === 'unity') { S.mods.bc += 0.15; S.mods.growth += 0.1; }
-  if (st.e2 === 'fracture') { S.mods.prod += 0.15; settle('Titan', 0.04); }
-  if (st.e2 === 'transcend') { S.mods.rp += 0.2; }
+  if (st.e1 === 'belt') { settle('Ceres', 0.07); settle('Titan', 0.05); const ab = body('Asteroid belt'); ab.owner = 0; ab.col = {pop: 0, outpost: true, focus: 'balanced', proj: {}, queue: [], prog: 0}; }
+  if (st.e1 === 'venus') { const v = settle('Venus', 0.09); v.clouds = true; }
+  if (st.e2 === 'medicine') S.techs.closed_ecology = 1;
+  if (st.e2 === 'outer') S.techs.orbital_construction = 1;
+  if (st.e2 === 'transcend') S.techs.gene_adaptation = 1;
   const home = s => newFleetAt(0, s);
   home('scout'); home('science'); home('colony');
-  if (st.e3 === 'ark') { home('colony'); home('colony'); }
-  if (st.e3 === 'telescope') { S.mods.earthTel = 24; S.techs.biosignatures = 1; }
+  if (st.e3 === 'ark') home('colony');
+  if (st.e3 === 'telescope') { earth.col.proj.greatscope = 1; S.mods.greatScope = 1; S.mods.earthTel = 24; }
   if (st.e3 === 'probes') {
-    const near = S.stars.filter(s => s.id !== 0).sort((a, b) => a.ly - b.ly).slice(0, 6);
-    shuffle(near).slice(0, 4).forEach((t, i) => { const f = newFleetAt(0, 'probe'); const k2 = 1 - (1 + i * 0.5) * 0.3 / Math.max(1, t.ly); f.star = null; f.x = t.x * k2; f.y = t.y * k2; f.z = t.z * k2; f.dest = t.id; });
+    for (const n of ['Alpha Centauri', "Barnard's Star"]) { const t = S.stars.find(x => x.name === n); if (t) newFleetAt(t.id, 'probe'); }
+    home('science');
   }
   for (const s of sun.bodies.map(B)) S.visited[0] = S.surveyed[0] = S.known[0] = 1;
   updateKnowledge();
@@ -278,6 +278,7 @@ function itemCost(b, it) { return it.kind === 'proj' ? projCost(it.id) : shipCos
 function itemName(it) { return it.kind === 'proj' ? PROJECTS[it.id].name : design(it.id).name; }
 function projReason(b, id) {
   const P = PROJECTS[id], c = b.col;
+  if (P.unique) return 'Unique';
   if (c.outpost) return 'Outposts cannot build';
   if (P.tech && !has(P.tech)) return 'Needs ' + TECH[P.tech].name;
   if (c.proj[id] && !P.repeat) return 'Already built';
@@ -301,7 +302,7 @@ function completeItem(b, it) {
     msg(b.name + ' launched a ' + design(it.id).name + '.', b.star, 'ship');
   }
 }
-function settlerCount() { return has('hibernation') ? 0.04 : 0.02; }
+function settlerCount() { return (has('hibernation') ? 0.04 : 0.02) * (S.mods.settlers || 1); }
 function colonizeCheck(f, b, kind) {
   if (f.star !== b.star || f.dest != null) return 'The ship must be in orbit';
   if (kind === 'colony') {
@@ -361,7 +362,9 @@ function visit(s) {
   msg('Our ship reached ' + s.name + ': ' + (n ? n + ' world' + (n > 1 ? 's' : '') + ' found' : 'no planets') + (s.anom ? '. Strange readings detected!' : '.'), s.id, 'arrive');
   journal('First visit to ' + s.name + (s.anom ? ' (strange readings)' : '') + '.', s.id);
 }
-function lifeVisible(s) { return S.surveyed[s.id] || (has('biosignatures') && S.known[s.id]); }
+function inGreatScope(s) { return !!(S.mods.greatScope && d3(s, S.stars[0]) <= 8.65); }
+function worldsKnown(s) { return !!(S.visited[s.id] || inGreatScope(s)); }
+function lifeVisible(s) { return S.surveyed[s.id] || inGreatScope(s) || (has('biosignatures') && S.known[s.id]); }
 
 // ---------- anomalies ----------
 function eventOf(s) { return EVENTS.find(e => e.id === s.anom); }

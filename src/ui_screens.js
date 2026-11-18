@@ -105,7 +105,7 @@ function saveTo(slot) {
   } catch (e) { console.warn('save failed', e); return false; }
 }
 function autosave() { if (S && !S.over) saveTo('auto'); }
-function migrateSave(d) { d.version = GAME_VERSION; d.msgs = d.msgs || []; d.journal = d.journal || []; d.hist = d.hist || []; return d; }
+function migrateSave(d) { d.version = GAME_VERSION; for (const x of d.designs || []) if (x.id === 'probe') x.name = 'Pathfinder Probe'; d.msgs = d.msgs || []; d.journal = d.journal || []; d.hist = d.hist || []; return d; }
 function loadFrom(slot) { const r = readSlot(slot); if (!r) return false; try { S = migrateSave(JSON.parse(r.data)); } catch (e) { toast('That save could not be read.'); return false; } startPlaying(false); return true; }
 function savesHTML(canSave) {
   let h = `<table class="list"><tr><th>Slot</th><th>Civilisation</th><th>Year</th><th>Saved</th><th></th></tr>`;
@@ -197,7 +197,7 @@ function renderNewGame() {
   if (NG.step < 4) {
     const e = ERAS[NG.step];
     h += `<div class="era"><div class="sub" style="margin:10px 0 2px">${e.years}</div><h2 style="text-align:center;font-size:24px">${e.name}</h2><p style="text-align:center" class="dim">${e.q}</p>
-      <div class="eraopts">${e.opts.map(o => `<div class="eraopt ${NG.story['e' + NG.step] === o.id ? 'sel' : ''}" data-a="ngPick" data-v="${o.id}"><h3>${o.name}</h3><p>${o.text}</p><ul>${o.fx.map(f => `<li>${f}</li>`).join('')}</ul></div>`).join('')}</div>
+      <div class="eraopts">${e.opts.map(o => `<div class="eraopt ${NG.story['e' + NG.step] === o.id ? 'sel' : ''}" data-a="ngPick" data-v="${o.id}"><h3>${o.name}</h3><p>${o.text}</p>${o.why ? `<p class="why">${o.why}</p>` : ''}<ul>${o.fx.map(f => `<li>${f}</li>`).join('')}</ul></div>`).join('')}</div>
       <div class="row" style="gap:10px;margin-top:22px;justify-content:center"><button class="btn" data-a="tBack">Back</button></div></div>`;
   } else {
     h += `<div class="era"><h2 style="text-align:center;font-size:24px;margin-top:10px">${START_YEAR}: First Light</h2><div class="card" style="margin-top:12px">${ERAS.map((e, i) => { const o = e.opts.find(x => x.id === NG.story['e' + i]); return `<div style="margin:4px 0"><span class="dim">${e.years}</span> · <b>${o.name}</b> <span class="small dim">${o.text}</span></div>`; }).join('')}</div>

@@ -165,3 +165,7 @@ table.list tr.click{cursor:pointer}table.list tr.click:hover td{background:#121d
 
 .chip .ell{max-width:150px;overflow:hidden;text-overflow:ellipsis}
 @media (max-width:1700px){.chip .k{font-size:10px;letter-spacing:.04em}.chip{padding:3px 7px;gap:5px}}
+.eraopt p.why{font-style:italic;color:#9fb0cc}
+@media (max-width:1560px){#topbar .brand{display:none}}
+@media (max-width:1440px){.tbtns .btn{padding:5px 8px;font-size:12.5px}.tbtns{gap:4px}#topbar{gap:8px}.chip .ell{max-width:110px}}
+@media (max-width:1300px){.chip .k{display:none}.chip{padding:3px 6px}#res{gap:4px}}

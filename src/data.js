@@ -1,6 +1,6 @@
 'use strict';
 // ===================== STARWAKE v2 — STATIC DATA =====================
-const GAME_VERSION = 2;
+const GAME_VERSION = 3;
 const SAVE_FORMAT = 2;
 const START_YEAR = 2326;
 const LENGTHS = {
@@ -70,6 +70,7 @@ const PROJECTS = {
   agridomes:   {name: 'Agri-Domes',           cost: 120, stage: 'settlement', desc: '+3 food, plus 3 more for each stage above Settlement.'},
   habitat:     {name: 'Habitat Expansion',    cost: 250, stage: 'settlement', desc: '+50% population capacity here.'},
   elevator:    {name: 'Space Elevator',       cost: 400, stage: 'city', tech: 'space_elevator', desc: 'Ships built here cost 25% less.'},
+  greatscope:  {name: 'The Great Telescope',  cost: 0, stage: 'settlement', unique: true, desc: 'Unique. Earth\'s telescope sees 24 light-years away, and knows worlds within 8.6 light-years of Earth and any signs of life on them.'},
   observatory: {name: 'Deep Sky Observatory', cost: 300, stage: 'settlement', tech: 'deep_sky', desc: 'Telescopes here see 24 light-years instead of 16.'},
   terraform:   {name: 'Terraforming',         cost: 600, stage: 'settlement', tech: 'terraforming', repeat: true, desc: 'Improves habitability one step (Hostile → Harsh → Livable → Garden). Destroys any native ecosystem.'},
 };
@@ -147,25 +148,25 @@ for (const k in BREAKTHROUGHS) TECH[k] = Object.assign({id: k, f: 'bt', cost: 0,
 
 // ---------- Backstory (2026–2326) ----------
 const ERAS = [
-  {years: '2026–2101', name: 'The Crisis Century', q: 'How did humanity get through its own crises?', opts: [
-    {id: 'green', name: 'The Green Accord', text: 'Nations bound themselves to repair the planet. Earth emerged cleaner, fertile and crowded with life.', fx: ['+20 food on Earth', 'Population grows 10% faster']},
-    {id: 'fortress', name: 'Fortress Nations', text: 'Walls went up and every bloc built for itself. Industry boomed; billions were lost along the way.', fx: ['+15% production', 'Earth starts with 1.5 billion fewer people']},
-    {id: 'corporate', name: 'Corporate Ascendancy', text: 'Megacorporations filled the gaps governments left. Wealth flowed, unevenly.', fx: ['+25% credits', '+300 starting credits']},
+  {years: '2026–2101', name: 'A New Order', q: 'How did humanity organise itself?', opts: [
+    {id: 'united', name: 'United Earth', text: 'The nations joined under a single world government that set policy for the whole planet.', why: 'The united government organised emigration on a planetary scale, through incentives and quotas.', fx: ['Colony Ships carry 50% more settlers']},
+    {id: 'blocs', name: 'Rival Blocs', text: 'A few large blocs of nations competed for resources, influence and a foothold in space.', why: 'The race between them kept every bloc\'s factories running at full stretch.', fx: ['+15% production']},
+    {id: 'corporate', name: 'The Corporate Age', text: 'Corporations took over much of what governments once did, from power grids to spaceports.', why: 'Private investment and global markets built up deep reserves of wealth for the journey ahead.', fx: ['+25% credits', '+300 starting credits']},
   ]},
   {years: '2101–2176', name: 'Leaving the Cradle', q: 'How did we spread through the Solar System?', opts: [
-    {id: 'moonmars', name: 'The Moon and Mars', text: 'Lunar mining towns and the domes of Mars became humanity\'s first homes beyond Earth.', fx: ['Start with Settlements on the Moon and Mars']},
-    {id: 'belt', name: 'The Belt Rush', text: 'Prospectors swarmed the asteroid belt and Ceres became its capital.', fx: ['Start with a Settlement on Ceres and a mining outpost in the belt', '+10% production']},
-    {id: 'venus', name: 'Cloud Cities of Venus', text: 'Floating cities drift in Venus\' upper air, where pressure and temperature feel almost like home.', fx: ['Start with a City floating above Venus', '+10% research']},
+    {id: 'moonmars', name: 'The Moon and Mars', text: 'Mining bases on the Moon and domed settlements on Mars became humanity\'s first homes beyond Earth.', why: 'Both grew from research outposts into permanent settlements.', fx: ['Start with Settlements on the Moon and Mars', 'Mars can grow to 20 million people; the Moon stays small']},
+    {id: 'belt', name: 'The Belt Rush', text: 'Prospectors swarmed the asteroid belt and pushed on to the moons of Saturn.', why: 'Mining crews followed the ice and metal outward as far as Titan.', fx: ['Start with Settlements on Ceres and Titan, plus a mining outpost in the belt', 'All three stay small, but the outpost adds production from the start']},
+    {id: 'venus', name: 'Cloud Cities of Venus', text: 'Floating cities were built in Venus\' upper air, where pressure and temperature are close to Earth\'s.', why: 'The first cloud cities were small, but the upper air of Venus has room for far more.', fx: ['Start with a Settlement floating above Venus', 'It can grow to 40 million people, the most of any starting choice']},
   ]},
-  {years: '2176–2251', name: 'The Great Divide', q: 'How did humanity organise itself?', opts: [
-    {id: 'unity', name: 'Unity', text: 'A single world government, slow but steady.', fx: ['+15% credits', 'Population grows 10% faster']},
-    {id: 'fracture', name: 'Fracture', text: 'Rival blocs raced each other outward, all the way to Saturn.', fx: ['+15% production', 'Start with a Settlement on Titan']},
-    {id: 'transcend', name: 'Transcendence', text: 'Genetic and cybernetic enhancement remade what it means to be human.', fx: ['+20% research']},
+  {years: '2176–2251', name: 'The Long Stride', q: 'Where did humanity put its effort?', opts: [
+    {id: 'medicine', name: 'Medicine', text: 'Research focused on longer, healthier lives and on self-sufficient habitats.', why: 'Life-support research made sealed farms far more productive.', fx: ['Free tech, Closed Ecology: Harsh and Hostile colonies make 50% more food']},
+    {id: 'outer', name: 'The Outer Planets', text: 'Shipyards around Jupiter built the first truly large spacecraft.', why: 'Building in orbit, free of Earth\'s gravity, made every hull cheaper.', fx: ['Free tech, Orbital Construction: ships cost 15% less']},
+    {id: 'transcend', name: 'Transcendence', text: 'Genetic and cybernetic enhancement changed what it means to be human.', why: 'Adapted people settled worlds too harsh for unaltered humans.', fx: ['Free tech, Genetic Adaptation: Harsh worlds hold 50% more people and grow 50% faster']},
   ]},
   {years: '2251–2326', name: 'First Light', q: 'What was our first step toward the stars?', opts: [
-    {id: 'ark', name: 'The Ark Program', text: 'Two great colony ships stand finished in orbit, waiting for a destination.', fx: ['Start with 2 extra Colony Ships']},
-    {id: 'telescope', name: 'The Great Telescope', text: 'A telescope array spanning the Solar System has mapped the nearby stars.', fx: ['Earth\'s telescopes see 24 light-years', 'Start knowing Biosignature Spectroscopy']},
-    {id: 'probes', name: 'The Probe Swarm', text: 'Decades ago, small fast probes were launched toward the nearest stars. They are about to arrive.', fx: ['4 probes are already arriving at nearby stars']},
+    {id: 'ark', name: 'The Ark Program', text: 'A great colony ship was completed in orbit.', why: 'It was built before anyone chose where it would go.', fx: ['Start with 1 extra Colony Ship']},
+    {id: 'telescope', name: 'The Great Telescope', text: 'A telescope array mapped the nearby stars and the worlds around them.', why: 'Its main mirror was placed in orbit around Earth and is still in service.', fx: ['A unique building on Earth. Its telescope sees 24 light-years away, and knows worlds within 8.6 light-years of Earth and any signs of life on them']},
+    {id: 'probes', name: 'The Pathfinder Probes', text: 'Small, fast probes were built and launched toward the two nearest stars in the early 2300s.', why: 'After a couple of decades in transit, both have now arrived at Alpha Centauri and Barnard\'s Star, and the science vessel built to follow up on their findings is ready at Earth.', fx: ['Start with 2 Pathfinder Probes at Alpha Centauri and Barnard\'s Star, plus a free Science Vessel at Earth']},
   ]},
 ];
 
