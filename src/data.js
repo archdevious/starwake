@@ -1,6 +1,6 @@
 'use strict';
 // ===================== STARWAKE v2 — STATIC DATA =====================
-const GAME_VERSION = 9;
+const GAME_VERSION = 10;
 const SAVE_FORMAT = 2;
 const START_YEAR = 2326;
 const LENGTHS = {
@@ -52,7 +52,7 @@ const STAGES = {
   settlement: {name: 'Settlement', prod: 3,  rp: 1.5, bc: 1.5, food: 1,  eat: 1},
   city:       {name: 'Province',   prod: 8,  rp: 5,   bc: 5,   food: 4,  eat: 4},
   core:       {name: 'Core World', prod: 20, rp: 13,  bc: 13,  food: 10, eat: 10},
-  home:       {name: 'Homeworld',  prod: 25, rp: 16,  bc: 20,  food: 30, eat: 40},
+  home:       {name: 'Homeworld',  prod: 250, rp: 160, bc: 200, food: 30, eat: 40}, // Earth's whole economy: only the space budget share reaches you
 };
 const STAGE_ORDER = ['outpost', 'settlement', 'city', 'core', 'home'];
 const FOCUS = {
@@ -137,7 +137,8 @@ const TECHS = [
   {id: 'quantum_computing', f: 'phys', cost: 400, req: [], name: 'Quantum Computing', desc: '+15% research everywhere.'},
   {id: 'antimatter_production', f: 'phys', cost: 1300, req: ['quantum_computing'], name: 'Antimatter Production', desc: '+10% production everywhere; needed for antimatter drives.'},
   {id: 'exotic_matter', f: 'phys', cost: 3200, req: ['antimatter_production'], name: 'Exotic Matter', desc: 'The physics needed for near-light flight, and perhaps one day more.'},
-  {id: 'stellar_priority', f: 'soc', cost: 300, req: [], name: 'Stellar Priority', desc: 'Earth\'s production +25%: the public wants more of the economy spent beyond Earth.'},
+  {id: 'stellar_priority', f: 'soc', cost: 300, req: [], name: 'Stellar Priority', desc: 'Space budget +3 points: the public wants more of Earth\'s economy spent beyond Earth.'},
+  {id: 'spacefaring', f: 'soc', cost: 1300, req: ['stellar_priority'], name: 'Spacefaring Society', desc: 'Space budget +5 points, and it can never fall below 20%. A generation has grown up with family on other worlds.'},
   {id: 'interstellar_commerce', f: 'soc', cost: 300, req: [], name: 'Interstellar Commerce', desc: '+20% credits; Cargo Bays carry twice as much.'},
   {id: 'colonial_charter', f: 'soc', cost: 550, req: [], name: 'Colonial Charters', desc: 'Settlements grow 50% faster.'},
   {id: 'unified_science', f: 'soc', cost: 1300, req: ['quantum_computing'], name: 'Unified Science Academy', desc: '+20% research everywhere.'},

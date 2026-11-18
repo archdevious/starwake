@@ -139,6 +139,7 @@ function newGame(o) {
   let k = 0;
   for (const s of shuffle(S.stars.filter(s => s.id !== 0 && !s.guard))) { if (rnd() < 0.38) { s.anom = ev[k % ev.length]; k++; } }
   // designs
+  S.budget = {perm: 0, temp: [], seen: {}};
   const looks = typeof loadLooks === 'function' ? loadLooks() : {};
   for (const d of DEFAULT_DESIGNS) S.designs.push(Object.assign({}, d, {mods: d.mods.slice(), std: true}, looks[d.id] && SHIP_ICONS_OK(looks[d.id].icon) ? {icon: looks[d.id].icon, acc: looks[d.id].acc} : {}));
   fixDesignIcons(S.designs);
@@ -266,21 +267,21 @@ function stageOf(b) {
 }
 function colonies(includeOutposts) { return S.bodies.filter(b => b.owner === 0 && b.col && (includeOutposts || !b.col.outpost)); }
 function colOut(b) {
-  const c = b.col, stg = stageOf(b), st = STAGES[stg], h = hab(b);
+  const c = b.col, stg = stageOf(b), st = STAGES[stg], h = hab(b), bf = c.home ? spaceBudget() / 100 : 1;
   const fm = {prod: 1, rp: 1, bc: 1, food: 1};
   if (c.focus === 'industry') { fm.prod = 1.75; fm.rp = fm.bc = 0.8; }
   if (c.focus === 'science') { fm.rp = 1.75; fm.prod = fm.bc = 0.8; }
   if (c.focus === 'trade') { fm.bc = 1.75; fm.prod = fm.rp = 0.8; }
   if (c.focus === 'farming') { fm.food = 2; fm.prod = fm.rp = fm.bc = 0.8; }
   const p = c.proj;
-  let prod = (st.prod * MIN_MULT[b.min] + (p.shallow ? 2 : 0)) * fm.prod * (p.mines ? 1.5 : 1) * (c.home && has('stellar_priority') ? 1.25 : 1) * S.mods.prod * (has('autofactories') ? 1.2 : 1) * (has('antimatter_production') ? 1.1 : 1) * (has('bt_fusion') ? 1.15 : 1);
+  let prod = (st.prod * MIN_MULT[b.min] + (p.shallow ? 2 : 0)) * fm.prod * (p.mines ? 1.5 : 1) * S.mods.prod * (has('autofactories') ? 1.2 : 1) * (has('antimatter_production') ? 1.1 : 1) * (has('bt_fusion') ? 1.15 : 1);
   let rp = (st.rp + (p.rstation ? (b.life !== 'none' || b.traits.some(t => t === 'rings' || t === 'subocean' || t === 'volcanic') ? 3 : 1) : 0)) * fm.rp * (p.campus ? 1.5 : 1) * S.mods.rp * (has('quantum_computing') ? 1.15 : 1) * (has('unified_science') ? 1.2 : 1) * (has('bt_signal') ? 1.15 : 1);
   let bc = stg === 'outpost' ? st.bc + (p.refinery ? 2 : 0) : st.bc * fm.bc * (p.tradeport ? 1.5 : 1) * S.mods.bc * (has('interstellar_commerce') ? 1.2 : 1);
   let fert = HAB[h].fert * ((h === 'harsh' || h === 'hostile') && has('closed_ecology') ? 1.5 : 1);
   const lvl = Math.max(0, STAGE_ORDER.indexOf(stg) - 1);
   let food = st.food * fert * fm.food + (p.agridomes ? (3 + 3 * Math.max(0, lvl - 0)) * (has('bt_seeds') ? 2 : 1) : 0) + (c.home ? S.mods.earthFood : 0);
   if (stg === 'outpost') { food = 0; }
-  return {stage: stg, prod: r1(prod), rp: r1(rp), bc: r1(bc), food: r1(food), eat: st.eat, cap: popCap(b), hab: h};
+  return {stage: stg, prod: r1(prod * bf), rp: r1(rp * bf), bc: r1(bc * bf), food: r1(food), eat: st.eat, cap: popCap(b), hab: h};
 }
 function systemFood(starId) {
   let made = 0, eaten = 0;
@@ -367,7 +368,7 @@ function colonize(f, b, kind) {
   if (kind === 'colony') {
     const add = settlerCount() * pods;
     if (b.owner === 0 && b.col && !b.col.outpost) { b.col.pop += add; msg(Math.round(add * 1e6).toLocaleString() + ' new settlers arrived on ' + b.name + '.', b.star, 'colony'); }
-    else { const old = b.col; b.owner = 0; b.col = {pop: add, focus: 'balanced', proj: old ? old.proj : {}, queue: old ? old.queue.filter(q => !(q.kind === 'proj' && PROJECTS[q.id] && PROJECTS[q.id].outpostOnly)) : [], prog: old ? old.prog : 0, founded: S.year}; msg((old ? 'The outpost on ' + b.name + ' became a colony' : 'A new colony is founded on ' + b.name) + ' with ' + Math.round(add * 1e6).toLocaleString() + ' settlers.', b.star, 'colony'); journal('Founded a colony on ' + b.name + '.', b.star); }
+    else { const old = b.col; b.owner = 0; b.col = {pop: add, focus: 'balanced', proj: old ? old.proj : {}, queue: old ? old.queue.filter(q => !(q.kind === 'proj' && PROJECTS[q.id] && PROJECTS[q.id].outpostOnly)) : [], prog: old ? old.prog : 0, founded: S.year}; msg((old ? 'The outpost on ' + b.name + ' became a colony' : 'A new colony is founded on ' + b.name) + ' with ' + Math.round(add * 1e6).toLocaleString() + ' settlers.', b.star, 'colony'); journal('Founded a colony on ' + b.name + '.', b.star); if (b.star !== 0) budgetEvent('firstStar', 1, 'Humanity\'s first colony at another star, on ' + b.name + ', inspires millions.', b.star); }
   } else { b.owner = 0; b.col = {pop: 0, outpost: true, mode: 'build', focus: 'balanced', proj: {}, queue: [], prog: 0, founded: S.year}; msg('A mining outpost is established on ' + b.name + '.', b.star, 'colony'); }
   cleanupFleets();
   return true;
@@ -444,6 +445,7 @@ function arrive(f) {
     s.guardKnown = true; S.visited[s.id] = 1;
     const first = !S.awakened; S.awakened = true;
     msg('Contact with our ships at ' + s.name + ' was lost. Their last transmissions show machines, ancient and artificial, opening fire. ' + (first ? 'We are not alone, and space is not safe.' : ''), s.id, 'lost');
+    if (first) budgetEvent('hostile', 10, 'News of the attack shocks Earth. People want their space programme able to protect itself.', s.id);
     journal('Guardian machines destroyed our ships at ' + s.name + '.', s.id);
     return;
   }
@@ -475,6 +477,7 @@ function processSurveys() {
       const life = s.bodies.map(B).filter(b => b.life !== 'none');
       msg('Survey of ' + s.name + ' complete' + (life.length ? ': ' + life.map(b => LIFE[b.life].toLowerCase() + ' on ' + b.name).join(', ') + '!' : '. No life found.'), s.id, 'survey');
       if (life.length) journal('Found ' + life.map(b => LIFE[b.life].toLowerCase() + ' on ' + b.name).join(', ') + '.', s.id);
+      if (life.length) budgetEvent('life', 1, 'Life beyond Earth! The discovery at ' + s.name + ' is on every screen on Earth.', s.id);
     }
   }
 }
@@ -514,7 +517,7 @@ function processEconomy() {
     else c.pop -= (c.pop - cap) * 0.1;
     c.pop = Math.max(0.001, c.pop);
     const after = stageOf(b);
-    if (after !== before && STAGE_ORDER.indexOf(after) > STAGE_ORDER.indexOf(before)) { msg(b.name + ' has grown into a ' + STAGES[after].name + '.', b.star, 'stage'); journal(b.name + ' became a ' + STAGES[after].name + '.', b.star); }
+    if (after !== before && STAGE_ORDER.indexOf(after) > STAGE_ORDER.indexOf(before)) { msg(b.name + ' has grown into a ' + STAGES[after].name + '.', b.star, 'stage'); journal(b.name + ' became a ' + STAGES[after].name + '.', b.star); if (after === 'core') budgetEvent('core' + b.id, 1, b.name + ' has become a Core World, proof that humanity can thrive beyond Earth.', b.star); }
   }
   // research
   if (!S.res) { S.rpBank += rp; }
@@ -558,6 +561,7 @@ function endTurn() {
   processSurveys();
   processEconomy();
   autoExplore();
+  budgetYearly();
   S.turn++; S.year++; S._inTurn = false;
   logNews(S.msgs, S.year);
   recordHistory();
@@ -578,6 +582,34 @@ function autoExplore() {
   }
 }
 function fleetName0(f) { return design(f.ships[0].d).name; }
+// ---------- space budget: Earth's share of its economy given to the space programme ----------
+function spaceBudget() {
+  const B0 = S.budget || {perm: 0, temp: []};
+  let v = 10 + B0.perm + (has('stellar_priority') ? 3 : 0) + (has('spacefaring') ? 5 : 0);
+  for (const t of B0.temp) if (S.year < t.until) v += t.v;
+  return clamp(v, has('spacefaring') ? 20 : 1, 100);
+}
+function budgetEvent(key, v, text, star) {
+  S.budget = S.budget || {perm: 0, temp: [], seen: {}};
+  if (key) { if (S.budget.seen[key]) return; S.budget.seen[key] = 1; }
+  const before = spaceBudget(); S.budget.perm += v; const after = spaceBudget();
+  msg(text + ' Space budget ' + (v >= 0 ? '+' : '') + v + ' (now ' + after + '% of Earth\'s economy).', star, 'budget');
+  journal(text + ' (space budget ' + before + '% → ' + after + '%)', star);
+}
+function budgetTemp(v, years, text, name) {
+  S.budget = S.budget || {perm: 0, temp: [], seen: {}};
+  S.budget.temp.push({v, until: S.year + years, name});
+  msg(text + ' Space budget ' + (v >= 0 ? '+' : '') + v + ' for ' + years + ' years (now ' + spaceBudget() + '%).', 0, 'budget');
+  journal(text, 0);
+}
+function budgetYearly() {
+  const B0 = S.budget; if (!B0) return;
+  for (const t of B0.temp) if (!t.ended && S.year >= t.until) { t.ended = true; msg('The ' + (t.name || 'temporary') + ' effect on the space budget has ended (now ' + spaceBudget() + '%).', 0, 'budget'); }
+  if (!B0.seen.earthFirst && S.turn >= 15 && S.turn <= 90 && rnd() < 0.02) {
+    B0.seen.earthFirst = 1;
+    budgetTemp(-3, 15, 'The "Earth First" movement has won seats in governments across Earth, arguing that money spent among the stars should be spent at home.', 'Earth First');
+  }
+}
 function canRenameStar(s) { return s.bodies.some(id => B(id).owner === 0); }
 function cleanName(t) { return String(t || '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 24); }
 function renameStar(s, t) { t = cleanName(t); if (!t || !canRenameStar(s)) return false; if (!s.orig) s.orig = s.name; s.name = t; return true; }

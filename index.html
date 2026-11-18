@@ -230,7 +230,7 @@ const FAR_STARS=[{"n": "Achernar", "d": [0.184, -0.484, -0.855], "ly": 139}, {"n
 
 'use strict';
 // ===================== STARWAKE v2 — STATIC DATA =====================
-const GAME_VERSION = 9;
+const GAME_VERSION = 10;
 const SAVE_FORMAT = 2;
 const START_YEAR = 2326;
 const LENGTHS = {
@@ -282,7 +282,7 @@ const STAGES = {
   settlement: {name: 'Settlement', prod: 3,  rp: 1.5, bc: 1.5, food: 1,  eat: 1},
   city:       {name: 'Province',   prod: 8,  rp: 5,   bc: 5,   food: 4,  eat: 4},
   core:       {name: 'Core World', prod: 20, rp: 13,  bc: 13,  food: 10, eat: 10},
-  home:       {name: 'Homeworld',  prod: 25, rp: 16,  bc: 20,  food: 30, eat: 40},
+  home:       {name: 'Homeworld',  prod: 250, rp: 160, bc: 200, food: 30, eat: 40}, // Earth's whole economy: only the space budget share reaches you
 };
 const STAGE_ORDER = ['outpost', 'settlement', 'city', 'core', 'home'];
 const FOCUS = {
@@ -367,7 +367,8 @@ const TECHS = [
   {id: 'quantum_computing', f: 'phys', cost: 400, req: [], name: 'Quantum Computing', desc: '+15% research everywhere.'},
   {id: 'antimatter_production', f: 'phys', cost: 1300, req: ['quantum_computing'], name: 'Antimatter Production', desc: '+10% production everywhere; needed for antimatter drives.'},
   {id: 'exotic_matter', f: 'phys', cost: 3200, req: ['antimatter_production'], name: 'Exotic Matter', desc: 'The physics needed for near-light flight, and perhaps one day more.'},
-  {id: 'stellar_priority', f: 'soc', cost: 300, req: [], name: 'Stellar Priority', desc: 'Earth\'s production +25%: the public wants more of the economy spent beyond Earth.'},
+  {id: 'stellar_priority', f: 'soc', cost: 300, req: [], name: 'Stellar Priority', desc: 'Space budget +3 points: the public wants more of Earth\'s economy spent beyond Earth.'},
+  {id: 'spacefaring', f: 'soc', cost: 1300, req: ['stellar_priority'], name: 'Spacefaring Society', desc: 'Space budget +5 points, and it can never fall below 20%. A generation has grown up with family on other worlds.'},
   {id: 'interstellar_commerce', f: 'soc', cost: 300, req: [], name: 'Interstellar Commerce', desc: '+20% credits; Cargo Bays carry twice as much.'},
   {id: 'colonial_charter', f: 'soc', cost: 550, req: [], name: 'Colonial Charters', desc: 'Settlements grow 50% faster.'},
   {id: 'unified_science', f: 'soc', cost: 1300, req: ['quantum_computing'], name: 'Unified Science Academy', desc: '+20% research everywhere.'},
@@ -767,6 +768,7 @@ function newGame(o) {
   let k = 0;
   for (const s of shuffle(S.stars.filter(s => s.id !== 0 && !s.guard))) { if (rnd() < 0.38) { s.anom = ev[k % ev.length]; k++; } }
   // designs
+  S.budget = {perm: 0, temp: [], seen: {}};
   const looks = typeof loadLooks === 'function' ? loadLooks() : {};
   for (const d of DEFAULT_DESIGNS) S.designs.push(Object.assign({}, d, {mods: d.mods.slice(), std: true}, looks[d.id] && SHIP_ICONS_OK(looks[d.id].icon) ? {icon: looks[d.id].icon, acc: looks[d.id].acc} : {}));
   fixDesignIcons(S.designs);
@@ -894,21 +896,21 @@ function stageOf(b) {
 }
 function colonies(includeOutposts) { return S.bodies.filter(b => b.owner === 0 && b.col && (includeOutposts || !b.col.outpost)); }
 function colOut(b) {
-  const c = b.col, stg = stageOf(b), st = STAGES[stg], h = hab(b);
+  const c = b.col, stg = stageOf(b), st = STAGES[stg], h = hab(b), bf = c.home ? spaceBudget() / 100 : 1;
   const fm = {prod: 1, rp: 1, bc: 1, food: 1};
   if (c.focus === 'industry') { fm.prod = 1.75; fm.rp = fm.bc = 0.8; }
   if (c.focus === 'science') { fm.rp = 1.75; fm.prod = fm.bc = 0.8; }
   if (c.focus === 'trade') { fm.bc = 1.75; fm.prod = fm.rp = 0.8; }
   if (c.focus === 'farming') { fm.food = 2; fm.prod = fm.rp = fm.bc = 0.8; }
   const p = c.proj;
-  let prod = (st.prod * MIN_MULT[b.min] + (p.shallow ? 2 : 0)) * fm.prod * (p.mines ? 1.5 : 1) * (c.home && has('stellar_priority') ? 1.25 : 1) * S.mods.prod * (has('autofactories') ? 1.2 : 1) * (has('antimatter_production') ? 1.1 : 1) * (has('bt_fusion') ? 1.15 : 1);
+  let prod = (st.prod * MIN_MULT[b.min] + (p.shallow ? 2 : 0)) * fm.prod * (p.mines ? 1.5 : 1) * S.mods.prod * (has('autofactories') ? 1.2 : 1) * (has('antimatter_production') ? 1.1 : 1) * (has('bt_fusion') ? 1.15 : 1);
   let rp = (st.rp + (p.rstation ? (b.life !== 'none' || b.traits.some(t => t === 'rings' || t === 'subocean' || t === 'volcanic') ? 3 : 1) : 0)) * fm.rp * (p.campus ? 1.5 : 1) * S.mods.rp * (has('quantum_computing') ? 1.15 : 1) * (has('unified_science') ? 1.2 : 1) * (has('bt_signal') ? 1.15 : 1);
   let bc = stg === 'outpost' ? st.bc + (p.refinery ? 2 : 0) : st.bc * fm.bc * (p.tradeport ? 1.5 : 1) * S.mods.bc * (has('interstellar_commerce') ? 1.2 : 1);
   let fert = HAB[h].fert * ((h === 'harsh' || h === 'hostile') && has('closed_ecology') ? 1.5 : 1);
   const lvl = Math.max(0, STAGE_ORDER.indexOf(stg) - 1);
   let food = st.food * fert * fm.food + (p.agridomes ? (3 + 3 * Math.max(0, lvl - 0)) * (has('bt_seeds') ? 2 : 1) : 0) + (c.home ? S.mods.earthFood : 0);
   if (stg === 'outpost') { food = 0; }
-  return {stage: stg, prod: r1(prod), rp: r1(rp), bc: r1(bc), food: r1(food), eat: st.eat, cap: popCap(b), hab: h};
+  return {stage: stg, prod: r1(prod * bf), rp: r1(rp * bf), bc: r1(bc * bf), food: r1(food), eat: st.eat, cap: popCap(b), hab: h};
 }
 function systemFood(starId) {
   let made = 0, eaten = 0;
@@ -995,7 +997,7 @@ function colonize(f, b, kind) {
   if (kind === 'colony') {
     const add = settlerCount() * pods;
     if (b.owner === 0 && b.col && !b.col.outpost) { b.col.pop += add; msg(Math.round(add * 1e6).toLocaleString() + ' new settlers arrived on ' + b.name + '.', b.star, 'colony'); }
-    else { const old = b.col; b.owner = 0; b.col = {pop: add, focus: 'balanced', proj: old ? old.proj : {}, queue: old ? old.queue.filter(q => !(q.kind === 'proj' && PROJECTS[q.id] && PROJECTS[q.id].outpostOnly)) : [], prog: old ? old.prog : 0, founded: S.year}; msg((old ? 'The outpost on ' + b.name + ' became a colony' : 'A new colony is founded on ' + b.name) + ' with ' + Math.round(add * 1e6).toLocaleString() + ' settlers.', b.star, 'colony'); journal('Founded a colony on ' + b.name + '.', b.star); }
+    else { const old = b.col; b.owner = 0; b.col = {pop: add, focus: 'balanced', proj: old ? old.proj : {}, queue: old ? old.queue.filter(q => !(q.kind === 'proj' && PROJECTS[q.id] && PROJECTS[q.id].outpostOnly)) : [], prog: old ? old.prog : 0, founded: S.year}; msg((old ? 'The outpost on ' + b.name + ' became a colony' : 'A new colony is founded on ' + b.name) + ' with ' + Math.round(add * 1e6).toLocaleString() + ' settlers.', b.star, 'colony'); journal('Founded a colony on ' + b.name + '.', b.star); if (b.star !== 0) budgetEvent('firstStar', 1, 'Humanity\'s first colony at another star, on ' + b.name + ', inspires millions.', b.star); }
   } else { b.owner = 0; b.col = {pop: 0, outpost: true, mode: 'build', focus: 'balanced', proj: {}, queue: [], prog: 0, founded: S.year}; msg('A mining outpost is established on ' + b.name + '.', b.star, 'colony'); }
   cleanupFleets();
   return true;
@@ -1072,6 +1074,7 @@ function arrive(f) {
     s.guardKnown = true; S.visited[s.id] = 1;
     const first = !S.awakened; S.awakened = true;
     msg('Contact with our ships at ' + s.name + ' was lost. Their last transmissions show machines, ancient and artificial, opening fire. ' + (first ? 'We are not alone, and space is not safe.' : ''), s.id, 'lost');
+    if (first) budgetEvent('hostile', 10, 'News of the attack shocks Earth. People want their space programme able to protect itself.', s.id);
     journal('Guardian machines destroyed our ships at ' + s.name + '.', s.id);
     return;
   }
@@ -1103,6 +1106,7 @@ function processSurveys() {
       const life = s.bodies.map(B).filter(b => b.life !== 'none');
       msg('Survey of ' + s.name + ' complete' + (life.length ? ': ' + life.map(b => LIFE[b.life].toLowerCase() + ' on ' + b.name).join(', ') + '!' : '. No life found.'), s.id, 'survey');
       if (life.length) journal('Found ' + life.map(b => LIFE[b.life].toLowerCase() + ' on ' + b.name).join(', ') + '.', s.id);
+      if (life.length) budgetEvent('life', 1, 'Life beyond Earth! The discovery at ' + s.name + ' is on every screen on Earth.', s.id);
     }
   }
 }
@@ -1142,7 +1146,7 @@ function processEconomy() {
     else c.pop -= (c.pop - cap) * 0.1;
     c.pop = Math.max(0.001, c.pop);
     const after = stageOf(b);
-    if (after !== before && STAGE_ORDER.indexOf(after) > STAGE_ORDER.indexOf(before)) { msg(b.name + ' has grown into a ' + STAGES[after].name + '.', b.star, 'stage'); journal(b.name + ' became a ' + STAGES[after].name + '.', b.star); }
+    if (after !== before && STAGE_ORDER.indexOf(after) > STAGE_ORDER.indexOf(before)) { msg(b.name + ' has grown into a ' + STAGES[after].name + '.', b.star, 'stage'); journal(b.name + ' became a ' + STAGES[after].name + '.', b.star); if (after === 'core') budgetEvent('core' + b.id, 1, b.name + ' has become a Core World, proof that humanity can thrive beyond Earth.', b.star); }
   }
   // research
   if (!S.res) { S.rpBank += rp; }
@@ -1186,6 +1190,7 @@ function endTurn() {
   processSurveys();
   processEconomy();
   autoExplore();
+  budgetYearly();
   S.turn++; S.year++; S._inTurn = false;
   logNews(S.msgs, S.year);
   recordHistory();
@@ -1206,6 +1211,34 @@ function autoExplore() {
   }
 }
 function fleetName0(f) { return design(f.ships[0].d).name; }
+// ---------- space budget: Earth's share of its economy given to the space programme ----------
+function spaceBudget() {
+  const B0 = S.budget || {perm: 0, temp: []};
+  let v = 10 + B0.perm + (has('stellar_priority') ? 3 : 0) + (has('spacefaring') ? 5 : 0);
+  for (const t of B0.temp) if (S.year < t.until) v += t.v;
+  return clamp(v, has('spacefaring') ? 20 : 1, 100);
+}
+function budgetEvent(key, v, text, star) {
+  S.budget = S.budget || {perm: 0, temp: [], seen: {}};
+  if (key) { if (S.budget.seen[key]) return; S.budget.seen[key] = 1; }
+  const before = spaceBudget(); S.budget.perm += v; const after = spaceBudget();
+  msg(text + ' Space budget ' + (v >= 0 ? '+' : '') + v + ' (now ' + after + '% of Earth\'s economy).', star, 'budget');
+  journal(text + ' (space budget ' + before + '% → ' + after + '%)', star);
+}
+function budgetTemp(v, years, text, name) {
+  S.budget = S.budget || {perm: 0, temp: [], seen: {}};
+  S.budget.temp.push({v, until: S.year + years, name});
+  msg(text + ' Space budget ' + (v >= 0 ? '+' : '') + v + ' for ' + years + ' years (now ' + spaceBudget() + '%).', 0, 'budget');
+  journal(text, 0);
+}
+function budgetYearly() {
+  const B0 = S.budget; if (!B0) return;
+  for (const t of B0.temp) if (!t.ended && S.year >= t.until) { t.ended = true; msg('The ' + (t.name || 'temporary') + ' effect on the space budget has ended (now ' + spaceBudget() + '%).', 0, 'budget'); }
+  if (!B0.seen.earthFirst && S.turn >= 15 && S.turn <= 90 && rnd() < 0.02) {
+    B0.seen.earthFirst = 1;
+    budgetTemp(-3, 15, 'The "Earth First" movement has won seats in governments across Earth, arguing that money spent among the stars should be spent at home.', 'Earth First');
+  }
+}
 function canRenameStar(s) { return s.bodies.some(id => B(id).owner === 0); }
 function cleanName(t) { return String(t || '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 24); }
 function renameStar(s, t) { t = cleanName(t); if (!t || !canRenameStar(s)) return false; if (!s.orig) s.orig = s.name; s.name = t; return true; }
@@ -1751,6 +1784,13 @@ function starPanel(sid) {
   if (colonyStars().includes(sid)) { const fd = systemFood(sid); h += `<div class="sec">System food</div><div class="small">Grown ${fd.made} · eaten ${fd.eaten} · <span class="${fd.net >= 0 ? 'good' : 'bad'}">${sgn(fd.net)}/yr</span> · stored ${fd.stock}</div>`; }
   return h;
 }
+function budgetHTML() {
+  const v = spaceBudget(), B0 = S.budget || {temp: []};
+  const temps = B0.temp.filter(t => S.year < t.until);
+  return `<div class="sec">Space budget</div><div class="card small"><div><b class="amber" style="font-size:16px">${v}%</b> of Earth's economy goes to the space programme</div>
+    <div class="tiny dim" style="margin-top:4px">Earth's production, research and credits below are that share of its whole economy. Discoveries, danger, public mood and some technologies change it.${has('spacefaring') ? ' Spacefaring Society keeps it at 20% or more.' : ''}</div>
+    ${temps.map(t => `<div class="tiny bad" style="margin-top:3px">${esc(t.name || 'Temporary change')}: ${t.v > 0 ? '+' : ''}${t.v} until ${t.until}</div>`).join('')}</div>`;
+}
 function buildLine(b) {
   const c = b.col, sup = supplyTarget(b);
   if (sup) return `<span class="dim">Supplying ${esc(sup.name)}</span>`;
@@ -1772,6 +1812,7 @@ function colonyPanel(b) {
     <div class="row sb small"><span><b>${people(c.pop)}</b> of ${people(cap)}</span><span class="${ST(b.star).short ? 'bad' : 'good'}">${ST(b.star).short ? 'Shrinking (hunger)' : c.pop >= cap ? 'Full' : '+' + (g * (1 - c.pop / cap) * 100).toFixed(1) + '% per year'}</span></div>
     <div class="bar g" style="margin-top:4px"><i style="width:${Math.min(100, Math.log10(1 + c.pop * 1e6) / Math.log10(1 + cap * 1e6) * 100)}%"></i></div>
     ${nextT ? `<div class="tiny dim" style="margin-top:3px">Becomes a ${STAGES[st === 'settlement' ? 'city' : 'core'].name} at ${people(nextT)}.</div>` : ''}
+    ${c.home ? budgetHTML() : ''}
     <div class="sec">Output per year</div>
     <div class="grid2 small"><div>Production <b>${o.prod}</b></div><div>Research <b>${o.rp}</b></div><div>Credits <b>${o.bc}</b></div><div>Food <b>${o.food}</b> <span class="dim">(eats ${o.eat})</span></div></div>
     <div class="sec">Focus</div><div class="row wrap" style="gap:4px">${Object.keys(FOCUS).map(k => `<button class="btn sm ${c.focus === k ? 'on' : ''}" data-a="focus" data-v="${b.id}:${k}" title="${esc(FOCUS[k].desc)}">${FOCUS[k].name}</button>`).join('')}</div>
@@ -1954,7 +1995,7 @@ ACT.mres = v => { if (UI.modalRes) UI.modalRes(v); };
 function confirmBox(title, text, yes) { modal({title, w: 460, body: `<div>${text}</div>`, foot: `<button class="btn" data-a="mres" data-v="no">Cancel</button><button class="btn danger" data-a="mres" data-v="yes">Confirm</button>`}).then(v => { if (v === 'yes') yes(); }); }
 
 // ---------- news feed ----------
-const NEWS_ICON = {info: 'ℹ️', tech: '🔬', build: '🏗️', ship: '🚀', colony: '🪐', warn: '⚠️', arrive: '🔭', spot: '✧', survey: '🧪', lost: '💥', stage: '🏙️', idle: '💤'};
+const NEWS_ICON = {info: 'ℹ️', tech: '🔬', build: '🏗️', ship: '🚀', colony: '🪐', warn: '⚠️', arrive: '🔭', spot: '✧', survey: '🧪', lost: '💥', stage: '🏙️', idle: '💤', budget: '🛰️'};
 function showNews() {
   const el = $('#news'); if (!S) return;
   const list = S.msgs.slice(-14);
@@ -2075,7 +2116,7 @@ function saveTo(slot) {
   } catch (e) { console.warn('save failed', e); return false; }
 }
 function autosave() { if (S && !S.over) saveTo('auto'); }
-function migrateSave(d) { d.version = GAME_VERSION; d.newsLog = d.newsLog || []; for (const x of d.designs || []) if (x.id === 'scout' && x.mods.length === 1 && x.mods[0] === 'tel_m') x.mods.push('booster'); for (const b of d.bodies || []) if (b.col && b.col.outpost && !b.col.mode) b.col.mode = 'build'; if ((d.designs || []).some(x => x.id === 'probe')) { for (const f of d.fleets || []) for (const sh of f.ships) if (sh.d === 'probe') sh.d = 'scout'; d.designs = d.designs.filter(x => x.id !== 'probe'); }
+function migrateSave(d) { d.version = GAME_VERSION; if (!d.budget) d.budget = {perm: 0, temp: [], seen: {}}; d.newsLog = d.newsLog || []; for (const x of d.designs || []) if (x.id === 'scout' && x.mods.length === 1 && x.mods[0] === 'tel_m') x.mods.push('booster'); for (const b of d.bodies || []) if (b.col && b.col.outpost && !b.col.mode) b.col.mode = 'build'; if ((d.designs || []).some(x => x.id === 'probe')) { for (const f of d.fleets || []) for (const sh of f.ships) if (sh.d === 'probe') sh.d = 'scout'; d.designs = d.designs.filter(x => x.id !== 'probe'); }
   for (const x of d.designs || []) delete x.obsolete; fixDesignIcons(d.designs || []); d.msgs = d.msgs || []; d.journal = d.journal || []; d.hist = d.hist || []; return d; }
 function loadFrom(slot) { const r = readSlot(slot); if (!r) return false; try { S = migrateSave(JSON.parse(r.data)); } catch (e) { toast('That save could not be read.'); return false; } startPlaying(false); return true; }
 function savesHTML(canSave) {
@@ -2200,6 +2241,16 @@ ACT.setVol = (v, el) => { SETTINGS[el.dataset.k] = +v; saveSettings(); audioVolu
 ACT.openSettings = () => modal({title: 'Settings', w: 520, body: settingsHTML(), foot: `<button class="btn primary" data-a="mclose">Done</button>`});
 ACT.setNear = v => { SETTINGS.near = +v; saveSettings(); UI.dirty = true; if (S) renderSide(); };
 
+// ---------- opening briefing ----------
+function introHTML() {
+  const who = {united: 'The World Assembly has', blocs: 'The council of the great blocs has', corporate: 'The boards of the leading corporations have'}[S.story && S.story.e0] || 'Earth\'s leaders have';
+  return `<div class="evt" style="line-height:1.7"><p>You have been appointed Director of humanity's space programme.</p>
+    <p>${who} committed one tenth of Earth's spare economic output to development beyond Earth. How that budget is spent is entirely up to you.</p>
+    <p>Every settlement and facility beyond Earth answers to you. Earth itself does not: its governments run its cities, farms and politics, and most people's worries stay firmly on the ground. For now, space is a curiosity.</p>
+    <p><i>That could change.</i></p></div>`;
+}
+ACT.openIntro = () => modal({title: START_YEAR + ' · ' + esc(S.empire.name), w: 620, noClose: true, body: introHTML(), foot: `<button class="btn primary" data-a="mclose">Begin</button>`});
+
 'use strict';
 // ===================== STARWAKE v2 — GAME FLOW =====================
 function refresh() { renderTop(); renderSide(); UI.dirty = true; }
@@ -2209,7 +2260,7 @@ function startPlaying(isNew) {
   requestAnimationFrame(() => {
     UI.cam.yaw = 0.6; UI.cam.pitch = 0.95; UI.cam.zoom = clamp(Math.min(mapSize().w, mapSize().h) / 30, 10, 40); centerOn(0);
     selectStar(0); refresh(); UI.busy = false; showNews();
-    if (isNew) { autosave(); if (!S.res) ACT.openResearch(); }
+    if (isNew) { autosave(); ACT.openIntro().then(() => { if (!S.res) ACT.openResearch(); }); }
   });
 }
 const FF_QUIET = new Set(['spot', 'info']);

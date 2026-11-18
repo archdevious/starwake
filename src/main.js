@@ -7,7 +7,7 @@ function startPlaying(isNew) {
   requestAnimationFrame(() => {
     UI.cam.yaw = 0.6; UI.cam.pitch = 0.95; UI.cam.zoom = clamp(Math.min(mapSize().w, mapSize().h) / 30, 10, 40); centerOn(0);
     selectStar(0); refresh(); UI.busy = false; showNews();
-    if (isNew) { autosave(); if (!S.res) ACT.openResearch(); }
+    if (isNew) { autosave(); ACT.openIntro().then(() => { if (!S.res) ACT.openResearch(); }); }
   });
 }
 const FF_QUIET = new Set(['spot', 'info']);

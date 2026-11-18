@@ -82,6 +82,13 @@ function starPanel(sid) {
   if (colonyStars().includes(sid)) { const fd = systemFood(sid); h += `<div class="sec">System food</div><div class="small">Grown ${fd.made} · eaten ${fd.eaten} · <span class="${fd.net >= 0 ? 'good' : 'bad'}">${sgn(fd.net)}/yr</span> · stored ${fd.stock}</div>`; }
   return h;
 }
+function budgetHTML() {
+  const v = spaceBudget(), B0 = S.budget || {temp: []};
+  const temps = B0.temp.filter(t => S.year < t.until);
+  return `<div class="sec">Space budget</div><div class="card small"><div><b class="amber" style="font-size:16px">${v}%</b> of Earth's economy goes to the space programme</div>
+    <div class="tiny dim" style="margin-top:4px">Earth's production, research and credits below are that share of its whole economy. Discoveries, danger, public mood and some technologies change it.${has('spacefaring') ? ' Spacefaring Society keeps it at 20% or more.' : ''}</div>
+    ${temps.map(t => `<div class="tiny bad" style="margin-top:3px">${esc(t.name || 'Temporary change')}: ${t.v > 0 ? '+' : ''}${t.v} until ${t.until}</div>`).join('')}</div>`;
+}
 function buildLine(b) {
   const c = b.col, sup = supplyTarget(b);
   if (sup) return `<span class="dim">Supplying ${esc(sup.name)}</span>`;
@@ -103,6 +110,7 @@ function colonyPanel(b) {
     <div class="row sb small"><span><b>${people(c.pop)}</b> of ${people(cap)}</span><span class="${ST(b.star).short ? 'bad' : 'good'}">${ST(b.star).short ? 'Shrinking (hunger)' : c.pop >= cap ? 'Full' : '+' + (g * (1 - c.pop / cap) * 100).toFixed(1) + '% per year'}</span></div>
     <div class="bar g" style="margin-top:4px"><i style="width:${Math.min(100, Math.log10(1 + c.pop * 1e6) / Math.log10(1 + cap * 1e6) * 100)}%"></i></div>
     ${nextT ? `<div class="tiny dim" style="margin-top:3px">Becomes a ${STAGES[st === 'settlement' ? 'city' : 'core'].name} at ${people(nextT)}.</div>` : ''}
+    ${c.home ? budgetHTML() : ''}
     <div class="sec">Output per year</div>
     <div class="grid2 small"><div>Production <b>${o.prod}</b></div><div>Research <b>${o.rp}</b></div><div>Credits <b>${o.bc}</b></div><div>Food <b>${o.food}</b> <span class="dim">(eats ${o.eat})</span></div></div>
     <div class="sec">Focus</div><div class="row wrap" style="gap:4px">${Object.keys(FOCUS).map(k => `<button class="btn sm ${c.focus === k ? 'on' : ''}" data-a="focus" data-v="${b.id}:${k}" title="${esc(FOCUS[k].desc)}">${FOCUS[k].name}</button>`).join('')}</div>
