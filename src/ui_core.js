@@ -103,8 +103,6 @@ function drawMap() {
   // distant beacons
   x.textAlign = 'left';
   for (const f of FAR_STARS) { const [sx, sy] = proj(f.d[0] * (R + 9), f.d[1] * (R + 9), f.d[2] * (R + 9)); x.fillStyle = 'rgba(150,165,200,.6)'; x.font = '13px Segoe UI, sans-serif'; x.fillText('✧', sx - 5, sy + 4); x.font = 'italic 10.5px Segoe UI, sans-serif'; x.fillStyle = 'rgba(130,145,180,.6)'; x.fillText(f.n + ' · ' + f.ly + ' ly', sx + 8, sy + 4); }
-  // fleets in transit (lines under stars)
-  for (const f of S.fleets) { if (f.dest == null) continue; const d = ST(f.dest); const [ax, ay] = proj(f.x, f.y, f.z), [bx, by] = proj(d.x, d.y, d.z); x.strokeStyle = f.task && f.task.type === 'route' ? 'rgba(255,200,90,.45)' : 'rgba(127,224,255,.6)'; x.setLineDash([5, 5]); x.lineWidth = 1.3; x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, by); x.stroke(); x.setLineDash([]); }
   // stars
   const showPins = C.pitch < 1.45;
   const items = [];
@@ -141,6 +139,8 @@ function drawMap() {
       const mx = (p0[0] + p[0]) / 2, my = (p0[1] + p[1]) / 2; x.fillStyle = '#ffd678cc'; x.font = '10px Segoe UI, sans-serif'; x.fillText(d.toFixed(1) + ' ly', mx, my - 3);
     });
   }
+  // fleets in transit (drawn over the nearest-system guides so paths always show)
+  for (const f of S.fleets) { if (f.dest == null) continue; const d = ST(f.dest); const [ax, ay] = proj(f.x, f.y, f.z), [bx, by] = proj(d.x, d.y, d.z); x.strokeStyle = f.task && f.task.type === 'route' ? 'rgba(255,200,90,.45)' : 'rgba(127,224,255,.6)'; x.setLineDash([5, 5]); x.lineWidth = 1.6; x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, by); x.stroke(); x.setLineDash([]); }
   // labels with de-cluttering
   const boxes = []; x.textAlign = 'center';
   const dots = LABELS.map(L => ({x: L.p[0] - L.rr, y: L.p[1] - L.rr, w: L.rr * 2, h: L.rr * 2}));

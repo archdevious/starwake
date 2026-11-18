@@ -14,7 +14,8 @@ const B = id => S.bodies[id];
 const ST = id => S.stars[id];
 const has = t => !!(S && S.techs[t]);
 function nid() { return S.nextId++; }
-function msg(text, star, kind) { S.msgs.push({text, star: star == null ? null : star, kind: kind || 'info'}); }
+function msg(text, star, kind) { const m = {text, star: star == null ? null : star, kind: kind || 'info'}; S.msgs.push(m); if (!S._inTurn) logNews([m], S.year); }
+function logNews(list, y) { S.newsLog = S.newsLog || []; for (const m of list) S.newsLog.push({y, text: m.text, star: m.star, kind: m.kind}); if (S.newsLog.length > 500) S.newsLog.splice(0, S.newsLog.length - 500); }
 function journal(text, star) { S.journal.push({year: S.year, text, star: star == null ? null : star}); }
 
 // ---------- star types ----------
@@ -252,9 +253,9 @@ function colOut(b) {
   if (c.focus === 'trade') { fm.bc = 1.75; fm.prod = fm.rp = 0.8; }
   if (c.focus === 'farming') { fm.food = 2; fm.prod = fm.rp = fm.bc = 0.8; }
   const p = c.proj;
-  let prod = st.prod * MIN_MULT[b.min] * fm.prod * (p.mines ? 1.5 : 1) * S.mods.prod * (has('autofactories') ? 1.2 : 1) * (has('antimatter_production') ? 1.1 : 1) * (has('bt_fusion') ? 1.15 : 1);
+  let prod = (st.prod * MIN_MULT[b.min] + (p.shallow ? 2 : 0)) * fm.prod * (p.mines ? 1.5 : 1) * (c.home && has('stellar_priority') ? 1.25 : 1) * S.mods.prod * (has('autofactories') ? 1.2 : 1) * (has('antimatter_production') ? 1.1 : 1) * (has('bt_fusion') ? 1.15 : 1);
   let rp = (st.rp + (p.rstation ? (b.life !== 'none' || b.traits.some(t => t === 'rings' || t === 'subocean' || t === 'volcanic') ? 3 : 1) : 0)) * fm.rp * (p.campus ? 1.5 : 1) * S.mods.rp * (has('quantum_computing') ? 1.15 : 1) * (has('unified_science') ? 1.2 : 1) * (has('bt_signal') ? 1.15 : 1);
-  let bc = stg === 'outpost' ? st.bc : st.bc * fm.bc * (p.tradeport ? 1.5 : 1) * S.mods.bc * (has('interstellar_commerce') ? 1.2 : 1);
+  let bc = stg === 'outpost' ? st.bc + (p.refinery ? 2 : 0) : st.bc * fm.bc * (p.tradeport ? 1.5 : 1) * S.mods.bc * (has('interstellar_commerce') ? 1.2 : 1);
   let fert = HAB[h].fert * ((h === 'harsh' || h === 'hostile') && has('closed_ecology') ? 1.5 : 1);
   const lvl = Math.max(0, STAGE_ORDER.indexOf(stg) - 1);
   let food = st.food * fert * fm.food + (p.agridomes ? (3 + 3 * Math.max(0, lvl - 0)) * (has('bt_seeds') ? 2 : 1) : 0) + (c.home ? S.mods.earthFood : 0);
@@ -287,6 +288,8 @@ function projReason(b, id) {
   const P = PROJECTS[id], c = b.col;
   if (P.unique) return 'Unique';
   if (c.outpost && !P.outpost) return 'Needs people';
+  if (P.giantOnly && b.cls !== 'gasgiant' && b.cls !== 'icegiant') return 'Gas and ice giants only';
+  if (P.req && !c.proj[P.req] && !(P.req === 'dock' && c.proj.shipyard) && !(P.req === 'shallow' && c.proj.mines)) return 'Needs ' + PROJECTS[P.req].name;
   if (!c.outpost && P.outpostOnly) return 'Outposts only';
   if (P.tech && !has(P.tech)) return 'Needs ' + TECH[P.tech].name;
   if (c.proj[id] && !P.repeat) return 'Already built';
@@ -295,7 +298,13 @@ function projReason(b, id) {
   if (id === 'terraform' && (hab(b) === 'garden' || hab(b) === 'none' || hab(b) === 'outpost' || c.home)) return 'Cannot be improved further';
   return null;
 }
-function shipReason(b) { if (!b.col.proj.shipyard) return 'Needs an Orbital Shipyard'; return null; }
+function shipReason(b, d) {
+  const p = b.col.proj;
+  if (!p.shipyard && !p.dock) return 'Needs an Orbital Dock';
+  if (d && b.col.outpost && designHas(d, 'colony')) return 'Outposts have no people to send';
+  if (d && !p.shipyard && d.hull !== 'light') return 'Needs an Orbital Shipyard (medium and heavy hulls)';
+  return null;
+}
 function buyCost(b) { const c = b.col; if (!c.queue.length) return 0; const cost = itemCost(b, c.queue[0]); return Math.ceil(Math.max(0, cost - c.prog) * (c.prog > 0 ? 2 : 3)); }
 function buyItem(b) { const k = buyCost(b); if (k <= 0 || S.bc < k) return false; S.bc = r1(S.bc - k); b.col.prog = itemCost(b, b.col.queue[0]); return true; }
 function completeItem(b, it) {
@@ -304,7 +313,7 @@ function completeItem(b, it) {
       b.tf = (b.tf || 0) + 1;
       if (b.life === 'ecosystem') { b.life = 'microbial'; msg('Terraforming on ' + b.name + ' has wiped out most of its native ecosystem.', b.star, 'warn'); }
       msg(b.name + ' is now ' + HAB[hab(b)].name + ' after a terraforming stage.', b.star, 'build');
-    } else { b.col.proj[it.id] = 1; msg(b.name + ' completed ' + PROJECTS[it.id].name + '.', b.star, 'build'); }
+    } else { b.col.proj[it.id] = 1; if (PROJECTS[it.id].replaces) delete b.col.proj[PROJECTS[it.id].replaces]; msg(b.name + ' completed ' + PROJECTS[it.id].name + '.', b.star, 'build'); }
   } else if (it.kind === 'outpost') {
     const t = B(it.id); t.owner = 0; t.col = {pop: 0, outpost: true, mode: 'build', focus: 'balanced', proj: {}, queue: [], prog: 0, founded: S.year};
     msg(b.name + ' established an outpost on ' + t.name + '.', b.star, 'colony');
@@ -505,10 +514,12 @@ function supplyTarget(b) {
   const t = B(c.supplyTo); return t && t.star === b.star && t.owner === 0 && t.col && !t.col.outpost ? t : null;
 }
 function itemValid(b, it) {
-  if (it.kind === 'ship') return !!design(it.id) && !shipReason(b);
+  if (it.kind === 'ship') return !!design(it.id) && !shipReason(b, design(it.id));
   if (it.kind === 'outpost') { const t = B(it.id); return !!t && t.star === b.star && t.owner == null && hab(t) !== 'none' && !b.col.outpost; }
   const P = PROJECTS[it.id], c = b.col;
   if ((c.outpost && !P.outpost) || (!c.outpost && P.outpostOnly) || (P.tech && !has(P.tech))) return false;
+  if (P.giantOnly && b.cls !== 'gasgiant' && b.cls !== 'icegiant') return false;
+  if (P.req && !c.proj[P.req]) return false;
   if (c.proj[it.id] && !P.repeat) return false;
   if (it.id === 'terraform' && (hab(b) === 'garden' || hab(b) === 'none' || hab(b) === 'outpost' || c.home)) return false;
   return true;
@@ -521,13 +532,14 @@ function totals() {
   return {prod: r1(prod), rp: r1(rp), bc: r1(bc), up: r1(up), net: r1(bc - up), pop, short};
 }
 function endTurn() {
-  S.msgs = [];
+  S.msgs = []; S._inTurn = true;
   moveFleets();
   updateKnowledge();
   processSurveys();
   processEconomy();
   autoExplore();
-  S.turn++; S.year++;
+  S.turn++; S.year++; S._inTurn = false;
+  logNews(S.msgs, S.year);
   recordHistory();
   if (S.turn > S.maxTurns && !S.over) S.over = {result: 'complete', why: 'The age of exploration draws to a close in the year ' + S.year + '.'};
 }
@@ -546,6 +558,10 @@ function autoExplore() {
   }
 }
 function fleetName0(f) { return design(f.ships[0].d).name; }
+function canRenameStar(s) { return s.bodies.some(id => B(id).owner === 0); }
+function cleanName(t) { return String(t || '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 24); }
+function renameStar(s, t) { t = cleanName(t); if (!t || !canRenameStar(s)) return false; if (!s.orig) s.orig = s.name; s.name = t; return true; }
+function renameBody(b, t) { t = cleanName(t); if (!t || b.owner !== 0) return false; if (!b.orig) b.orig = b.name; b.name = t; return true; }
 function recordHistory() { S.hist.push({t: S.turn, y: S.year, pop: Math.round(totals().pop), exp: Object.keys(S.visited).length, score: score().total}); }
 function score() {
   let micro = 0, eco = 0, settle = 0, city = 0, core = 0;

@@ -180,6 +180,12 @@ table.list tr.click{cursor:pointer}table.list tr.click:hover td{background:#121d
 .nnum{display:inline-block;width:16px;height:16px;line-height:16px;border-radius:50%;background:#ffd678;color:#1a1206;font-weight:700;font-size:10.5px;text-align:center;margin-right:6px}
 .setline{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:10px 0;border-bottom:1px solid var(--line)}
 .card.idlecard{border-color:#d04848;box-shadow:0 0 0 1px #d0484866 inset}
+#news .nh .click{cursor:pointer}
+#news .nh .click:hover .acc{text-decoration:underline}
+.x.ren{font-size:13px;opacity:.55;vertical-align:middle}
+.x.ren:hover{opacity:1}
+#modal .ni{padding:5px 6px;font-size:13px;border-bottom:1px solid var(--line)}
+#modal .ni.click{cursor:pointer}#modal .ni.click:hover{background:#13203a}
 
 </style>
 </head>
@@ -217,7 +223,7 @@ const FAR_STARS=[{"n": "Achernar", "d": [0.184, -0.484, -0.855], "ly": 139}, {"n
 
 'use strict';
 // ===================== STARWAKE v2 — STATIC DATA =====================
-const GAME_VERSION = 7;
+const GAME_VERSION = 8;
 const SAVE_FORMAT = 2;
 const START_YEAR = 2326;
 const LENGTHS = {
@@ -280,17 +286,20 @@ const FOCUS = {
   farming:  {name: 'Farming',  desc: 'Double food, -20% production, research and credits'},
 };
 const PROJECTS = {
-  shipyard:    {name: 'Orbital Shipyard',     cost: 150, stage: 'settlement', outpost: true, desc: 'This colony can build ships.'},
-  mines:       {name: 'Deep Mines',           cost: 180, stage: 'settlement', outpost: true, desc: '+50% production here.'},
+  shallow:     {name: 'Shallow Mines',        cost: 60,  stage: 'settlement', outpost: true, desc: '+2 production a year.'},
+  mines:       {name: 'Deep Mines',           cost: 120, stage: 'settlement', outpost: true, req: 'shallow', replaces: 'shallow', tech: 'deep_mining', desc: 'Replaces Shallow Mines: +50% production instead of +2.'},
+  dock:        {name: 'Orbital Dock',         cost: 75,  stage: 'settlement', outpost: true, desc: 'Builds light-hull ships (Scouts, Science Vessels, Outpost Ships).'},
+  shipyard:    {name: 'Orbital Shipyard',     cost: 75,  stage: 'settlement', req: 'dock', replaces: 'dock', desc: 'Replaces the Orbital Dock: builds every kind of ship.'},
   campus:      {name: 'Research Campus',      cost: 180, stage: 'settlement', desc: '+50% research here.'},
   tradeport:   {name: 'Trade Port',           cost: 180, stage: 'settlement', desc: '+50% credits here.'},
   agridomes:   {name: 'Agri-Domes',           cost: 120, stage: 'settlement', desc: '+3 food, plus 3 more for each stage above Settlement.'},
   habitat:     {name: 'Habitat Expansion',    cost: 250, stage: 'settlement', desc: '+50% population capacity here.'},
+  rstation:    {name: 'Robotic Research Station', cost: 60, stage: 'settlement', outpost: true, tech: 'survey_drones', desc: '+1 research a year, or +3 if this world has life, rings, an ocean under its ice or volcanoes.'},
+  refinery:    {name: 'Gas Refinery',         cost: 60,  stage: 'settlement', outpost: true, outpostOnly: true, giantOnly: true, desc: '+2 credits a year. Outposts on gas and ice giants only.'},
+  observatory: {name: 'Deep Sky Observatory', cost: 250, stage: 'settlement', outpost: true, tech: 'deep_sky', desc: 'Telescopes here see 24 light-years instead of 16.'},
   elevator:    {name: 'Space Elevator',       cost: 400, stage: 'city', tech: 'space_elevator', desc: 'Ships built here cost 25% less.'},
-  greatscope:  {name: 'The Great Telescope',  cost: 0, stage: 'settlement', unique: true, desc: 'Unique. Earth\'s telescope sees 24 light-years away, and knows worlds within 8.6 light-years of Earth and any signs of life on them.'},
-  rstation:    {name: 'Robotic Research Station', cost: 60, stage: 'settlement', outpost: true, outpostOnly: true, tech: 'survey_drones', desc: '+1 research a year, or +3 if this world has life, rings, an ocean under its ice or volcanoes.'},
-  observatory: {name: 'Deep Sky Observatory', cost: 300, stage: 'settlement', outpost: true, tech: 'deep_sky', desc: 'Telescopes here see 24 light-years instead of 16.'},
   terraform:   {name: 'Terraforming',         cost: 600, stage: 'settlement', tech: 'terraforming', repeat: true, desc: 'Improves habitability one step (Hostile → Harsh → Livable → Garden). Destroys any native ecosystem.'},
+  greatscope:  {name: 'The Great Telescope',  cost: 0, stage: 'settlement', unique: true, desc: 'Unique. Earth\'s telescope sees 24 light-years away, and knows worlds within 8.6 light-years of Earth and any signs of life on them.'},
 };
 
 // ---------- Ships ----------
@@ -339,6 +348,7 @@ const TECHS = [
   {id: 'terraforming', f: 'bio', cost: 2300, req: ['gene_adaptation', 'space_elevator'], name: 'Terraforming', desc: 'Unlocks the Terraforming project.'},
   {id: 'longevity', f: 'bio', cost: 3000, req: ['gene_adaptation'], name: 'Longevity Treatments', desc: 'Population grows 25% faster everywhere.'},
   {id: 'orbital_construction', f: 'eng', cost: 300, req: [], name: 'Orbital Construction', desc: 'Ships cost 15% less.'},
+  {id: 'deep_mining', f: 'eng', cost: 300, req: [], name: 'Deep Core Mining', desc: 'Unlocks Deep Mines, an upgrade of Shallow Mines (+50% production instead of +2).'},
   {id: 'orbital_logistics', f: 'eng', cost: 700, req: ['orbital_construction'], name: 'Orbital Logistics', desc: 'Outposts supplying a colony lose nothing in transport (instead of 20%).'},
   {id: 'autofactories', f: 'eng', cost: 650, req: [], name: 'Autofactories', desc: '+20% production everywhere.'},
   {id: 'space_elevator', f: 'eng', cost: 1100, req: ['orbital_construction'], name: 'Space Elevators', desc: 'Unlocks the Space Elevator project (ships built there cost 25% less).'},
@@ -347,6 +357,7 @@ const TECHS = [
   {id: 'quantum_computing', f: 'phys', cost: 400, req: [], name: 'Quantum Computing', desc: '+15% research everywhere.'},
   {id: 'antimatter_production', f: 'phys', cost: 1300, req: ['quantum_computing'], name: 'Antimatter Production', desc: '+10% production everywhere; needed for antimatter drives.'},
   {id: 'exotic_matter', f: 'phys', cost: 3200, req: ['antimatter_production'], name: 'Exotic Matter', desc: 'The physics needed for near-light flight, and perhaps one day more.'},
+  {id: 'stellar_priority', f: 'soc', cost: 300, req: [], name: 'Stellar Priority', desc: 'Earth\'s production +25%: the public wants more of the economy spent beyond Earth.'},
   {id: 'interstellar_commerce', f: 'soc', cost: 300, req: [], name: 'Interstellar Commerce', desc: '+20% credits; Cargo Bays carry twice as much.'},
   {id: 'colonial_charter', f: 'soc', cost: 550, req: [], name: 'Colonial Charters', desc: 'Settlements grow 50% faster.'},
   {id: 'unified_science', f: 'soc', cost: 1300, req: ['quantum_computing'], name: 'Unified Science Academy', desc: '+20% research everywhere.'},
@@ -585,10 +596,10 @@ const NUMW = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eigh
 const an = p => (/^[aeiou]/i.test(p) ? 'an ' : 'a ') + p;
 const lc = t => t.toLowerCase().replace('sun-', 'Sun-').replace('earth', 'Earth').replace('neptune', 'Neptune');
 function starFact(s) {
-  const t = STAR_DESC[s.name] || STAR_DESC[STAR_ALIAS[s.name]];
+  const n = s.orig || s.name, t = STAR_DESC[n] || STAR_DESC[STAR_ALIAS[n]];
   if (t) return t;
-  const w = lc(starKind(s.sp).word), n = s.cnt || s.c || 1;
-  const a = an(w); return a[0].toUpperCase() + a.slice(1) + (n > 2 ? ' with two companion stars.' : n > 1 ? ' with a companion star.' : '.');
+  const w = lc(starKind(s.sp).word), cnt = s.cnt || s.c || 1;
+  const a = an(w); return a[0].toUpperCase() + a.slice(1) + (cnt > 2 ? ' with two companion stars.' : cnt > 1 ? ' with a companion star.' : '.');
 }
 function worldPhrase(b) {
   let p = lc(TEMPS[b.temp] + ' ' + PCLASS[b.cls].name);
@@ -621,7 +632,8 @@ const B = id => S.bodies[id];
 const ST = id => S.stars[id];
 const has = t => !!(S && S.techs[t]);
 function nid() { return S.nextId++; }
-function msg(text, star, kind) { S.msgs.push({text, star: star == null ? null : star, kind: kind || 'info'}); }
+function msg(text, star, kind) { const m = {text, star: star == null ? null : star, kind: kind || 'info'}; S.msgs.push(m); if (!S._inTurn) logNews([m], S.year); }
+function logNews(list, y) { S.newsLog = S.newsLog || []; for (const m of list) S.newsLog.push({y, text: m.text, star: m.star, kind: m.kind}); if (S.newsLog.length > 500) S.newsLog.splice(0, S.newsLog.length - 500); }
 function journal(text, star) { S.journal.push({year: S.year, text, star: star == null ? null : star}); }
 
 // ---------- star types ----------
@@ -859,9 +871,9 @@ function colOut(b) {
   if (c.focus === 'trade') { fm.bc = 1.75; fm.prod = fm.rp = 0.8; }
   if (c.focus === 'farming') { fm.food = 2; fm.prod = fm.rp = fm.bc = 0.8; }
   const p = c.proj;
-  let prod = st.prod * MIN_MULT[b.min] * fm.prod * (p.mines ? 1.5 : 1) * S.mods.prod * (has('autofactories') ? 1.2 : 1) * (has('antimatter_production') ? 1.1 : 1) * (has('bt_fusion') ? 1.15 : 1);
+  let prod = (st.prod * MIN_MULT[b.min] + (p.shallow ? 2 : 0)) * fm.prod * (p.mines ? 1.5 : 1) * (c.home && has('stellar_priority') ? 1.25 : 1) * S.mods.prod * (has('autofactories') ? 1.2 : 1) * (has('antimatter_production') ? 1.1 : 1) * (has('bt_fusion') ? 1.15 : 1);
   let rp = (st.rp + (p.rstation ? (b.life !== 'none' || b.traits.some(t => t === 'rings' || t === 'subocean' || t === 'volcanic') ? 3 : 1) : 0)) * fm.rp * (p.campus ? 1.5 : 1) * S.mods.rp * (has('quantum_computing') ? 1.15 : 1) * (has('unified_science') ? 1.2 : 1) * (has('bt_signal') ? 1.15 : 1);
-  let bc = stg === 'outpost' ? st.bc : st.bc * fm.bc * (p.tradeport ? 1.5 : 1) * S.mods.bc * (has('interstellar_commerce') ? 1.2 : 1);
+  let bc = stg === 'outpost' ? st.bc + (p.refinery ? 2 : 0) : st.bc * fm.bc * (p.tradeport ? 1.5 : 1) * S.mods.bc * (has('interstellar_commerce') ? 1.2 : 1);
   let fert = HAB[h].fert * ((h === 'harsh' || h === 'hostile') && has('closed_ecology') ? 1.5 : 1);
   const lvl = Math.max(0, STAGE_ORDER.indexOf(stg) - 1);
   let food = st.food * fert * fm.food + (p.agridomes ? (3 + 3 * Math.max(0, lvl - 0)) * (has('bt_seeds') ? 2 : 1) : 0) + (c.home ? S.mods.earthFood : 0);
@@ -894,6 +906,8 @@ function projReason(b, id) {
   const P = PROJECTS[id], c = b.col;
   if (P.unique) return 'Unique';
   if (c.outpost && !P.outpost) return 'Needs people';
+  if (P.giantOnly && b.cls !== 'gasgiant' && b.cls !== 'icegiant') return 'Gas and ice giants only';
+  if (P.req && !c.proj[P.req] && !(P.req === 'dock' && c.proj.shipyard) && !(P.req === 'shallow' && c.proj.mines)) return 'Needs ' + PROJECTS[P.req].name;
   if (!c.outpost && P.outpostOnly) return 'Outposts only';
   if (P.tech && !has(P.tech)) return 'Needs ' + TECH[P.tech].name;
   if (c.proj[id] && !P.repeat) return 'Already built';
@@ -902,7 +916,13 @@ function projReason(b, id) {
   if (id === 'terraform' && (hab(b) === 'garden' || hab(b) === 'none' || hab(b) === 'outpost' || c.home)) return 'Cannot be improved further';
   return null;
 }
-function shipReason(b) { if (!b.col.proj.shipyard) return 'Needs an Orbital Shipyard'; return null; }
+function shipReason(b, d) {
+  const p = b.col.proj;
+  if (!p.shipyard && !p.dock) return 'Needs an Orbital Dock';
+  if (d && b.col.outpost && designHas(d, 'colony')) return 'Outposts have no people to send';
+  if (d && !p.shipyard && d.hull !== 'light') return 'Needs an Orbital Shipyard (medium and heavy hulls)';
+  return null;
+}
 function buyCost(b) { const c = b.col; if (!c.queue.length) return 0; const cost = itemCost(b, c.queue[0]); return Math.ceil(Math.max(0, cost - c.prog) * (c.prog > 0 ? 2 : 3)); }
 function buyItem(b) { const k = buyCost(b); if (k <= 0 || S.bc < k) return false; S.bc = r1(S.bc - k); b.col.prog = itemCost(b, b.col.queue[0]); return true; }
 function completeItem(b, it) {
@@ -911,7 +931,7 @@ function completeItem(b, it) {
       b.tf = (b.tf || 0) + 1;
       if (b.life === 'ecosystem') { b.life = 'microbial'; msg('Terraforming on ' + b.name + ' has wiped out most of its native ecosystem.', b.star, 'warn'); }
       msg(b.name + ' is now ' + HAB[hab(b)].name + ' after a terraforming stage.', b.star, 'build');
-    } else { b.col.proj[it.id] = 1; msg(b.name + ' completed ' + PROJECTS[it.id].name + '.', b.star, 'build'); }
+    } else { b.col.proj[it.id] = 1; if (PROJECTS[it.id].replaces) delete b.col.proj[PROJECTS[it.id].replaces]; msg(b.name + ' completed ' + PROJECTS[it.id].name + '.', b.star, 'build'); }
   } else if (it.kind === 'outpost') {
     const t = B(it.id); t.owner = 0; t.col = {pop: 0, outpost: true, mode: 'build', focus: 'balanced', proj: {}, queue: [], prog: 0, founded: S.year};
     msg(b.name + ' established an outpost on ' + t.name + '.', b.star, 'colony');
@@ -1112,10 +1132,12 @@ function supplyTarget(b) {
   const t = B(c.supplyTo); return t && t.star === b.star && t.owner === 0 && t.col && !t.col.outpost ? t : null;
 }
 function itemValid(b, it) {
-  if (it.kind === 'ship') return !!design(it.id) && !shipReason(b);
+  if (it.kind === 'ship') return !!design(it.id) && !shipReason(b, design(it.id));
   if (it.kind === 'outpost') { const t = B(it.id); return !!t && t.star === b.star && t.owner == null && hab(t) !== 'none' && !b.col.outpost; }
   const P = PROJECTS[it.id], c = b.col;
   if ((c.outpost && !P.outpost) || (!c.outpost && P.outpostOnly) || (P.tech && !has(P.tech))) return false;
+  if (P.giantOnly && b.cls !== 'gasgiant' && b.cls !== 'icegiant') return false;
+  if (P.req && !c.proj[P.req]) return false;
   if (c.proj[it.id] && !P.repeat) return false;
   if (it.id === 'terraform' && (hab(b) === 'garden' || hab(b) === 'none' || hab(b) === 'outpost' || c.home)) return false;
   return true;
@@ -1128,13 +1150,14 @@ function totals() {
   return {prod: r1(prod), rp: r1(rp), bc: r1(bc), up: r1(up), net: r1(bc - up), pop, short};
 }
 function endTurn() {
-  S.msgs = [];
+  S.msgs = []; S._inTurn = true;
   moveFleets();
   updateKnowledge();
   processSurveys();
   processEconomy();
   autoExplore();
-  S.turn++; S.year++;
+  S.turn++; S.year++; S._inTurn = false;
+  logNews(S.msgs, S.year);
   recordHistory();
   if (S.turn > S.maxTurns && !S.over) S.over = {result: 'complete', why: 'The age of exploration draws to a close in the year ' + S.year + '.'};
 }
@@ -1153,6 +1176,10 @@ function autoExplore() {
   }
 }
 function fleetName0(f) { return design(f.ships[0].d).name; }
+function canRenameStar(s) { return s.bodies.some(id => B(id).owner === 0); }
+function cleanName(t) { return String(t || '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 24); }
+function renameStar(s, t) { t = cleanName(t); if (!t || !canRenameStar(s)) return false; if (!s.orig) s.orig = s.name; s.name = t; return true; }
+function renameBody(b, t) { t = cleanName(t); if (!t || b.owner !== 0) return false; if (!b.orig) b.orig = b.name; b.name = t; return true; }
 function recordHistory() { S.hist.push({t: S.turn, y: S.year, pop: Math.round(totals().pop), exp: Object.keys(S.visited).length, score: score().total}); }
 function score() {
   let micro = 0, eco = 0, settle = 0, city = 0, core = 0;
@@ -1275,8 +1302,6 @@ function drawMap() {
   // distant beacons
   x.textAlign = 'left';
   for (const f of FAR_STARS) { const [sx, sy] = proj(f.d[0] * (R + 9), f.d[1] * (R + 9), f.d[2] * (R + 9)); x.fillStyle = 'rgba(150,165,200,.6)'; x.font = '13px Segoe UI, sans-serif'; x.fillText('✧', sx - 5, sy + 4); x.font = 'italic 10.5px Segoe UI, sans-serif'; x.fillStyle = 'rgba(130,145,180,.6)'; x.fillText(f.n + ' · ' + f.ly + ' ly', sx + 8, sy + 4); }
-  // fleets in transit (lines under stars)
-  for (const f of S.fleets) { if (f.dest == null) continue; const d = ST(f.dest); const [ax, ay] = proj(f.x, f.y, f.z), [bx, by] = proj(d.x, d.y, d.z); x.strokeStyle = f.task && f.task.type === 'route' ? 'rgba(255,200,90,.45)' : 'rgba(127,224,255,.6)'; x.setLineDash([5, 5]); x.lineWidth = 1.3; x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, by); x.stroke(); x.setLineDash([]); }
   // stars
   const showPins = C.pitch < 1.45;
   const items = [];
@@ -1313,6 +1338,8 @@ function drawMap() {
       const mx = (p0[0] + p[0]) / 2, my = (p0[1] + p[1]) / 2; x.fillStyle = '#ffd678cc'; x.font = '10px Segoe UI, sans-serif'; x.fillText(d.toFixed(1) + ' ly', mx, my - 3);
     });
   }
+  // fleets in transit (drawn over the nearest-system guides so paths always show)
+  for (const f of S.fleets) { if (f.dest == null) continue; const d = ST(f.dest); const [ax, ay] = proj(f.x, f.y, f.z), [bx, by] = proj(d.x, d.y, d.z); x.strokeStyle = f.task && f.task.type === 'route' ? 'rgba(255,200,90,.45)' : 'rgba(127,224,255,.6)'; x.setLineDash([5, 5]); x.lineWidth = 1.6; x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, by); x.stroke(); x.setLineDash([]); }
   // labels with de-cluttering
   const boxes = []; x.textAlign = 'center';
   const dots = LABELS.map(L => ({x: L.p[0] - L.rr, y: L.p[1] - L.rr, w: L.rr * 2, h: L.rr * 2}));
@@ -1612,7 +1639,7 @@ ACT.colonize = v => {
 };
 function starPanel(sid) {
   const s = ST(sid);
-  let h = `<div class="hdr"><div><h2>${esc(s.name)}</h2><div class="dim small">${starTitle(s)}</div></div><button class="x" data-a="close">✕</button></div>`;
+  let h = `<div class="hdr"><div><h2>${esc(s.name)}${canRenameStar(s) ? ` <button class="x ren" data-a="renStar" data-v="${s.id}" title="Rename this star">✎</button>` : ''}</h2>${s.orig ? `<div class="tiny faint">Charted as ${esc(s.orig)}</div>` : ''}<div class="dim small">${starTitle(s)}</div></div><button class="x" data-a="close">✕</button></div>`;
   h += `<div class="sdesc">${esc(starDesc(s))}</div>`;
   if (s.guardKnown) h += `<div class="card" style="border-color:#7a2a2a"><b class="bad">Guardian machines.</b> Ancient automated defenses destroy any ship that enters this system.</div>`;
   if (!worldsKnown(s)) {
@@ -1657,7 +1684,7 @@ function colonyPanel(b) {
   const c = b.col, o = colOut(b), st = stageOf(b);
   const cap = o.cap, g = growthRate(b);
   const nextT = {settlement: 0.1, city: 10}[st];
-  let h = `<div class="hdr"><div class="row">${planetBall(b, 42)}<div><h2>${esc(b.name)}</h2><div class="dim small">${STAGES[st].name} · ${HAB[o.hab].name} ${lc(PCLASS[b.cls].name)}</div></div></div><button class="x" data-a="close">✕</button></div>
+  let h = `<div class="hdr"><div class="row">${planetBall(b, 42)}<div><h2>${esc(b.name)} <button class="x ren" data-a="renBody" data-v="${b.id}" title="Rename this world">✎</button></h2><div class="dim small">${STAGES[st].name} · ${HAB[o.hab].name} ${lc(PCLASS[b.cls].name)}</div></div></div><button class="x" data-a="close">✕</button></div>
     <div class="small"><a class="acc" style="cursor:pointer" data-a="star" data-v="${b.star}">◂ ${esc(ST(b.star).name)} system</a></div>
     <div class="sec">Population</div>
     <div class="row sb small"><span><b>${people(c.pop)}</b> of ${people(cap)}</span><span class="${ST(b.star).short ? 'bad' : 'good'}">${ST(b.star).short ? 'Shrinking (hunger)' : c.pop >= cap ? 'Full' : '+' + (g * (1 - c.pop / cap) * 100).toFixed(1) + '% per year'}</span></div>
@@ -1690,16 +1717,22 @@ function colonyPanel(b) {
   } else if (tab === 'proj') {
     for (const id in PROJECTS) {
       const P = PROJECTS[id]; if (P.unique || P.outpostOnly || (P.tech && !has(P.tech))) continue; if (c.proj[id] && !P.repeat) continue;
+      if ((id === 'shallow' && c.proj.mines) || (id === 'dock' && c.proj.shipyard)) continue;
       const why = projReason(b, id), cost = projCost(id);
       h += `<div class="opt" ${why ? `style="opacity:.45;cursor:default"` : `data-a="qadd" data-v="${b.id}:proj:${id}"`}><span class="nm">${P.name}<div class="tiny dim">${esc(why || P.desc)}</div></span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`;
     }
   } else {
-    const why = shipReason(b);
-    if (why) h += `<div class="small dim" style="padding:6px">${why}. Build an Orbital Shipyard first (Projects tab).</div>`;
-    for (const d of S.designs.filter(d => !d.hidden && !d.obsolete)) {
-      const cost = shipCost(d, b);
-      h += `<div class="opt" ${why ? 'style="opacity:.45;cursor:default"' : `data-a="qadd" data-v="${b.id}:ship:${d.id}"`}><span class="nm">${esc(d.name)}<div class="tiny dim">${designSummary(d)}</div></span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`;
-    }
+    h += shipListHTML(b, o);
+  }
+  return h;
+}
+function shipListHTML(b, o) {
+  let h = '';
+  const base = shipReason(b);
+  if (base) h += `<div class="small dim" style="padding:6px">${base}. Build one first (Projects tab).</div>`;
+  for (const d of S.designs.filter(d => !d.hidden && !d.obsolete)) {
+    const why = base || shipReason(b, d), cost = shipCost(d, b);
+    h += `<div class="opt" ${why ? 'style="opacity:.45;cursor:default"' : `data-a="qadd" data-v="${b.id}:ship:${d.id}"`}><span class="nm">${esc(d.name)}<div class="tiny dim">${!base && why ? esc(why) : designSummary(d)}</div></span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`;
   }
   return h;
 }
@@ -1778,10 +1811,10 @@ function outpostPanel(b) {
   const c = b.col, o = colOut(b);
   const targets = ST(b.star).bodies.map(B).filter(x => x.owner === 0 && x.col && !x.col.outpost);
   const sup = supplyTarget(b);
-  let h = `<div class="hdr"><div class="row">${planetBall(b, 42)}<div><h2>${esc(b.name)}</h2><div class="dim small">Outpost · ${lc(PCLASS[b.cls].name)}</div></div></div><button class="x" data-a="close">✕</button></div>
+  let h = `<div class="hdr"><div class="row">${planetBall(b, 42)}<div><h2>${esc(b.name)} <button class="x ren" data-a="renBody" data-v="${b.id}" title="Rename this world">✎</button></h2><div class="dim small">Outpost · ${lc(PCLASS[b.cls].name)}</div></div></div><button class="x" data-a="close">✕</button></div>
     <div class="small"><a class="acc" style="cursor:pointer" data-a="star" data-v="${b.star}">◂ ${esc(ST(b.star).name)} system</a></div>
     <div class="sec">Output per year</div>
-    <div class="grid2 small"><div>Production <b>${o.prod}</b> <span class="dim">(${MINERALS[b.min].toLowerCase()} minerals)</span></div><div>Upkeep <b class="bad">${-o.bc} credit a year</b></div>${o.rp ? `<div>Research <b>${o.rp}</b></div>` : ''}</div>
+    <div class="grid2 small"><div>Production <b>${o.prod}</b> <span class="dim">(${MINERALS[b.min].toLowerCase()} minerals)</span></div><div>${o.bc < 0 ? `Upkeep <b class="bad">${-o.bc} credit a year</b>` : `Credits <b class="good">+${o.bc}</b> <span class="dim">(after upkeep)</span>`}</div>${o.rp ? `<div>Research <b>${o.rp}</b></div>` : ''}</div>
     <div class="sec">Production goes to</div>
     <div class="row wrap" style="gap:4px"><button class="btn sm ${sup ? '' : 'on'}" data-a="opMode" data-v="${b.id}:build">Build here</button>${targets.map(t => `<button class="btn sm ${sup === t ? 'on' : ''}" data-a="opMode" data-v="${b.id}:${t.id}">Supply ${esc(t.name)}</button>`).join('')}</div>
     <div class="tiny dim" style="margin-top:3px">${sup ? `Sends ${r1(o.prod * supplyRate())} production a year to ${esc(sup.name)}'s build queue${supplyRate() < 1 ? ' (20% is lost in transport until Orbital Logistics)' : ''}.` : targets.length ? 'Builds its own projects and ships, or can supply a colony in this system.' : 'Builds its own projects and ships. With a colony in this system, it could supply that colony instead.'}</div>`;
@@ -1800,20 +1833,26 @@ function outpostPanel(b) {
   if (tab === 'proj') {
     for (const id in PROJECTS) {
       const P = PROJECTS[id]; if (!P.outpost || (c.proj[id] && !P.repeat)) continue;
+      if (P.giantOnly && b.cls !== 'gasgiant' && b.cls !== 'icegiant') continue; if (P.replaces && c.proj[P.replaces] == null && !P.req) continue; if (P.req === 'shallow' && c.proj.mines) continue;
       const why = projReason(b, id), cost = projCost(id);
       h += `<div class="opt" ${why ? `style="opacity:.45;cursor:default"` : `data-a="qadd" data-v="${b.id}:proj:${id}"`}><span class="nm">${P.name}<div class="tiny dim">${esc(why || P.desc)}</div></span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`;
     }
   } else {
-    const why = shipReason(b);
-    if (why) h += `<div class="small dim" style="padding:6px">${why}. An automated Orbital Shipyard can be built here (Projects tab).</div>`;
-    for (const d of S.designs.filter(d => !d.hidden && !d.obsolete)) {
-      const cost = shipCost(d, b);
-      h += `<div class="opt" ${why ? 'style="opacity:.45;cursor:default"' : `data-a="qadd" data-v="${b.id}:ship:${d.id}"`}><span class="nm">${esc(d.name)}<div class="tiny dim">${designSummary(d)}</div></span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`;
-    }
+    h += shipListHTML(b, o);
   }
   return h;
 }
 ACT.opMode = v => { const [bid, m] = v.split(':'); const c = B(+bid).col; if (m === 'build') { c.mode = 'build'; c.supplyTo = null; } else { c.mode = 'supply'; c.supplyTo = +m; } renderSide(); renderTop(); };
+
+function askName(title, cur, done) {
+  modal({title, w: 420, body: `<input type="text" id="rnInput" maxlength="24" value="${esc(cur)}" style="width:100%"><div class="tiny dim" style="margin-top:6px">Up to 24 characters.</div>`,
+    foot: `<button class="btn" data-a="mclose">Cancel</button><button class="btn primary" data-a="rnOk">Rename</button>`,
+    after: () => { const i = $('#rnInput'); if (i) { i.addEventListener('keydown', e => { if (e.key === 'Enter') ACT.rnOk(); }); setTimeout(() => { i.focus(); i.select(); }, 30); } }});
+  UI.rnDone = done;
+}
+ACT.rnOk = () => { const v = $('#rnInput') ? $('#rnInput').value : ''; const f = UI.rnDone; ACT.mclose(); if (f && f(v)) { UI.dirty = true; renderSide(); toast('Renamed'); } };
+ACT.renStar = v => { const s = ST(+v); askName('Rename ' + s.name, s.name, t => renameStar(s, t)); };
+ACT.renBody = v => { const b = B(+v); askName('Rename ' + b.name, b.name, t => renameBody(b, t)); };
 
 'use strict';
 // ===================== STARWAKE v2 — SCREENS =====================
@@ -1838,10 +1877,16 @@ function showNews() {
   const el = $('#news'); if (!S) return;
   const list = S.msgs.slice(-14);
   if (!list.length || !UI.newsOpen) { el.classList.toggle('show', false); return; }
-  el.innerHTML = `<div class="nh"><span>Year ${S.year - (S.msgs === UI._lastMsgs ? 0 : 0)} news</span><button class="x" data-a="newsClose">✕</button></div>` +
+  el.innerHTML = `<div class="nh"><span class="click" data-a="openNewsLog" title="See all past news">Year ${S.year} news <span class="acc">· all news ▸</span></span><button class="x" data-a="newsClose">✕</button></div>` +
     list.map(m => `<div class="ni ${m.star != null ? 'click' : ''}" ${m.star != null ? `data-a="goStar" data-v="${m.star}"` : ''}>${NEWS_ICON[m.kind] || 'ℹ️'} ${esc(m.text)}</div>`).join('');
   el.classList.add('show');
 }
+ACT.openNewsLog = () => {
+  const log = (S.newsLog || []).slice().reverse(); let h = '', y = null;
+  for (const m of log) { if (m.y !== y) { y = m.y; h += `<div class="sec">${y}</div>`; } h += `<div class="ni ${m.star != null ? 'click' : ''}" ${m.star != null ? `data-a="logGo" data-v="${m.star}"` : ''}>${NEWS_ICON[m.kind] || 'ℹ️'} ${esc(m.text)}</div>`; }
+  modal({title: 'All news', w: 720, kind: 'newslog', body: h || '<div class="dim">No news yet.</div>', foot: `<button class="btn primary" data-a="mclose">Close</button>`});
+};
+ACT.logGo = v => { ACT.mclose(); ACT.goStar(v); };
 ACT.newsClose = () => { $('#news').classList.remove('show'); };
 
 // ---------- anomaly events ----------
@@ -1922,7 +1967,7 @@ function saveTo(slot) {
   } catch (e) { console.warn('save failed', e); return false; }
 }
 function autosave() { if (S && !S.over) saveTo('auto'); }
-function migrateSave(d) { d.version = GAME_VERSION; for (const x of d.designs || []) if (x.id === 'scout' && x.mods.length === 1 && x.mods[0] === 'tel_m') x.mods.push('booster'); for (const b of d.bodies || []) if (b.col && b.col.outpost && !b.col.mode) b.col.mode = 'build'; for (const x of d.designs || []) if (x.id === 'probe') x.name = 'Pathfinder Probe'; d.msgs = d.msgs || []; d.journal = d.journal || []; d.hist = d.hist || []; return d; }
+function migrateSave(d) { d.version = GAME_VERSION; d.newsLog = d.newsLog || []; for (const x of d.designs || []) if (x.id === 'scout' && x.mods.length === 1 && x.mods[0] === 'tel_m') x.mods.push('booster'); for (const b of d.bodies || []) if (b.col && b.col.outpost && !b.col.mode) b.col.mode = 'build'; for (const x of d.designs || []) if (x.id === 'probe') x.name = 'Pathfinder Probe'; d.msgs = d.msgs || []; d.journal = d.journal || []; d.hist = d.hist || []; return d; }
 function loadFrom(slot) { const r = readSlot(slot); if (!r) return false; try { S = migrateSave(JSON.parse(r.data)); } catch (e) { toast('That save could not be read.'); return false; } startPlaying(false); return true; }
 function savesHTML(canSave) {
   let h = `<table class="list"><tr><th>Slot</th><th>Civilisation</th><th>Year</th><th>Saved</th><th></th></tr>`;

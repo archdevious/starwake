@@ -173,3 +173,9 @@ table.list tr.click{cursor:pointer}table.list tr.click:hover td{background:#121d
 .nnum{display:inline-block;width:16px;height:16px;line-height:16px;border-radius:50%;background:#ffd678;color:#1a1206;font-weight:700;font-size:10.5px;text-align:center;margin-right:6px}
 .setline{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:10px 0;border-bottom:1px solid var(--line)}
 .card.idlecard{border-color:#d04848;box-shadow:0 0 0 1px #d0484866 inset}
+#news .nh .click{cursor:pointer}
+#news .nh .click:hover .acc{text-decoration:underline}
+.x.ren{font-size:13px;opacity:.55;vertical-align:middle}
+.x.ren:hover{opacity:1}
+#modal .ni{padding:5px 6px;font-size:13px;border-bottom:1px solid var(--line)}
+#modal .ni.click{cursor:pointer}#modal .ni.click:hover{background:#13203a}

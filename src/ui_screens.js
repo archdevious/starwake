@@ -21,10 +21,16 @@ function showNews() {
   const el = $('#news'); if (!S) return;
   const list = S.msgs.slice(-14);
   if (!list.length || !UI.newsOpen) { el.classList.toggle('show', false); return; }
-  el.innerHTML = `<div class="nh"><span>Year ${S.year - (S.msgs === UI._lastMsgs ? 0 : 0)} news</span><button class="x" data-a="newsClose">✕</button></div>` +
+  el.innerHTML = `<div class="nh"><span class="click" data-a="openNewsLog" title="See all past news">Year ${S.year} news <span class="acc">· all news ▸</span></span><button class="x" data-a="newsClose">✕</button></div>` +
     list.map(m => `<div class="ni ${m.star != null ? 'click' : ''}" ${m.star != null ? `data-a="goStar" data-v="${m.star}"` : ''}>${NEWS_ICON[m.kind] || 'ℹ️'} ${esc(m.text)}</div>`).join('');
   el.classList.add('show');
 }
+ACT.openNewsLog = () => {
+  const log = (S.newsLog || []).slice().reverse(); let h = '', y = null;
+  for (const m of log) { if (m.y !== y) { y = m.y; h += `<div class="sec">${y}</div>`; } h += `<div class="ni ${m.star != null ? 'click' : ''}" ${m.star != null ? `data-a="logGo" data-v="${m.star}"` : ''}>${NEWS_ICON[m.kind] || 'ℹ️'} ${esc(m.text)}</div>`; }
+  modal({title: 'All news', w: 720, kind: 'newslog', body: h || '<div class="dim">No news yet.</div>', foot: `<button class="btn primary" data-a="mclose">Close</button>`});
+};
+ACT.logGo = v => { ACT.mclose(); ACT.goStar(v); };
 ACT.newsClose = () => { $('#news').classList.remove('show'); };
 
 // ---------- anomaly events ----------
@@ -105,7 +111,7 @@ function saveTo(slot) {
   } catch (e) { console.warn('save failed', e); return false; }
 }
 function autosave() { if (S && !S.over) saveTo('auto'); }
-function migrateSave(d) { d.version = GAME_VERSION; for (const x of d.designs || []) if (x.id === 'scout' && x.mods.length === 1 && x.mods[0] === 'tel_m') x.mods.push('booster'); for (const b of d.bodies || []) if (b.col && b.col.outpost && !b.col.mode) b.col.mode = 'build'; for (const x of d.designs || []) if (x.id === 'probe') x.name = 'Pathfinder Probe'; d.msgs = d.msgs || []; d.journal = d.journal || []; d.hist = d.hist || []; return d; }
+function migrateSave(d) { d.version = GAME_VERSION; d.newsLog = d.newsLog || []; for (const x of d.designs || []) if (x.id === 'scout' && x.mods.length === 1 && x.mods[0] === 'tel_m') x.mods.push('booster'); for (const b of d.bodies || []) if (b.col && b.col.outpost && !b.col.mode) b.col.mode = 'build'; for (const x of d.designs || []) if (x.id === 'probe') x.name = 'Pathfinder Probe'; d.msgs = d.msgs || []; d.journal = d.journal || []; d.hist = d.hist || []; return d; }
 function loadFrom(slot) { const r = readSlot(slot); if (!r) return false; try { S = migrateSave(JSON.parse(r.data)); } catch (e) { toast('That save could not be read.'); return false; } startPlaying(false); return true; }
 function savesHTML(canSave) {
   let h = `<table class="list"><tr><th>Slot</th><th>Civilisation</th><th>Year</th><th>Saved</th><th></th></tr>`;

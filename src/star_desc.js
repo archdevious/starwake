@@ -80,10 +80,10 @@ const NUMW = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eigh
 const an = p => (/^[aeiou]/i.test(p) ? 'an ' : 'a ') + p;
 const lc = t => t.toLowerCase().replace('sun-', 'Sun-').replace('earth', 'Earth').replace('neptune', 'Neptune');
 function starFact(s) {
-  const t = STAR_DESC[s.name] || STAR_DESC[STAR_ALIAS[s.name]];
+  const n = s.orig || s.name, t = STAR_DESC[n] || STAR_DESC[STAR_ALIAS[n]];
   if (t) return t;
-  const w = lc(starKind(s.sp).word), n = s.cnt || s.c || 1;
-  const a = an(w); return a[0].toUpperCase() + a.slice(1) + (n > 2 ? ' with two companion stars.' : n > 1 ? ' with a companion star.' : '.');
+  const w = lc(starKind(s.sp).word), cnt = s.cnt || s.c || 1;
+  const a = an(w); return a[0].toUpperCase() + a.slice(1) + (cnt > 2 ? ' with two companion stars.' : cnt > 1 ? ' with a companion star.' : '.');
 }
 function worldPhrase(b) {
   let p = lc(TEMPS[b.temp] + ' ' + PCLASS[b.cls].name);

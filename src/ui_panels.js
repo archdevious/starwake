@@ -52,7 +52,7 @@ ACT.colonize = v => {
 };
 function starPanel(sid) {
   const s = ST(sid);
-  let h = `<div class="hdr"><div><h2>${esc(s.name)}</h2><div class="dim small">${starTitle(s)}</div></div><button class="x" data-a="close">✕</button></div>`;
+  let h = `<div class="hdr"><div><h2>${esc(s.name)}${canRenameStar(s) ? ` <button class="x ren" data-a="renStar" data-v="${s.id}" title="Rename this star">✎</button>` : ''}</h2>${s.orig ? `<div class="tiny faint">Charted as ${esc(s.orig)}</div>` : ''}<div class="dim small">${starTitle(s)}</div></div><button class="x" data-a="close">✕</button></div>`;
   h += `<div class="sdesc">${esc(starDesc(s))}</div>`;
   if (s.guardKnown) h += `<div class="card" style="border-color:#7a2a2a"><b class="bad">Guardian machines.</b> Ancient automated defenses destroy any ship that enters this system.</div>`;
   if (!worldsKnown(s)) {
@@ -97,7 +97,7 @@ function colonyPanel(b) {
   const c = b.col, o = colOut(b), st = stageOf(b);
   const cap = o.cap, g = growthRate(b);
   const nextT = {settlement: 0.1, city: 10}[st];
-  let h = `<div class="hdr"><div class="row">${planetBall(b, 42)}<div><h2>${esc(b.name)}</h2><div class="dim small">${STAGES[st].name} · ${HAB[o.hab].name} ${lc(PCLASS[b.cls].name)}</div></div></div><button class="x" data-a="close">✕</button></div>
+  let h = `<div class="hdr"><div class="row">${planetBall(b, 42)}<div><h2>${esc(b.name)} <button class="x ren" data-a="renBody" data-v="${b.id}" title="Rename this world">✎</button></h2><div class="dim small">${STAGES[st].name} · ${HAB[o.hab].name} ${lc(PCLASS[b.cls].name)}</div></div></div><button class="x" data-a="close">✕</button></div>
     <div class="small"><a class="acc" style="cursor:pointer" data-a="star" data-v="${b.star}">◂ ${esc(ST(b.star).name)} system</a></div>
     <div class="sec">Population</div>
     <div class="row sb small"><span><b>${people(c.pop)}</b> of ${people(cap)}</span><span class="${ST(b.star).short ? 'bad' : 'good'}">${ST(b.star).short ? 'Shrinking (hunger)' : c.pop >= cap ? 'Full' : '+' + (g * (1 - c.pop / cap) * 100).toFixed(1) + '% per year'}</span></div>
@@ -130,16 +130,22 @@ function colonyPanel(b) {
   } else if (tab === 'proj') {
     for (const id in PROJECTS) {
       const P = PROJECTS[id]; if (P.unique || P.outpostOnly || (P.tech && !has(P.tech))) continue; if (c.proj[id] && !P.repeat) continue;
+      if ((id === 'shallow' && c.proj.mines) || (id === 'dock' && c.proj.shipyard)) continue;
       const why = projReason(b, id), cost = projCost(id);
       h += `<div class="opt" ${why ? `style="opacity:.45;cursor:default"` : `data-a="qadd" data-v="${b.id}:proj:${id}"`}><span class="nm">${P.name}<div class="tiny dim">${esc(why || P.desc)}</div></span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`;
     }
   } else {
-    const why = shipReason(b);
-    if (why) h += `<div class="small dim" style="padding:6px">${why}. Build an Orbital Shipyard first (Projects tab).</div>`;
-    for (const d of S.designs.filter(d => !d.hidden && !d.obsolete)) {
-      const cost = shipCost(d, b);
-      h += `<div class="opt" ${why ? 'style="opacity:.45;cursor:default"' : `data-a="qadd" data-v="${b.id}:ship:${d.id}"`}><span class="nm">${esc(d.name)}<div class="tiny dim">${designSummary(d)}</div></span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`;
-    }
+    h += shipListHTML(b, o);
+  }
+  return h;
+}
+function shipListHTML(b, o) {
+  let h = '';
+  const base = shipReason(b);
+  if (base) h += `<div class="small dim" style="padding:6px">${base}. Build one first (Projects tab).</div>`;
+  for (const d of S.designs.filter(d => !d.hidden && !d.obsolete)) {
+    const why = base || shipReason(b, d), cost = shipCost(d, b);
+    h += `<div class="opt" ${why ? 'style="opacity:.45;cursor:default"' : `data-a="qadd" data-v="${b.id}:ship:${d.id}"`}><span class="nm">${esc(d.name)}<div class="tiny dim">${!base && why ? esc(why) : designSummary(d)}</div></span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`;
   }
   return h;
 }
@@ -218,10 +224,10 @@ function outpostPanel(b) {
   const c = b.col, o = colOut(b);
   const targets = ST(b.star).bodies.map(B).filter(x => x.owner === 0 && x.col && !x.col.outpost);
   const sup = supplyTarget(b);
-  let h = `<div class="hdr"><div class="row">${planetBall(b, 42)}<div><h2>${esc(b.name)}</h2><div class="dim small">Outpost · ${lc(PCLASS[b.cls].name)}</div></div></div><button class="x" data-a="close">✕</button></div>
+  let h = `<div class="hdr"><div class="row">${planetBall(b, 42)}<div><h2>${esc(b.name)} <button class="x ren" data-a="renBody" data-v="${b.id}" title="Rename this world">✎</button></h2><div class="dim small">Outpost · ${lc(PCLASS[b.cls].name)}</div></div></div><button class="x" data-a="close">✕</button></div>
     <div class="small"><a class="acc" style="cursor:pointer" data-a="star" data-v="${b.star}">◂ ${esc(ST(b.star).name)} system</a></div>
     <div class="sec">Output per year</div>
-    <div class="grid2 small"><div>Production <b>${o.prod}</b> <span class="dim">(${MINERALS[b.min].toLowerCase()} minerals)</span></div><div>Upkeep <b class="bad">${-o.bc} credit a year</b></div>${o.rp ? `<div>Research <b>${o.rp}</b></div>` : ''}</div>
+    <div class="grid2 small"><div>Production <b>${o.prod}</b> <span class="dim">(${MINERALS[b.min].toLowerCase()} minerals)</span></div><div>${o.bc < 0 ? `Upkeep <b class="bad">${-o.bc} credit a year</b>` : `Credits <b class="good">+${o.bc}</b> <span class="dim">(after upkeep)</span>`}</div>${o.rp ? `<div>Research <b>${o.rp}</b></div>` : ''}</div>
     <div class="sec">Production goes to</div>
     <div class="row wrap" style="gap:4px"><button class="btn sm ${sup ? '' : 'on'}" data-a="opMode" data-v="${b.id}:build">Build here</button>${targets.map(t => `<button class="btn sm ${sup === t ? 'on' : ''}" data-a="opMode" data-v="${b.id}:${t.id}">Supply ${esc(t.name)}</button>`).join('')}</div>
     <div class="tiny dim" style="margin-top:3px">${sup ? `Sends ${r1(o.prod * supplyRate())} production a year to ${esc(sup.name)}'s build queue${supplyRate() < 1 ? ' (20% is lost in transport until Orbital Logistics)' : ''}.` : targets.length ? 'Builds its own projects and ships, or can supply a colony in this system.' : 'Builds its own projects and ships. With a colony in this system, it could supply that colony instead.'}</div>`;
@@ -240,17 +246,23 @@ function outpostPanel(b) {
   if (tab === 'proj') {
     for (const id in PROJECTS) {
       const P = PROJECTS[id]; if (!P.outpost || (c.proj[id] && !P.repeat)) continue;
+      if (P.giantOnly && b.cls !== 'gasgiant' && b.cls !== 'icegiant') continue; if (P.replaces && c.proj[P.replaces] == null && !P.req) continue; if (P.req === 'shallow' && c.proj.mines) continue;
       const why = projReason(b, id), cost = projCost(id);
       h += `<div class="opt" ${why ? `style="opacity:.45;cursor:default"` : `data-a="qadd" data-v="${b.id}:proj:${id}"`}><span class="nm">${P.name}<div class="tiny dim">${esc(why || P.desc)}</div></span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`;
     }
   } else {
-    const why = shipReason(b);
-    if (why) h += `<div class="small dim" style="padding:6px">${why}. An automated Orbital Shipyard can be built here (Projects tab).</div>`;
-    for (const d of S.designs.filter(d => !d.hidden && !d.obsolete)) {
-      const cost = shipCost(d, b);
-      h += `<div class="opt" ${why ? 'style="opacity:.45;cursor:default"' : `data-a="qadd" data-v="${b.id}:ship:${d.id}"`}><span class="nm">${esc(d.name)}<div class="tiny dim">${designSummary(d)}</div></span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`;
-    }
+    h += shipListHTML(b, o);
   }
   return h;
 }
 ACT.opMode = v => { const [bid, m] = v.split(':'); const c = B(+bid).col; if (m === 'build') { c.mode = 'build'; c.supplyTo = null; } else { c.mode = 'supply'; c.supplyTo = +m; } renderSide(); renderTop(); };
+
+function askName(title, cur, done) {
+  modal({title, w: 420, body: `<input type="text" id="rnInput" maxlength="24" value="${esc(cur)}" style="width:100%"><div class="tiny dim" style="margin-top:6px">Up to 24 characters.</div>`,
+    foot: `<button class="btn" data-a="mclose">Cancel</button><button class="btn primary" data-a="rnOk">Rename</button>`,
+    after: () => { const i = $('#rnInput'); if (i) { i.addEventListener('keydown', e => { if (e.key === 'Enter') ACT.rnOk(); }); setTimeout(() => { i.focus(); i.select(); }, 30); } }});
+  UI.rnDone = done;
+}
+ACT.rnOk = () => { const v = $('#rnInput') ? $('#rnInput').value : ''; const f = UI.rnDone; ACT.mclose(); if (f && f(v)) { UI.dirty = true; renderSide(); toast('Renamed'); } };
+ACT.renStar = v => { const s = ST(+v); askName('Rename ' + s.name, s.name, t => renameStar(s, t)); };
+ACT.renBody = v => { const b = B(+v); askName('Rename ' + b.name, b.name, t => renameBody(b, t)); };
