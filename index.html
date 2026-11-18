@@ -233,7 +233,7 @@ const FAR_STARS=[{"n": "Achernar", "d": [0.184, -0.484, -0.855], "ly": 139}, {"n
 
 'use strict';
 // ===================== STARWAKE v2 — STATIC DATA =====================
-const GAME_VERSION = 13;
+const GAME_VERSION = 14;
 const SAVE_FORMAT = 2;
 const START_YEAR = 2326;
 const LENGTHS = {
@@ -327,7 +327,7 @@ const MODULES = {
   lab:     {name: 'Science Lab',      mass: 1, cost: 40,  desc: 'Surveys systems and investigates anomalies.'},
   colony:  {name: 'Colony Pod',       mass: 4, cost: 120, desc: 'Carries 20,000 settlers to found or grow a colony (twice as many with Hibernation). Needs a medium or heavy hull.'},
   outpost: {name: 'Outpost Kit',      mass: 2, cost: 80,  desc: 'Builds a robotic outpost on almost any world, for star systems where we have no colony. Where we already have a colony, order an outpost from that colony instead: it costs far less.'},
-  booster: {name: 'Booster',          mass: 0, cost: 20,  desc: '+10% of light speed (30% becomes 40%). Only one Booster counts. Light hulls only.'},
+  booster: {name: 'Booster',          mass: 1, cost: 20,  desc: '+10% of light speed (30% becomes 40%). Only one Booster counts. Light hulls only.'},
   cargo:   {name: 'Cargo Bay',        mass: 2, cost: 40,  desc: 'Each trip carries 10,000 settlers and 10 food from your colonies, and brings trade back on a trade route. Needs a medium or heavy hull.'},
 };
 const DEFAULT_DESIGNS = [
@@ -1965,9 +1965,9 @@ function colonyPanel(b) {
   const tab = UI.buildTab;
   const ots = outpostTargets(b), sts = settleTargets(b), ownOut = sts.filter(t => t.owner === 0);
   const nWorlds = ots.length + ownOut.length;
-  h += `<div class="row" style="margin:8px 0 4px;gap:4px"><button class="btn sm ${tab === 'proj' ? 'on' : ''}" data-a="btab" data-v="proj">Projects</button><button class="btn sm ${tab === 'outp' ? 'on' : ''}" data-a="btab" data-v="outp">Worlds${nWorlds ? ' (' + nWorlds + ')' : ''}</button><button class="btn sm ${tab === 'ship' ? 'on' : ''}" data-a="btab" data-v="ship">Ships</button></div>`;
+  h += `<div class="row" style="margin:8px 0 4px;gap:4px"><button class="btn sm ${tab === 'proj' ? 'on' : ''}" data-a="btab" data-v="proj">Projects</button><button class="btn sm ${tab === 'outp' ? 'on' : ''}" data-a="btab" data-v="outp">New colonies${nWorlds ? ' (' + nWorlds + ')' : ''}</button><button class="btn sm ${tab === 'ship' ? 'on' : ''}" data-a="btab" data-v="ship">Ships</button></div>`;
   if (tab === 'outp') {
-    h += `<div class="tiny dim" style="padding:2px 6px 6px">Claim other worlds in this system. No ship is needed: the outpost or colony appears as soon as the project is done.</div>`;
+    h += `<div class="tiny dim" style="padding:2px 6px 6px">Interplanetary expansion within this star system: no ship needed. The outpost or settlement appears as soon as the project is done.</div>`;
     if (!nWorlds) h += `<div class="small dim" style="padding:6px">Every world in this system is already claimed.</div>`;
     const robo = ots.filter(t => HAB[habSeen(t)].cap <= 0), live = ots.filter(t => HAB[habSeen(t)].cap > 0);
     const anyQ = t => c.queue.some(x => (x.kind === 'outpost' || x.kind === 'settle') && x.id === t.id);
@@ -2315,11 +2315,13 @@ ACT.menuGo = v => {
   else if (v === 'title') { autosave(); showTitle(); }
 };
 const HELP = `<div class="small" style="line-height:1.65">
-<h3>The setting</h3><p>It is ${START_YEAR}. Humanity has never met anyone else and has just learned to travel between the stars, slowly. Nothing goes faster than light: one year passes each turn, and your first ships fly at 30% of light speed, so a star 5 light-years away takes about 17 years to reach. The map uses real nearby stars at their real positions.</p>
-<h3>Seeing</h3><p>Colonies' telescopes show where stars are within 16 light-years; ships see 4 (8 or 16 with telescope modules). You only learn what worlds orbit a star by flying a ship there. A Science Vessel can then <b>survey</b> the system to learn about life and minerals, and <b>investigate</b> strange readings (◆).</p>
-<h3>Settling</h3><p>A Colony Ship founds a colony on a world people can live on, or adds settlers to one you already have. A colony can build robotic outposts on other worlds in its own system; an Outpost Ship claims worlds at stars where you have no colony. Colonies grow over decades from Settlement to Province to Core World. Give each one a <b>focus</b> and order big <b>projects</b>. Ships can only be built at a colony with an Orbital Shipyard.</p>
-<h3>Food</h3><p>Food cannot travel between stars by itself: each star system feeds itself. Set a colony to Farming, build Agri-Domes, or run a Freighter trade route to carry food from a system with a surplus.</p>
-<h3>Danger</h3><p>A few systems hold ancient guardian machines that destroy any ship entering them. They show as ⚠ once found.</p>
+<h3>The setting</h3><p>It is ${START_YEAR}, and you run Earth's space programme. Nothing goes faster than light: one year passes each turn, and your first ships fly at 30% of light speed, so a star 5 light-years away takes about 17 years to reach. The map uses real nearby stars at their real positions.</p>
+<h3>Earth and the space budget</h3><p>Earth gives a share of its economy to space, shown on Earth's screen. It moves with events and some technologies. Earth only builds space projects, like ships and orbital structures.</p>
+<h3>Exploring</h3><p>Colonies see star positions within 16 light-years, ships within 4 (8 or 16 with telescope modules). What orbits a star stays unknown until a ship visits. Scouts are fast explorers with an auto-explore button; Science Vessels <b>survey</b> systems for life and minerals and <b>investigate</b> strange readings (◆).</p>
+<h3>Settling</h3><p>Colony and Outpost Ships travel between stars. Within your own star systems, use a colony's <b>New colonies</b> tab instead: no ship needed. Settlements grow to Province, then Core World, and <b>projects</b> improve them. <b>Ships</b> need an Orbital Dock (light hulls) or a Shipyard (all hulls).</p>
+<h3>What's shared</h3><p>Production stays with each colony. Research and credits go into one empire-wide total. Food is shared by everything at the same star. Outposts can send their production to a colony in their system.</p>
+<h3>Freighters</h3><p>A trade route between two of your systems carries settlers and food out and brings trade back. Short routes pay best.</p>
+<h3>Staying on top</h3><p>The top-bar button points to idle colonies, then idle research, then idle ships.</p>
 <h3>Map controls</h3><p>Drag to rotate, right-drag or Shift-drag to pan, scroll to zoom. Stars sit on pins above or below a flat reference plane through the Sun. Click a star or ship; with a ship selected, click a star to send it.</p>
 <h3>Keys</h3><p>Enter: end the year · F: skip ahead until something happens · R: research · D: ship design · C: colonies · J: journal · Esc: close</p></div>`;
 ACT.openHelp = () => modal({title: 'How to play', w: 760, body: HELP, foot: `<button class="btn primary" data-a="mclose">Got it</button>`});

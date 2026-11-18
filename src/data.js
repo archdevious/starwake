@@ -1,6 +1,6 @@
 'use strict';
 // ===================== STARWAKE v2 — STATIC DATA =====================
-const GAME_VERSION = 13;
+const GAME_VERSION = 14;
 const SAVE_FORMAT = 2;
 const START_YEAR = 2326;
 const LENGTHS = {
@@ -94,7 +94,7 @@ const MODULES = {
   lab:     {name: 'Science Lab',      mass: 1, cost: 40,  desc: 'Surveys systems and investigates anomalies.'},
   colony:  {name: 'Colony Pod',       mass: 4, cost: 120, desc: 'Carries 20,000 settlers to found or grow a colony (twice as many with Hibernation). Needs a medium or heavy hull.'},
   outpost: {name: 'Outpost Kit',      mass: 2, cost: 80,  desc: 'Builds a robotic outpost on almost any world, for star systems where we have no colony. Where we already have a colony, order an outpost from that colony instead: it costs far less.'},
-  booster: {name: 'Booster',          mass: 0, cost: 20,  desc: '+10% of light speed (30% becomes 40%). Only one Booster counts. Light hulls only.'},
+  booster: {name: 'Booster',          mass: 1, cost: 20,  desc: '+10% of light speed (30% becomes 40%). Only one Booster counts. Light hulls only.'},
   cargo:   {name: 'Cargo Bay',        mass: 2, cost: 40,  desc: 'Each trip carries 10,000 settlers and 10 food from your colonies, and brings trade back on a trade route. Needs a medium or heavy hull.'},
 };
 const DEFAULT_DESIGNS = [

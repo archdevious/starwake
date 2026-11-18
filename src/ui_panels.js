@@ -136,9 +136,9 @@ function colonyPanel(b) {
   const tab = UI.buildTab;
   const ots = outpostTargets(b), sts = settleTargets(b), ownOut = sts.filter(t => t.owner === 0);
   const nWorlds = ots.length + ownOut.length;
-  h += `<div class="row" style="margin:8px 0 4px;gap:4px"><button class="btn sm ${tab === 'proj' ? 'on' : ''}" data-a="btab" data-v="proj">Projects</button><button class="btn sm ${tab === 'outp' ? 'on' : ''}" data-a="btab" data-v="outp">Worlds${nWorlds ? ' (' + nWorlds + ')' : ''}</button><button class="btn sm ${tab === 'ship' ? 'on' : ''}" data-a="btab" data-v="ship">Ships</button></div>`;
+  h += `<div class="row" style="margin:8px 0 4px;gap:4px"><button class="btn sm ${tab === 'proj' ? 'on' : ''}" data-a="btab" data-v="proj">Projects</button><button class="btn sm ${tab === 'outp' ? 'on' : ''}" data-a="btab" data-v="outp">New colonies${nWorlds ? ' (' + nWorlds + ')' : ''}</button><button class="btn sm ${tab === 'ship' ? 'on' : ''}" data-a="btab" data-v="ship">Ships</button></div>`;
   if (tab === 'outp') {
-    h += `<div class="tiny dim" style="padding:2px 6px 6px">Claim other worlds in this system. No ship is needed: the outpost or colony appears as soon as the project is done.</div>`;
+    h += `<div class="tiny dim" style="padding:2px 6px 6px">Interplanetary expansion within this star system: no ship needed. The outpost or settlement appears as soon as the project is done.</div>`;
     if (!nWorlds) h += `<div class="small dim" style="padding:6px">Every world in this system is already claimed.</div>`;
     const robo = ots.filter(t => HAB[habSeen(t)].cap <= 0), live = ots.filter(t => HAB[habSeen(t)].cap > 0);
     const anyQ = t => c.queue.some(x => (x.kind === 'outpost' || x.kind === 'settle') && x.id === t.id);
