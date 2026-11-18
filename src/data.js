@@ -1,317 +1,275 @@
 'use strict';
-// ===================== STARWAKE — STATIC GAME DATA =====================
-const GAME_VERSION = 1;
-const SAVE_FORMAT = 1;
+// ===================== STARWAKE v2 — STATIC DATA =====================
+const GAME_VERSION = 2;
+const SAVE_FORMAT = 2;
+const START_YEAR = 2326;
+const LENGTHS = {
+  standard: {label: 'Standard', turns: 300, radius: 26},
+  long:     {label: 'Long',     turns: 500, radius: 35},
+};
+const COLONY_TEL = 16, SHIP_TEL = 4, DETAIL_RANGE = 1;
 
-// fert = food produced per population unit; popF = habitability factor
-const PT = {
-  gaia:     {name:'Gaia',      fert:1.5,  popF:5, color:'#4fd06b', c2:'#1f7a3a'},
-  terran:   {name:'Terran',    fert:1.25, popF:4, color:'#4a9be0', c2:'#2e7d3a'},
-  ocean:    {name:'Ocean',     fert:1.25, popF:4, color:'#2f6fd8', c2:'#123a80'},
-  jungle:   {name:'Jungle',    fert:1.0,  popF:3, color:'#5f9a3a', c2:'#2a4a14'},
-  arid:     {name:'Arid',      fert:0.75, popF:3, color:'#d0a060', c2:'#7a5426'},
-  tundra:   {name:'Tundra',    fert:0.75, popF:3, color:'#c4d4e0', c2:'#6a8090'},
-  desert:   {name:'Desert',    fert:0.5,  popF:2, color:'#e3bc66', c2:'#9a6a24'},
-  barren:   {name:'Barren',    fert:0,    popF:1, color:'#9a948c', c2:'#4a4642'},
-  toxic:    {name:'Toxic',     fert:0,    popF:0, hostile:true, color:'#9fcf3a', c2:'#4a6a10'},
-  radiated: {name:'Radiated',  fert:0,    popF:0, hostile:true, color:'#c25ae0', c2:'#5a1a70'},
-  molten:   {name:'Molten',    fert:0,    popF:0, hostile:true, color:'#e8582e', c2:'#7a1a08'},
-  gasgiant: {name:'Gas Giant', fert:0,    popF:0, outpostOnly:true, color:'#d6b088', c2:'#8a5a3a'},
-  asteroids:{name:'Asteroid Belt', fert:0, popF:0, outpostOnly:true, color:'#8a8a8a', c2:'#444'},
+// ---------- Planets ----------
+const PCLASS = {
+  rocky:       {name: 'Rocky world',   solid: true},
+  superearth:  {name: 'Super-Earth',   solid: true},
+  ocean:       {name: 'Ocean world',   solid: true},
+  ice:         {name: 'Ice world',     solid: true},
+  molten:      {name: 'Molten world',  solid: true, burning: true},
+  minineptune: {name: 'Mini-Neptune',  solid: false},
+  gasgiant:    {name: 'Gas giant',     solid: false},
+  icegiant:    {name: 'Ice giant',     solid: false},
+  belt:        {name: 'Asteroid belt', solid: true, belt: true},
+  moon:        {name: 'Moon',          solid: true},
+  dwarf:       {name: 'Dwarf planet',  solid: true},
 };
-const TERRAFORM = {toxic:'barren', radiated:'barren', molten:'barren', barren:'desert', desert:'arid', tundra:'arid', arid:'terran', jungle:'terran'};
-const SIZE_NAMES = ['', 'Tiny', 'Small', 'Medium', 'Large', 'Huge'];
-const SIZE_BASE = [0, 2, 4, 6, 8, 10];
-const SIZE_SLOTS = [0, 2, 3, 4, 5, 6];
-const MIN_NAMES = ['Ultra Poor', 'Poor', 'Abundant', 'Rich', 'Ultra Rich'];
-const MIN_MULT = [0.5, 0.75, 1, 1.5, 2];
-
-const STAR_TYPES = {
-  yellow: {name:'Yellow', color:'#ffe27a', w:{terran:4, ocean:3, arid:3, jungle:2, tundra:2, desert:2, barren:2, gaia:1, toxic:1, molten:1, radiated:0.5, gasgiant:3, asteroids:2}},
-  orange: {name:'Orange', color:'#ffb05a', w:{terran:2, ocean:2, arid:3, jungle:2, tundra:3, desert:3, barren:3, gaia:0.5, toxic:1, molten:1, radiated:1, gasgiant:3, asteroids:2}},
-  red:    {name:'Red',    color:'#ff6a5a', w:{terran:1, ocean:1, tundra:4, barren:4, desert:2, jungle:2, toxic:2, radiated:1, molten:0.5, gasgiant:2, asteroids:2}},
-  white:  {name:'White',  color:'#eef4ff', w:{terran:2, ocean:3, tundra:3, barren:3, arid:2, desert:2, radiated:2, toxic:2, molten:1, jungle:1, gasgiant:3, asteroids:2}},
-  blue:   {name:'Blue',   color:'#7fb2ff', w:{molten:4, radiated:4, toxic:2, barren:3, desert:1, arid:1, terran:0.5, gasgiant:3, asteroids:3}},
+const TEMPS = {scorching: 'Scorching', hot: 'Hot', temperate: 'Temperate', cold: 'Cold', frozen: 'Frozen'};
+const ATMS = {none: 'No atmosphere', thin: 'Thin atmosphere', thick: 'Thick atmosphere', toxic: 'Toxic atmosphere', breathable: 'Breathable air'};
+const LIFE = {none: 'Lifeless', microbial: 'Microbial life', ecosystem: 'Diverse ecosystem'};
+const MINERALS = ['Poor', 'Average', 'Rich'];
+const MIN_MULT = [0.6, 1, 1.5];
+const TRAITS = {
+  locked:   {name: 'Tidally locked', desc: 'One side always faces the star'},
+  flares:   {name: 'Flare star', desc: 'Its red dwarf sun throws violent flares'},
+  rings:    {name: 'Rings', desc: 'A ring system'},
+  subocean: {name: 'Subsurface ocean', desc: 'Liquid water under the ice'},
+  volcanic: {name: 'Volcanic', desc: 'Active volcanoes'},
+  moons:    {name: 'Many moons', desc: 'A large family of moons'},
 };
-const STAR_FREQ = {yellow:3, orange:3, red:4, white:2, blue:1};
-
-const PSPECIAL = {
-  gold:      {name:'Gold Deposits',     desc:'+5 credits per turn'},
-  gems:      {name:'Crystal Veins',     desc:'+8 credits per turn'},
-  artifacts: {name:'Precursor Ruins',   desc:'+5 research per turn; the first colony here uncovers a free tech'},
-  fertile:   {name:'Fertile Soil',      desc:'+0.5 food per population'},
+// habitability for humans: label, pop capacity per size (millions), food per stage unit, growth rate
+const HAB = {
+  garden:  {name: 'Garden world', cap: 400, fert: 2,   grow: 0.045, color: '#5be08a', desc: 'Humans can walk outside'},
+  livable: {name: 'Livable',      cap: 60,  fert: 1,   grow: 0.04,  color: '#9fd86a', desc: 'Pressure suits outdoors, open towns under domes'},
+  harsh:   {name: 'Harsh',        cap: 10,  fert: 0.5, grow: 0.03,  color: '#ffcf4a', desc: 'Sealed cities, greenhouse farming'},
+  hostile: {name: 'Hostile',      cap: 1.5, fert: 0.3, grow: 0.022, color: '#ff9f43', desc: 'Small domed or buried habitats'},
+  outpost: {name: 'Outposts only',cap: 0,   fert: 0,   grow: 0,     color: '#8a94aa', desc: 'Robotic mining outposts only'},
+  none:    {name: 'Uninhabitable',cap: 0,   fert: 0,   grow: 0,     color: '#ff5d5d', desc: 'Nothing can be built here'},
 };
-
-const RACES = [
-  {id:'human',    name:'Terran Concord',     species:'Humans',   icon:'human',  bc:1.3, diplo:20,
-    desc:'Adaptable traders and diplomats. +30% credits; other empires like them more.'},
-  {id:'vashari',  name:'Vashari Collective', species:'Vashari',  icon:'vashari', research:1.5, attack:-1,
-    desc:'Brilliant, frail scientists. +50% research, -1 ship attack.'},
-  {id:'thrunn',   name:'Thrunn Hive',        species:'Thrunn',   icon:'thrunn', prodPop:0.5, growth:1.25, research:0.8, aggressive:1.3,
-    desc:'Tireless insectoid workers. +0.5 production per population, +25% growth, -20% research.'},
-  {id:'ixari',    name:'Ixari Dominion',     species:'Ixari',    icon:'ixari', attack:2, ground:1.5, aggressive:1.6,
-    desc:'Born hunters. +2 ship attack, +50% ground troop strength.'},
-  {id:'ondine',   name:'Ondine Tides',       species:'Ondine',   icon:'ondine', aquatic:true, foodPop:0.25,
-    desc:'Amphibious. Ocean and Jungle worlds are paradise to them; +0.25 food per population.'},
-  {id:'groak',    name:'Groak Monolith',     species:'Groak',    icon:'groak', lithovore:true, growth:0.6, aggressive:1.1,
-    desc:'Silicon rock-eaters. Need no food and can live on any solid world, even hostile ones. -40% growth.'},
-  {id:'myrrhine', name:'Myrrhine Aerie',     species:'Myrrhine', icon:'myrrhine', creative:true, research:0.85,
-    desc:'Creative avians. Learn EVERY option in a tech tier at once. -15% research.'},
-  {id:'selari',   name:'Selari Mind',        species:'Selari',   icon:'selari', defense:1, ground:2, bc:1.1, research:0.9,
-    desc:'Telepaths. +1 ship defense, double ground troop strength, +10% credits, -10% research.'},
-];
-const RACE = {}; RACES.forEach(r => RACE[r.id] = r);
-const EMP_COLORS = ['#4aa8ff', '#ff5a5a', '#5ad76a', '#ffd23f', '#c77dff', '#ff9f43', '#2ee6d6', '#ff6fb5'];
-
-// ---------- Ship components ----------
-const HULLS = {
-  corvette:   {name:'Corvette',    space:25,  hp:8,   cost:10,  def:2,  armorMult:1,   cspeed:5, size:1, tech:null},
-  destroyer:  {name:'Destroyer',   space:60,  hp:20,  cost:30,  def:1,  armorMult:2.5, cspeed:4, size:2, tech:null},
-  cruiser:    {name:'Cruiser',     space:120, hp:40,  cost:60,  def:0,  armorMult:5,   cspeed:4, size:3, tech:'hull_cruiser', drydock:true},
-  battleship: {name:'Battleship',  space:250, hp:80,  cost:120, def:-1, armorMult:10,  cspeed:3, size:4, tech:'hull_battleship', drydock:true},
-  dreadnought:{name:'Dreadnought', space:500, hp:160, cost:250, def:-2, armorMult:20,  cspeed:3, size:5, tech:'hull_dreadnought', drydock:true},
+const HAB_ORDER = ['none', 'outpost', 'hostile', 'harsh', 'livable', 'garden'];
+// colony stages
+const STAGES = {
+  outpost:    {name: 'Outpost',    prod: 1,  rp: 0.5, bc: 0.5, food: 0,  eat: 0},
+  settlement: {name: 'Settlement', prod: 2,  rp: 1,   bc: 1,   food: 1,  eat: 1},
+  city:       {name: 'City',       prod: 6,  rp: 4,   bc: 4,   food: 4,  eat: 4},
+  core:       {name: 'Core World', prod: 15, rp: 10,  bc: 10,  food: 10, eat: 10},
+  home:       {name: 'Homeworld',  prod: 40, rp: 25,  bc: 30,  food: 30, eat: 40},
 };
-const HULL_ORDER = ['corvette', 'destroyer', 'cruiser', 'battleship', 'dreadnought'];
-const ARMOR = [
-  {name:'Composite Plate', hp:5,  tech:null},
-  {name:'Ceramite Plate',  hp:10, tech:'ceramite_armor'},
-  {name:'Lattice Armor',   hp:18, tech:'lattice_armor'},
-  {name:'Voidsteel Armor', hp:30, tech:'voidsteel_armor'},
-];
-const SHIELDS = [
-  {name:'None', val:0, tech:null},
-  {name:'Barrier Mk 1', val:1, tech:'barrier_1'},
-  {name:'Barrier Mk 2', val:2, tech:'barrier_2'},
-  {name:'Barrier Mk 3', val:3, tech:'barrier_3'},
-  {name:'Barrier Mk 4', val:5, tech:'barrier_4'},
-  {name:'Barrier Mk 5', val:7, tech:'barrier_5'},
-];
-const COMPUTERS = [
-  {name:'None', val:0, tech:null},
-  {name:'Targeting Array Mk 1', val:1, tech:'targeting_1'},
-  {name:'Targeting Array Mk 2', val:2, tech:'targeting_2'},
-  {name:'Targeting Array Mk 3', val:3, tech:'targeting_3'},
-  {name:'Targeting Array Mk 4', val:4, tech:'targeting_4'},
-  {name:'Targeting Array Mk 5', val:5, tech:'targeting_5'},
-];
-const DRIVES = [
-  {name:'Chemical Thrusters', speed:2, tech:null},
-  {name:'Ion Drive',          speed:3, tech:'ion_drive'},
-  {name:'Fusion Drive',       speed:4, tech:'fusion_drive'},
-  {name:'Fold Drive',         speed:5, tech:'fold_drive'},
-  {name:'Lightwake Drive',    speed:6, tech:'lightwake_drive'},
-  {name:'Starwake Drive',     speed:8, tech:'starwake_drive'},
-];
-const WEAPONS = {
-  pulse_laser:     {name:'Pulse Laser',       type:'beam',    dmg:[1,4],   range:5, space:10, cost:3,  tech:null,                 color:'#ff4a4a'},
-  railgun:         {name:'Railgun',           type:'beam',    dmg:[2,6],   range:6, space:12, cost:4,  tech:'railgun',            color:'#ffd060'},
-  ion_lance:       {name:'Ion Lance',         type:'beam',    dmg:[3,9],   range:6, space:14, cost:6,  tech:'ion_lance',          color:'#5ad1ff'},
-  graviton_shear:  {name:'Graviton Shear',    type:'beam',    dmg:[5,14],  range:6, space:16, cost:8,  tech:'graviton_shear',     color:'#b070ff'},
-  plasma_torrent:  {name:'Plasma Torrent',    type:'beam',    dmg:[7,20],  range:5, space:20, cost:12, tech:'plasma_torrent',     color:'#40ff90'},
-  singularity:     {name:'Singularity Cannon',type:'beam',    dmg:[10,30], range:7, space:24, cost:16, tech:'singularity_cannon', color:'#ff70ff'},
-  fission_rocket:  {name:'Fission Rocket',    type:'missile', dmg:[5,5],   range:9, space:8,  cost:3,  tech:null,                 color:'#ffffff', ammo:3},
-  hunter_missile:  {name:'Hunter Missile',    type:'missile', dmg:[8,8],   range:10,space:10, cost:5,  tech:'hunter_missile',     color:'#ffffff', ammo:3},
-  swarm_torpedo:   {name:'Swarm Torpedo',     type:'missile', dmg:[14,14], range:10,space:14, cost:8,  tech:'swarm_torpedo',      color:'#a0d0ff', ammo:3},
-  nova_torpedo:    {name:'Nova Torpedo',      type:'missile', dmg:[26,26], range:11,space:18, cost:12, tech:'nova_torpedo',       color:'#ffa0ff', ammo:3},
+const STAGE_ORDER = ['outpost', 'settlement', 'city', 'core', 'home'];
+const FOCUS = {
+  balanced: {name: 'Balanced', desc: 'No specialty'},
+  industry: {name: 'Industry', desc: '+75% production, -20% research and credits'},
+  science:  {name: 'Science',  desc: '+75% research, -20% production and credits'},
+  trade:    {name: 'Trade',    desc: '+75% credits, -20% production and research'},
+  farming:  {name: 'Farming',  desc: 'Double food, -20% production, research and credits'},
 };
-// modules: space is a fraction of hull space
-const MODULES = {
-  thrusters: {name:'Combat Thrusters', space:0.10, cost:0.15, tech:null,           desc:'+2 movement in battle'},
-  plating:   {name:'Extra Plating',    space:0.15, cost:0.15, tech:null,           desc:'+50% armor hit points'},
-  troopbay:  {name:'Troop Bay',        space:0.20, cost:0.10, tech:null,           desc:'Carries 2 marines per ship for invasions'},
-  ecm:       {name:'ECM Jammer',       space:0.10, cost:0.20, tech:'ecm_suite',    desc:'Missiles fired at this ship are 30% less likely to hit'},
-  drones:    {name:'Repair Drones',    space:0.15, cost:0.25, tech:'nanite_repair',desc:'Repairs 10% of hit points each battle round'},
-};
-const SPECIAL_SHIPS = {
-  scout:     {name:'Scout',           cost:15,  hp:6,  cspeed:6, desc:'Fast explorer with long-range sensors.'},
-  colony:    {name:'Colony Ship',     cost:110, hp:12, cspeed:3, desc:'Founds a new colony of 1 population on a habitable world.'},
-  outpost:   {name:'Outpost Ship',    cost:45,  hp:8,  cspeed:3, desc:'Claims any planet, including gas giants and asteroid belts. Extends fuel range.'},
-  transport: {name:'Troop Transport', cost:40,  hp:16, cspeed:4, desc:'Carries 4 marines to invade enemy colonies.'},
-};
-
-// ---------- Buildings (each uses one building slot) ----------
-// e: effects. Pop = per population unit. All descriptions are generated from effects.
-const BUILDINGS = {
-  shipyard:         {name:'Shipyard',          cost:60,  up:1, e:{shipyard:1},                cat:'military', tech:null},
-  foundry:          {name:'Foundry',           cost:50,  up:1, e:{prodPop:0.5, prodFlat:2},   cat:'industry', tech:null},
-  research_station: {name:'Research Station',  cost:50,  up:1, e:{rpPop:0.5, rpFlat:2},       cat:'science',  tech:null},
-  market:           {name:'Market',            cost:50,  up:0, e:{bcPop:0.5, bcFlat:2},       cat:'trade',    tech:null},
-  hydroponic_bays:  {name:'Hydroponic Bays',   cost:50,  up:1, e:{foodFlat:3},                cat:'food',     tech:null},
-  orbital_smelter:  {name:'Orbital Smelter',   cost:120, up:2, e:{prodPop:0.75, prodFlat:3},  cat:'industry', tech:'orbital_smelter'},
-  core_tap:         {name:'Core Tap',          cost:260, up:3, e:{prodPop:1, prodFlat:6},     cat:'industry', tech:'core_tap'},
-  xeno_lab:         {name:'Xeno Laboratory',   cost:120, up:2, e:{rpPop:0.75, rpFlat:3},      cat:'science',  tech:'xeno_lab'},
-  quantum_archive:  {name:'Quantum Archive',   cost:260, up:3, e:{rpPop:1, rpFlat:6},         cat:'science',  tech:'quantum_archive'},
-  exchange_spire:   {name:'Exchange Spire',    cost:120, up:1, e:{bcPop:0.75, bcFlat:3},      cat:'trade',    tech:'exchange_spire'},
-  free_port:        {name:'Free Port',         cost:220, up:1, e:{bcPop:1, bcFlat:6},         cat:'trade',    tech:'free_port'},
-  agri_domes:       {name:'Agri-Domes',        cost:90,  up:1, e:{foodPop:0.5},               cat:'food',     tech:'agri_domes', fertile:true},
-  weather_grid:     {name:'Weather Grid',      cost:160, up:2, e:{foodPop:0.5},               cat:'food',     tech:'weather_grid', fertile:true},
-  protein_vats:     {name:'Protein Vats',      cost:160, up:2, e:{foodFlat:8},                cat:'food',     tech:'protein_vats'},
-  habitat_ring:     {name:'Habitat Ring',      cost:90,  up:1, e:{maxPop:3},                  cat:'growth',   tech:'habitat_ring'},
-  clone_vats:       {name:'Clone Vats',        cost:90,  up:1, e:{growth:1},                  cat:'growth',   tech:'clone_vats'},
-  arcology:         {name:'Arcology',          cost:220, up:2, e:{maxPop:6},                  cat:'growth',   tech:'arcology'},
-  drydock:          {name:'Drydock',           cost:150, up:2, e:{drydock:1},                 cat:'military', tech:'drydock'},
-  barracks:         {name:'Barracks',          cost:60,  up:1, e:{troops:6},                  cat:'military', tech:'barracks'},
-  defense_battery:  {name:'Defense Battery',   cost:100, up:1, e:{defN:4, defHp:40},          cat:'defense',  tech:'defense_battery'},
-  orbital_bastion:  {name:'Orbital Bastion',   cost:180, up:2, e:{defN:8, defHp:100},         cat:'defense',  tech:'orbital_bastion'},
-  planetary_citadel:{name:'Planetary Citadel', cost:340, up:3, e:{defN:16, defHp:260},        cat:'defense',  tech:'planetary_citadel'},
-  shield_lattice:   {name:'Shield Lattice',    cost:100, up:1, e:{shield:3},                  cat:'defense',  tech:'shield_lattice'},
-  aegis_dome:       {name:'Aegis Dome',        cost:220, up:2, e:{shield:8},                  cat:'defense',  tech:'aegis_dome'},
-};
-const BLD_CAT = {industry:'#ffb84a', science:'#5ad1ff', trade:'#ffe060', food:'#5be08a', growth:'#c77dff', military:'#ff7a5a', defense:'#ff5d8a'};
-function effText(e) {
-  const out = [];
-  const pp = (v, w) => (v > 0 ? '+' : '') + v + ' ' + w;
-  if (e.prodPop || e.prodFlat) out.push([e.prodPop ? pp(e.prodPop, 'production per pop') : '', e.prodFlat ? pp(e.prodFlat, 'production') : ''].filter(Boolean).join(', '));
-  if (e.rpPop || e.rpFlat) out.push([e.rpPop ? pp(e.rpPop, 'research per pop') : '', e.rpFlat ? pp(e.rpFlat, 'research') : ''].filter(Boolean).join(', '));
-  if (e.bcPop || e.bcFlat) out.push([e.bcPop ? pp(e.bcPop, 'credits per pop') : '', e.bcFlat ? pp(e.bcFlat, 'credits') : ''].filter(Boolean).join(', '));
-  if (e.foodPop) out.push(pp(e.foodPop, 'food per pop (fertile worlds only)'));
-  if (e.foodFlat) out.push(pp(e.foodFlat, 'food'));
-  if (e.maxPop) out.push(pp(e.maxPop, 'max population'));
-  if (e.growth) out.push('+100% population growth');
-  if (e.shipyard) out.push('Builds ships here; fully repairs fleets in orbit');
-  if (e.drydock) out.push('Allows Cruiser and larger hulls to be built here (needs a Shipyard)');
-  if (e.troops) out.push(pp(e.troops, 'defending marines'));
-  if (e.defN) out.push('Defense guns: ' + e.defN + ' mounts of your best beam weapon, ' + e.defHp + ' hit points');
-  if (e.shield) out.push('Planet defenses ignore ' + e.shield + ' damage from every hit');
-  return out.join('. ');
-}
 const PROJECTS = {
-  terraform: {name:'Terraforming',        tech:'terraforming',        desc:'Improve this planet one step toward Terran (more population and food)'},
-  gaia:      {name:'Gaia Transformation', tech:'gaia_transformation', desc:'Turn a Terran or Ocean world into a Gaia paradise'},
+  shipyard:    {name: 'Orbital Shipyard',     cost: 150, stage: 'settlement', desc: 'This colony can build ships.'},
+  mines:       {name: 'Deep Mines',           cost: 180, stage: 'settlement', desc: '+50% production here.'},
+  campus:      {name: 'Research Campus',      cost: 180, stage: 'settlement', desc: '+50% research here.'},
+  tradeport:   {name: 'Trade Port',           cost: 180, stage: 'settlement', desc: '+50% credits here.'},
+  agridomes:   {name: 'Agri-Domes',           cost: 120, stage: 'settlement', desc: '+3 food, plus 3 more for each stage above Settlement.'},
+  habitat:     {name: 'Habitat Expansion',    cost: 250, stage: 'settlement', desc: '+50% population capacity here.'},
+  elevator:    {name: 'Space Elevator',       cost: 400, stage: 'city', tech: 'space_elevator', desc: 'Ships built here cost 25% less.'},
+  observatory: {name: 'Deep Sky Observatory', cost: 300, stage: 'settlement', tech: 'deep_sky', desc: 'Telescopes here see 24 light-years instead of 16.'},
+  terraform:   {name: 'Terraforming',         cost: 600, stage: 'settlement', tech: 'terraforming', repeat: true, desc: 'Improves habitability one step (Hostile → Harsh → Livable → Garden). Destroys any native ecosystem.'},
 };
 
-// ---------- Technology ----------
-const FIELDS = [
-  {id:'eng', name:'Engineering', color:'#e8a84a', tiers:[
-    {cost:60,   opts:['orbital_smelter', 'defense_battery']},
-    {cost:150,  opts:['ceramite_armor', 'reinforced_frames'], bonus:['hull_cruiser', 'drydock']},
-    {cost:300,  opts:['orbital_bastion', 'arcology']},
-    {cost:520,  opts:['lattice_armor', 'hardened_colonies'], bonus:['hull_battleship']},
-    {cost:850,  opts:['core_tap', 'planetary_citadel']},
-    {cost:1300, opts:['voidsteel_armor', 'bastion_frames'], bonus:['hull_dreadnought']},
+// ---------- Ships ----------
+const HULLS = {
+  light:  {name: 'Light hull',  mass: 1, cost: 20,  slots: 2},
+  medium: {name: 'Medium hull', mass: 3, cost: 50,  slots: 3},
+  heavy:  {name: 'Heavy hull',  mass: 6, cost: 110, slots: 5},
+};
+const MODULES = {
+  tel_m:   {name: 'Medium Telescope', mass: 1, cost: 25,  desc: 'Telescope range 8 light-years (instead of 4).'},
+  tel_l:   {name: 'Large Telescope',  mass: 3, cost: 90,  desc: 'Telescope range 16 light-years.'},
+  lab:     {name: 'Science Lab',      mass: 1, cost: 40,  desc: 'Surveys systems and investigates anomalies.'},
+  colony:  {name: 'Colony Pod',       mass: 4, cost: 120, desc: 'Carries 20,000 settlers to found or grow a colony (twice as many with Hibernation).'},
+  outpost: {name: 'Outpost Kit',      mass: 2, cost: 50,  desc: 'Builds a robotic mining outpost on any world, even gas giants.'},
+  cargo:   {name: 'Cargo Bay',        mass: 2, cost: 40,  desc: 'Carries 4 food or 2,000 settlers per trip on a trade route.'},
+};
+const DEFAULT_DESIGNS = [
+  {id: 'scout',    name: 'Scout',          hull: 'light',  mods: ['tel_m']},
+  {id: 'science',  name: 'Science Vessel', hull: 'light',  mods: ['lab', 'tel_m']},
+  {id: 'colony',   name: 'Colony Ship',    hull: 'medium', mods: ['colony']},
+  {id: 'outposter',name: 'Outpost Ship',   hull: 'light',  mods: ['outpost']},
+  {id: 'freighter',name: 'Freighter',      hull: 'medium', mods: ['cargo', 'cargo']},
+];
+const DRIVE_SPEEDS = [0.30, 0.40, 0.55, 0.70, 0.85, 0.95, 0.9999];
+const DRIVE_TECH = [null, 'fusion_torch', 'antimatter_catalysis', 'laser_sails', 'antimatter_drive', 'relativistic', 'near_light'];
+
+// ---------- Research ----------
+const FIELDS = {prop: {name: 'Propulsion', color: '#5ac8ff'}, sens: {name: 'Sensors', color: '#d07aff'}, bio: {name: 'Biology', color: '#6ae07a'},
+  eng: {name: 'Engineering', color: '#e8a84a'}, phys: {name: 'Physics', color: '#ff7a7a'}, soc: {name: 'Society', color: '#ffd860'}};
+const TECHS = [
+  {id: 'fusion_torch', f: 'prop', cost: 200, req: [], name: 'Fusion Torch Drive', desc: 'Top speed 40% of light speed.'},
+  {id: 'antimatter_catalysis', f: 'prop', cost: 550, req: ['fusion_torch'], name: 'Antimatter-Catalysed Fusion', desc: 'Top speed 55% of light speed.'},
+  {id: 'laser_sails', f: 'prop', cost: 1100, req: ['antimatter_catalysis', 'orbital_construction'], name: 'Laser Sail Network', desc: 'Top speed 70% of light speed.'},
+  {id: 'antimatter_drive', f: 'prop', cost: 2000, req: ['laser_sails', 'antimatter_production'], name: 'Antimatter Drive', desc: 'Top speed 85% of light speed.'},
+  {id: 'relativistic', f: 'prop', cost: 3400, req: ['antimatter_drive'], name: 'Relativistic Flight', desc: 'Top speed 95% of light speed.'},
+  {id: 'near_light', f: 'prop', cost: 5600, req: ['relativistic', 'exotic_matter'], name: 'Near-Light Drive', desc: 'Top speed 99.99% of light speed.'},
+  {id: 'survey_drones', f: 'sens', cost: 250, req: [], name: 'Survey Drones', desc: 'System surveys take 1 year instead of 3.'},
+  {id: 'biosignatures', f: 'sens', cost: 650, req: ['survey_drones'], name: 'Biosignature Spectroscopy', desc: 'Your telescopes show whether a known system holds life, without visiting it.'},
+  {id: 'deep_sky', f: 'sens', cost: 950, req: ['biosignatures'], name: 'Deep Sky Surveys', desc: 'Unlocks the Deep Sky Observatory project (a colony\'s telescopes reach 24 light-years).'},
+  {id: 'interferometry', f: 'sens', cost: 1700, req: ['deep_sky'], name: 'Interferometry', desc: 'Every ship and colony telescope reaches 50% farther.'},
+  {id: 'closed_ecology', f: 'bio', cost: 250, req: [], name: 'Closed Ecology', desc: 'Harsh and Hostile colonies make 50% more food.'},
+  {id: 'hibernation', f: 'bio', cost: 500, req: [], name: 'Hibernation', desc: 'Colony Pods carry 40,000 settlers instead of 20,000.'},
+  {id: 'gene_adaptation', f: 'bio', cost: 950, req: ['closed_ecology'], name: 'Genetic Adaptation', desc: 'Harsh worlds hold 50% more people and grow 50% faster.'},
+  {id: 'xenobiochem', f: 'bio', cost: 1500, req: ['gene_adaptation'], name: 'Xenobiochemistry', desc: 'Worlds whose native life is toxic to humans become fully livable, without destroying the ecosystem.'},
+  {id: 'terraforming', f: 'bio', cost: 2300, req: ['gene_adaptation', 'space_elevator'], name: 'Terraforming', desc: 'Unlocks the Terraforming project.'},
+  {id: 'longevity', f: 'bio', cost: 3000, req: ['gene_adaptation'], name: 'Longevity Treatments', desc: 'Population grows 25% faster everywhere.'},
+  {id: 'orbital_construction', f: 'eng', cost: 300, req: [], name: 'Orbital Construction', desc: 'Ships cost 15% less.'},
+  {id: 'autofactories', f: 'eng', cost: 650, req: [], name: 'Autofactories', desc: '+20% production everywhere.'},
+  {id: 'space_elevator', f: 'eng', cost: 1100, req: ['orbital_construction'], name: 'Space Elevators', desc: 'Unlocks the Space Elevator project (ships built there cost 25% less).'},
+  {id: 'arcologies', f: 'eng', cost: 1600, req: ['autofactories'], name: 'Arcologies', desc: '+25% population capacity everywhere.'},
+  {id: 'megastructures', f: 'eng', cost: 3600, req: ['space_elevator', 'arcologies'], name: 'Megastructures', desc: 'Colony projects cost 25% less.'},
+  {id: 'quantum_computing', f: 'phys', cost: 400, req: [], name: 'Quantum Computing', desc: '+15% research everywhere.'},
+  {id: 'antimatter_production', f: 'phys', cost: 1300, req: ['quantum_computing'], name: 'Antimatter Production', desc: '+10% production everywhere; needed for antimatter drives.'},
+  {id: 'exotic_matter', f: 'phys', cost: 3200, req: ['antimatter_production'], name: 'Exotic Matter', desc: 'The physics needed for near-light flight, and perhaps one day more.'},
+  {id: 'interstellar_commerce', f: 'soc', cost: 300, req: [], name: 'Interstellar Commerce', desc: '+20% credits; Cargo Bays carry twice as much.'},
+  {id: 'colonial_charter', f: 'soc', cost: 550, req: [], name: 'Colonial Charters', desc: 'Settlements grow 50% faster.'},
+  {id: 'unified_science', f: 'soc', cost: 1300, req: ['quantum_computing'], name: 'Unified Science Academy', desc: '+20% research everywhere.'},
+  {id: 'xenology', f: 'soc', cost: 1800, req: ['biosignatures'], name: 'Xenology', desc: 'Anomalies give 50% more research.'},
+];
+const TECH = {}; TECHS.forEach(t => TECH[t.id] = t);
+// breakthroughs: only found by exploring
+const BREAKTHROUGHS = {
+  bt_alloys:   {name: 'Precursor Alloys',          desc: 'Lighter hulls: every ship flies 10% closer to your top speed.'},
+  bt_genome:   {name: 'Alien Genome Library',      desc: 'Colonies on worlds with native life grow 25% faster.'},
+  bt_lensing:  {name: 'Stellar Lensing',           desc: 'Every telescope reaches 4 light-years farther.'},
+  bt_exotic:   {name: 'Exotic Matter Sample',      desc: 'Exotic Matter research costs half as much.'},
+  bt_seeds:    {name: 'Cryo-Seed Vault',           desc: 'Agri-Domes produce twice as much food.'},
+  bt_signal:   {name: 'Mathematics of the Signal', desc: '+15% research everywhere.'},
+  bt_machines: {name: 'Guardian Machine Logic',    desc: 'Your ships sense guardian machines from 4 light-years away and stop before entering their systems.'},
+  bt_fusion:   {name: 'Stellar Fusion Insight',    desc: '+15% production everywhere.'},
+};
+for (const k in BREAKTHROUGHS) TECH[k] = Object.assign({id: k, f: 'bt', cost: 0, req: [], breakthrough: true}, BREAKTHROUGHS[k]);
+
+// ---------- Backstory (2026–2326) ----------
+const ERAS = [
+  {years: '2026–2101', name: 'The Crisis Century', q: 'How did humanity get through its own crises?', opts: [
+    {id: 'green', name: 'The Green Accord', text: 'Nations bound themselves to repair the planet. Earth emerged cleaner, fertile and crowded with life.', fx: ['+20 food on Earth', 'Population grows 10% faster']},
+    {id: 'fortress', name: 'Fortress Nations', text: 'Walls went up and every bloc built for itself. Industry boomed; billions were lost along the way.', fx: ['+15% production', 'Earth starts with 1.5 billion fewer people']},
+    {id: 'corporate', name: 'Corporate Ascendancy', text: 'Megacorporations filled the gaps governments left. Wealth flowed, unevenly.', fx: ['+25% credits', '+300 starting credits']},
   ]},
-  {id:'prop', name:'Propulsion', color:'#5ac8ff', tiers:[
-    {cost:50,   opts:['ion_drive', 'fuel_cells']},
-    {cost:140,  opts:['fusion_drive', 'deep_scanners']},
-    {cost:300,  opts:['fold_drive', 'subspace_tanks']},
-    {cost:520,  opts:['lightwake_drive', 'vector_thrusters']},
-    {cost:850,  opts:['starwake_drive', 'phase_dampers']},
+  {years: '2101–2176', name: 'Leaving the Cradle', q: 'How did we spread through the Solar System?', opts: [
+    {id: 'moonmars', name: 'The Moon and Mars', text: 'Lunar mining towns and the domes of Mars became humanity\'s first homes beyond Earth.', fx: ['Start with Settlements on the Moon and Mars']},
+    {id: 'belt', name: 'The Belt Rush', text: 'Prospectors swarmed the asteroid belt and Ceres became its capital.', fx: ['Start with a Settlement on Ceres and a mining outpost in the belt', '+10% production']},
+    {id: 'venus', name: 'Cloud Cities of Venus', text: 'Floating cities drift in Venus\' upper air, where pressure and temperature feel almost like home.', fx: ['Start with a City floating above Venus', '+10% research']},
   ]},
-  {id:'wpn', name:'Weapons', color:'#ff6060', tiers:[
-    {cost:60,   opts:['railgun', 'hunter_missile']},
-    {cost:150,  opts:['ion_lance', 'assault_armor']},
-    {cost:300,  opts:['graviton_shear', 'swarm_torpedo']},
-    {cost:520,  opts:['plasma_torrent', 'heavy_mounts']},
-    {cost:850,  opts:['nova_torpedo', 'drop_pods']},
-    {cost:1300, opts:['singularity_cannon', 'fire_control_ai']},
+  {years: '2176–2251', name: 'The Great Divide', q: 'How did humanity organise itself?', opts: [
+    {id: 'unity', name: 'Unity', text: 'A single world government, slow but steady.', fx: ['+15% credits', 'Population grows 10% faster']},
+    {id: 'fracture', name: 'Fracture', text: 'Rival blocs raced each other outward, all the way to Saturn.', fx: ['+15% production', 'Start with a Settlement on Titan']},
+    {id: 'transcend', name: 'Transcendence', text: 'Genetic and cybernetic enhancement remade what it means to be human.', fx: ['+20% research']},
   ]},
-  {id:'shd', name:'Shields', color:'#7ad0ff', tiers:[
-    {cost:60,   opts:['barrier_1', 'shield_lattice']},
-    {cost:150,  opts:['barrier_2', 'personal_shields']},
-    {cost:300,  opts:['barrier_3', 'nanite_repair']},
-    {cost:520,  opts:['barrier_4', 'aegis_dome']},
-    {cost:850,  opts:['barrier_5', 'hardlight_shields']},
-  ]},
-  {id:'bio', name:'Biology', color:'#6ae07a', tiers:[
-    {cost:50,   opts:['agri_domes', 'habitat_ring']},
-    {cost:130,  opts:['clone_vats', 'hostile_habitats']},
-    {cost:280,  opts:['weather_grid', 'terraforming']},
-    {cost:480,  opts:['protein_vats', 'gene_crafting']},
-    {cost:800,  opts:['gaia_transformation', 'hyper_growth']},
-  ]},
-  {id:'cmp', name:'Computing', color:'#d07aff', tiers:[
-    {cost:60,   opts:['xeno_lab', 'targeting_1']},
-    {cost:150,  opts:['targeting_2', 'ecm_suite']},
-    {cost:300,  opts:['quantum_archive', 'targeting_3']},
-    {cost:520,  opts:['neural_net', 'targeting_4']},
-    {cost:850,  opts:['sentient_core', 'targeting_5']},
-  ]},
-  {id:'soc', name:'Society', color:'#ffd860', tiers:[
-    {cost:60,   opts:['exchange_spire', 'xeno_relations']},
-    {cost:150,  opts:['barracks', 'civil_engineering']},
-    {cost:300,  opts:['free_port', 'galactic_bank']},
-    {cost:520,  opts:['unified_government', 'war_college']},
-    {cost:850,  opts:['imperial_charter', 'xeno_psychology']},
+  {years: '2251–2326', name: 'First Light', q: 'What was our first step toward the stars?', opts: [
+    {id: 'ark', name: 'The Ark Program', text: 'Two great colony ships stand finished in orbit, waiting for a destination.', fx: ['Start with 2 extra Colony Ships']},
+    {id: 'telescope', name: 'The Great Telescope', text: 'A telescope array spanning the Solar System has mapped the nearby stars.', fx: ['Earth\'s telescopes see 24 light-years', 'Start knowing Biosignature Spectroscopy']},
+    {id: 'probes', name: 'The Probe Swarm', text: 'Decades ago, small fast probes were launched toward the nearest stars. They are about to arrive.', fx: ['4 probes are already arriving at nearby stars']},
   ]},
 ];
-const TECH = {
-  hull_cruiser:      {name:'Cruiser Hull', desc:'Ship hull with 120 space (needs a Drydock to build).'},
-  hull_battleship:   {name:'Battleship Hull', desc:'Ship hull with 250 space (needs a Drydock).'},
-  hull_dreadnought:  {name:'Dreadnought Hull', desc:'Ship hull with 500 space (needs a Drydock).'},
-  ceramite_armor:    {name:'Ceramite Plate', desc:'Ship armor: 10 hit points per hull class.'},
-  lattice_armor:     {name:'Lattice Armor', desc:'Ship armor: 18 hit points per hull class.'},
-  voidsteel_armor:   {name:'Voidsteel Armor', desc:'Ship armor: 30 hit points per hull class.'},
-  reinforced_frames: {name:'Reinforced Frames', desc:'+25% hull hit points on all ships.'},
-  bastion_frames:    {name:'Bastion Frames', desc:'+50% hull hit points on all ships.'},
-  hardened_colonies: {name:'Hardened Colonies', desc:'+50% planet defense hit points and defending marines.'},
-  ion_drive:         {name:'Ion Drive', desc:'Fleets travel 3 parsecs per turn.'},
-  fusion_drive:      {name:'Fusion Drive', desc:'Fleets travel 4 parsecs per turn; +1 battle movement.'},
-  fold_drive:        {name:'Fold Drive', desc:'Fleets travel 5 parsecs per turn.'},
-  lightwake_drive:   {name:'Lightwake Drive', desc:'Fleets travel 6 parsecs per turn; +1 battle movement.'},
-  starwake_drive:    {name:'Starwake Drive', desc:'Fleets travel 8 parsecs per turn.'},
-  fuel_cells:        {name:'Fuel Cells', desc:'+2 parsecs fuel range.'},
-  subspace_tanks:    {name:'Subspace Tanks', desc:'+4 parsecs fuel range.'},
-  deep_scanners:     {name:'Deep Scanners', desc:'+2 sensor range for colonies and fleets.'},
-  vector_thrusters:  {name:'Vector Thrusters', desc:'+1 battle movement for all ships.'},
-  phase_dampers:     {name:'Phase Dampers', desc:'+2 defense for all ships.'},
-  railgun:           {name:'Railgun', desc:'Beam weapon: 2-6 damage, range 6.'},
-  ion_lance:         {name:'Ion Lance', desc:'Beam weapon: 3-9 damage, range 6.'},
-  graviton_shear:    {name:'Graviton Shear', desc:'Beam weapon: 5-14 damage, range 6.'},
-  plasma_torrent:    {name:'Plasma Torrent', desc:'Beam weapon: 7-20 damage, range 5.'},
-  singularity_cannon:{name:'Singularity Cannon', desc:'Beam weapon: 10-30 damage, range 7.'},
-  hunter_missile:    {name:'Hunter Missile', desc:'Missile: 8 damage, range 10, 3 volleys per battle, +10% to hit, half effect from shields.'},
-  swarm_torpedo:     {name:'Swarm Torpedo', desc:'Missile: 14 damage, range 10.'},
-  nova_torpedo:      {name:'Nova Torpedo', desc:'Missile: 26 damage, range 11.'},
-  assault_armor:     {name:'Assault Armor', desc:'+50% attacking marine strength.'},
-  heavy_mounts:      {name:'Heavy Mounts', desc:'+25% damage for all ship and planet weapons.'},
-  drop_pods:         {name:'Drop Pods', desc:'Troop Transports carry 8 marines instead of 4.'},
-  fire_control_ai:   {name:'Fire Control AI', desc:'+2 attack for ships and planets.'},
-  barrier_1:         {name:'Barrier Mk 1', desc:'Ship shield: ignores 1 damage from every hit.'},
-  barrier_2:         {name:'Barrier Mk 2', desc:'Ship shield: ignores 2 damage from every hit.'},
-  barrier_3:         {name:'Barrier Mk 3', desc:'Ship shield: ignores 3 damage from every hit.'},
-  barrier_4:         {name:'Barrier Mk 4', desc:'Ship shield: ignores 5 damage from every hit.'},
-  barrier_5:         {name:'Barrier Mk 5', desc:'Ship shield: ignores 7 damage from every hit.'},
-  personal_shields:  {name:'Personal Shields', desc:'+50% defending marine strength.'},
-  nanite_repair:     {name:'Nanite Repair', desc:'Ships repair 25% per turn anywhere. Unlocks the Repair Drones ship module.'},
-  hardlight_shields: {name:'Hardlight Shields', desc:'Ship shields block 50% more damage.'},
-  hostile_habitats:  {name:'Hostile Habitats', desc:'Toxic, Radiated and Molten worlds can be colonized (small populations).'},
-  terraforming:      {name:'Terraforming', desc:'Project: improve a planet one step toward Terran.'},
-  gene_crafting:     {name:'Gene Crafting', desc:'+2 max population on every colony.'},
-  gaia_transformation:{name:'Gaia Transformation', desc:'Project: turn Terran or Ocean worlds into Gaia worlds.'},
-  hyper_growth:      {name:'Hyper-Growth', desc:'+50% population growth and +3 max population on every colony.'},
-  targeting_1:       {name:'Targeting Array Mk 1', desc:'Ship computer: +1 attack.'},
-  targeting_2:       {name:'Targeting Array Mk 2', desc:'Ship computer: +2 attack.'},
-  targeting_3:       {name:'Targeting Array Mk 3', desc:'Ship computer: +3 attack.'},
-  targeting_4:       {name:'Targeting Array Mk 4', desc:'Ship computer: +4 attack.'},
-  targeting_5:       {name:'Targeting Array Mk 5', desc:'Ship computer: +5 attack.'},
-  ecm_suite:         {name:'ECM Suite', desc:'+1 defense for all ships. Unlocks the ECM Jammer ship module.'},
-  neural_net:        {name:'Neural Net', desc:'+20% research on every colony.'},
-  sentient_core:     {name:'Sentient Core', desc:'+5 research on every colony.'},
-  xeno_relations:    {name:'Xeno Relations', desc:'+20 relations with all empires; trade treaties earn 50% more.'},
-  civil_engineering: {name:'Civil Engineering', desc:'Buildings cost 20% less.'},
-  galactic_bank:     {name:'Galactic Bank', desc:'+20% credits.'},
-  unified_government:{name:'Unified Government', desc:'+10% production and credits.'},
-  war_college:       {name:'War College', desc:'Ship upkeep halved, +1 ship attack.'},
-  imperial_charter:  {name:'Imperial Charter', desc:'+20% production and research.'},
-  xeno_psychology:   {name:'Xeno Psychology', desc:'Conquered colonies keep all their population; +30 relations.'},
-};
-for (const k in BUILDINGS) if (BUILDINGS[k].tech === k) TECH[k] = {name:BUILDINGS[k].name, desc:'Building: ' + effText(BUILDINGS[k].e) + '.'};
-TECH.drydock = {name:'Drydock', desc:'Building: ' + effText(BUILDINGS.drydock.e) + '.'};
-const TECH_LOC = {};
-FIELDS.forEach((f, fi) => f.tiers.forEach((t, ti) => {
-  t.opts.forEach(o => TECH_LOC[o] = {f:fi, t:ti});
-  (t.bonus || []).forEach(o => TECH_LOC[o] = {f:fi, t:ti, bonus:true});
-}));
 
-const SYL1 = ['Al','Bel','Cor','Dra','El','Fen','Gar','Hel','Ix','Jor','Kal','Lor','Mor','Nex','Or','Pra','Qua','Ryl','Sol','Tar','Ul','Vel','Xan','Yr','Zan','Ath','Ces','Dor','Eph','Gal','Kor','Myr','Ner','Pol','Rho','Sar','Tal','Vor','Aur','Bry','Cy','Dun','Ess','Fal','Gry','Hal','Ist','Kes','Lyr','Mal','Nor','Ost','Ren','Syl','Thal','Var','Wyn','Zir'];
-const SYL2 = ['a','ar','eth','ion','is','on','us','ara','ex','or','ia','um','ix','os','ane','esh','ir','ova','en','ys','oth','ea','ul','ani'];
-
-// galaxy settings
-const GAL = {
-  small:  {n:18, w:26, h:20, rivals:2, min:1, max:3, label:'Small'},
-  medium: {n:30, w:36, h:26, rivals:3, min:1, max:5, label:'Medium'},
-  large:  {n:44, w:44, h:32, rivals:5, min:2, max:6, label:'Large'},
-  huge:   {n:60, w:52, h:38, rivals:7, min:3, max:7, label:'Huge'},
+// ---------- The Solar System ----------
+const SOL_BODIES = [
+  {name: 'Mercury', cls: 'rocky', size: 1, temp: 'scorching', atm: 'none', min: 2, traits: []},
+  {name: 'Venus', cls: 'rocky', size: 3, temp: 'scorching', atm: 'toxic', min: 1, traits: ['volcanic']},
+  {name: 'Earth', cls: 'rocky', size: 3, temp: 'temperate', atm: 'breathable', life: 'ecosystem', min: 1, traits: []},
+  {name: 'Moon', cls: 'moon', size: 1, temp: 'cold', atm: 'none', min: 1, traits: ['locked'], of: 'Earth'},
+  {name: 'Mars', cls: 'rocky', size: 2, temp: 'cold', atm: 'thin', min: 1, traits: []},
+  {name: 'Ceres', cls: 'dwarf', size: 1, temp: 'frozen', atm: 'none', min: 1, traits: ['subocean']},
+  {name: 'Asteroid belt', cls: 'belt', size: 1, temp: 'cold', atm: 'none', min: 2, traits: []},
+  {name: 'Jupiter', cls: 'gasgiant', size: 5, temp: 'frozen', atm: 'thick', min: 1, traits: ['moons']},
+  {name: 'Europa', cls: 'moon', size: 1, temp: 'frozen', atm: 'none', life: 'microbial', min: 0, traits: ['subocean'], of: 'Jupiter'},
+  {name: 'Ganymede', cls: 'moon', size: 1, temp: 'frozen', atm: 'none', min: 1, traits: ['subocean'], of: 'Jupiter'},
+  {name: 'Saturn', cls: 'gasgiant', size: 5, temp: 'frozen', atm: 'thick', min: 1, traits: ['rings', 'moons']},
+  {name: 'Titan', cls: 'moon', size: 2, temp: 'frozen', atm: 'thick', min: 1, traits: [], of: 'Saturn'},
+  {name: 'Enceladus', cls: 'moon', size: 1, temp: 'frozen', atm: 'none', min: 0, traits: ['subocean'], of: 'Saturn'},
+  {name: 'Uranus', cls: 'icegiant', size: 4, temp: 'frozen', atm: 'thick', min: 1, traits: ['rings']},
+  {name: 'Neptune', cls: 'icegiant', size: 4, temp: 'frozen', atm: 'thick', min: 1, traits: []},
+  {name: 'Triton', cls: 'moon', size: 1, temp: 'frozen', atm: 'thin', min: 1, traits: [], of: 'Neptune'},
+];
+// Known exoplanets (from published discoveries; uncertain details are filled in by the game)
+const KNOWN_PLANETS = {
+  'Alpha Centauri': [['Proxima b', 'rocky', 2, 'temperate', ['locked', 'flares']], ['Proxima d', 'rocky', 1, 'hot', ['flares']]],
+  "Barnard's Star": [['b', 'rocky', 1, 'hot'], ['c', 'rocky', 1, 'hot'], ['d', 'rocky', 1, 'hot'], ['e', 'rocky', 1, 'hot']],
+  'Lalande 21185': [['b', 'superearth', 3, 'hot'], ['c', 'minineptune', 4, 'cold']],
+  'Epsilon Eridani': [['b', 'gasgiant', 5, 'cold'], ['Inner belt', 'belt', 1, 'cold'], ['Outer belt', 'belt', 1, 'frozen']],
+  'Ross 128': [['b', 'superearth', 2, 'temperate', ['locked']]],
+  "Luyten's Star": [['b', 'superearth', 3, 'temperate', ['locked']], ['c', 'superearth', 3, 'hot']],
+  'Tau Ceti': [['g', 'superearth', 2, 'scorching'], ['h', 'superearth', 2, 'hot'], ['e', 'superearth', 3, 'hot'], ['f', 'superearth', 3, 'cold'], ['Debris belt', 'belt', 1, 'frozen']],
+  'Wolf 1061': [['b', 'rocky', 1, 'scorching'], ['c', 'superearth', 3, 'temperate', ['locked']], ['d', 'superearth', 4, 'frozen']],
+  'Gliese 876': [['d', 'superearth', 3, 'scorching'], ['c', 'gasgiant', 5, 'temperate'], ['b', 'gasgiant', 5, 'temperate'], ['e', 'icegiant', 4, 'cold']],
+  'Gliese 581': [['e', 'rocky', 1, 'scorching'], ['b', 'minineptune', 4, 'hot'], ['c', 'superearth', 3, 'hot']],
+  'Gliese 667': [['b', 'superearth', 3, 'scorching'], ['c', 'superearth', 3, 'temperate', ['locked']], ['d', 'superearth', 3, 'cold']],
+  "Teegarden's Star": [['b', 'rocky', 2, 'temperate', ['locked']], ['c', 'rocky', 2, 'cold'], ['d', 'rocky', 2, 'frozen']],
+  'Gliese 1061': [['b', 'rocky', 2, 'hot'], ['c', 'superearth', 2, 'temperate', ['locked']], ['d', 'superearth', 2, 'temperate', ['locked']]],
+  'Gliese 1002': [['b', 'rocky', 2, 'temperate', ['locked']], ['c', 'rocky', 2, 'temperate', ['locked']]],
+  'YZ Ceti': [['b', 'rocky', 1, 'scorching'], ['c', 'rocky', 1, 'hot'], ['d', 'rocky', 1, 'hot']],
+  'Lacaille 9352': [['b', 'superearth', 3, 'hot'], ['c', 'superearth', 3, 'hot'], ['d', 'superearth', 3, 'temperate']],
+  'Gliese 687': [['b', 'minineptune', 4, 'cold']],
+  'Gliese 682': [['b', 'superearth', 3, 'temperate'], ['c', 'superearth', 3, 'hot']],
+  'Epsilon Indi': [['Ab', 'gasgiant', 5, 'frozen']],
+  'Groombridge 34': [['Ab', 'superearth', 2, 'hot'], ['Ac', 'minineptune', 4, 'cold']],
+  'Gliese 832': [['b', 'gasgiant', 5, 'frozen']],
+  'Gliese 229': [['Ac', 'minineptune', 4, 'hot']],
+  '82 Eridani': [['b', 'superearth', 2, 'scorching'], ['c', 'superearth', 2, 'scorching'], ['d', 'superearth', 3, 'hot']],
+  'Fomalhaut': [['Dust belt', 'belt', 1, 'frozen']],
+  'Vega': [['Debris disc', 'belt', 1, 'frozen']],
+  'Pollux': [['b', 'gasgiant', 5, 'hot']],
+  'TRAPPIST-1': [['b', 'rocky', 1, 'scorching', ['locked']], ['c', 'rocky', 1, 'hot', ['locked']], ['d', 'rocky', 1, 'temperate', ['locked']], ['e', 'rocky', 1, 'temperate', ['locked']], ['f', 'rocky', 1, 'temperate', ['locked']], ['g', 'rocky', 1, 'cold', ['locked']], ['h', 'rocky', 1, 'frozen', ['locked']]],
+  'Sirius': [], 'Procyon': [], "Van Maanen's Star": [], 'Altair': [], '61 Cygni': [], 'Arcturus': [],
 };
-const SHAPES = {round:'Round', spiral:'Spiral', clusters:'Clusters', ring:'Ring'};
-const SKILL = {relaxed:'Relaxed', standard:'Standard', cunning:'Cunning'};
+
+// ---------- Anomaly stories (grounded mystery) ----------
+// Each outcome: {p: chance, t: text, rp, bc, bt (breakthrough), lose (ship lost), reveal (stars), score}
+const EVENTS = [
+  {id: 'probe', title: 'Derelict Probe', text: 'A small machine drifts silently through the system: tumbling, cold, unmistakably artificial. Its hull is pitted by thousands of years of dust.',
+    ch: [{t: 'Bring it aboard', o: [{p: 0.55, t: 'Its frame is made of an alloy our metallurgists cannot explain. They are thrilled.', bt: 'bt_alloys', score: 20}, {p: 0.45, t: 'It is long dead, but its construction teaches us a great deal.', rp: 120, score: 10}]},
+         {t: 'Scan it from a safe distance', o: [{p: 1, t: 'Careful scans give us a detailed picture of a machine no human built.', rp: 90, score: 8}]}]},
+  {id: 'ringing', title: 'The Ringing Moon', text: 'A small moon vibrates with regular, almost musical seismic pulses, as if something deep inside it were still running.',
+    ch: [{t: 'Drill toward the source', o: [{p: 0.5, t: 'The drill breaks into a hollow chamber lined with patterns. Mathematicians spend years on them.', bt: 'bt_signal', score: 25}, {p: 0.3, t: 'The chamber is empty, though clearly carved. Fascinating.', rp: 150, score: 10}, {p: 0.2, t: 'The moon shudders. Debris tears through the ship. Contact is lost.', lose: true}]},
+         {t: 'Map it with seismometers', o: [{p: 1, t: 'A beautiful map of an interior that should not exist.', rp: 110, score: 8}]}]},
+  {id: 'rogue', title: 'Rogue Planet', text: 'A starless planet is drifting through the system on its endless journey between the stars.',
+    ch: [{t: 'Study it as it passes', o: [{p: 1, t: 'A frozen world from another star, perhaps billions of years old.', rp: 160, score: 10}]},
+         {t: 'Mine its surface on the fly', o: [{p: 0.75, t: 'Rare metals worth a fortune are hauled aboard.', bc: 200, score: 5}, {p: 0.25, t: 'The ship cannot match its speed safely and is torn apart.', lose: true}]}]},
+  {id: 'flare', title: 'Superflare', text: 'The star is building toward a massive flare. Instruments are already overloading.',
+    ch: [{t: 'Shelter behind a planet', o: [{p: 1, t: 'The ship rides it out safely and records the whole event.', rp: 70, score: 5}]},
+         {t: 'Observe from up close', o: [{p: 0.55, t: 'The data reveal how starlight bends near the star. Our telescopes will never be the same.', bt: 'bt_lensing', score: 20}, {p: 0.45, t: 'The flare overwhelms the ship\'s shielding.', lose: true}]}]},
+  {id: 'spores', title: 'Frozen Spores', text: 'A comet passing the star carries dormant microscopic life frozen in its ice.',
+    ch: [{t: 'Collect samples', o: [{p: 0.5, t: 'Their genetic machinery is entirely unlike ours, and very useful.', bt: 'bt_genome', score: 20}, {p: 0.5, t: 'The samples are fragile but valuable.', rp: 130, score: 10}]},
+         {t: 'Leave them undisturbed', o: [{p: 1, t: 'We record them in place and leave the comet as we found it.', rp: 60, score: 15}]}]},
+  {id: 'beacon', title: 'The Silent Beacon', text: 'A faint radio beacon repeats a sequence of prime numbers. Its source has no heat signature.',
+    ch: [{t: 'Decode the full message', o: [{p: 0.6, t: 'Hidden in the primes is a lesson in mathematics we were not ready for.', bt: 'bt_signal', score: 25}, {p: 0.4, t: 'The sequence ends abruptly. We learn little, but the effort sharpens our methods.', rp: 140, score: 10}]},
+         {t: 'Triangulate where it was aimed', o: [{p: 1, t: 'The beacon points toward other stars. We now know where they are.', reveal: 3, rp: 60, score: 12}]}]},
+  {id: 'gravity', title: 'Gravitational Anomaly', text: 'Something with the mass of a mountain is orbiting the star, but nothing can be seen there.',
+    ch: [{t: 'Approach and sample', o: [{p: 0.5, t: 'A speck of matter with negative energy density. The physicists are speechless.', bt: 'bt_exotic', score: 25}, {p: 0.5, t: 'Space folds around the ship. Contact is lost.', lose: true}]},
+         {t: 'Measure from a distance', o: [{p: 1, t: 'Measurements alone rewrite several textbooks.', rp: 180, score: 10}]}]},
+  {id: 'geysers', title: 'Organic Geysers', text: 'Ice geysers spray complex organic chemistry hundreds of kilometres into space.',
+    ch: [{t: 'Fly through the plumes', o: [{p: 0.8, t: 'Samples collected; the chemistry is rich and strange.', rp: 150, score: 10}, {p: 0.2, t: 'Ice fragments shred the hull.', lose: true}]},
+         {t: 'Drop sensor probes', o: [{p: 1, t: 'Probes will report for decades.', rp: 100, score: 8}]}]},
+  {id: 'crystal', title: 'Crystal Caverns', text: 'Radar shows vast caverns lined with enormous crystals beneath a world\'s crust.',
+    ch: [{t: 'Prospect them', o: [{p: 1, t: 'The crystals are worth a fortune to industry at home.', bc: 250, score: 5}]},
+         {t: 'Study how they formed', o: [{p: 1, t: 'Their growth tells the geological history of the system.', rp: 120, score: 8}]}]},
+  {id: 'ruins', title: 'Ruins on an Airless World', text: 'Geometric shapes cover a small airless world: walls, channels, buried towers, far older than humanity.',
+    ch: [{t: 'Excavate', o: [{p: 0.5, t: 'Buried machinery yields alloys and design principles we can use.', bt: 'bt_alloys', score: 25}, {p: 0.5, t: 'The ruins are empty shells, but their age and layout are a revelation.', rp: 220, score: 20}]},
+         {t: 'Document without disturbing', o: [{p: 1, t: 'A careful record of someone who was here long before us.', rp: 160, score: 20}]}]},
+  {id: 'oldprobe', title: 'A Probe from Earth', text: 'Our sensors pick up a tiny, ancient human-made probe, launched centuries ago by one of Earth\'s first interstellar projects. It made it.',
+    ch: [{t: 'Recover it and bring it home', o: [{p: 1, t: 'The probe goes on display on Earth. Millions come to see it.', bc: 120, score: 25}]},
+         {t: 'Read its data and let it fly on', o: [{p: 1, t: 'Its long journey continues, now with a new chapter in its log.', rp: 90, score: 20}]}]},
+  {id: 'lightocean', title: 'The Glowing Sea', text: 'At night, one world\'s oceans glow blue for thousands of kilometres. Something living is causing it.',
+    ch: [{t: 'Send a submersible down', o: [{p: 0.7, t: 'The light comes from vast colonies of drifting organisms.', rp: 170, bt: 'bt_genome', score: 20}, {p: 0.3, t: 'The submersible is lost in the deep. The ship remains, the mystery too.', rp: 40, score: 5}]},
+         {t: 'Observe from orbit', o: [{p: 1, t: 'Years of observation reveal the glow follows a daily rhythm.', rp: 110, score: 12}]}]},
+  {id: 'debris', title: 'Debris Field', text: 'A cloud of shattered metal plates orbits the star: the remains of something large and artificial.',
+    ch: [{t: 'Salvage the metal', o: [{p: 0.85, t: 'The salvage is worth a great deal.', bc: 220, score: 5}, {p: 0.15, t: 'A dormant mechanism wakes as we touch it. The ship is destroyed.', lose: true}]},
+         {t: 'Study how it was destroyed', o: [{p: 1, t: 'Analysing the wreck reveals how these machines think, and how to spot them.', bt: 'bt_machines', score: 20}]}]},
+  {id: 'orbit', title: 'An Impossible Orbit', text: 'A planet here moves in an orbit that should not be stable, yet it has been stable for millions of years.',
+    ch: [{t: 'Model the orbit', o: [{p: 1, t: 'The answer involves a hidden companion body we had never detected.', rp: 200, score: 10}]}]},
+  {id: 'vault', title: 'Cryogenic Vault', text: 'Buried in permafrost, a sealed vault holds frozen seeds and spores from many different worlds.',
+    ch: [{t: 'Open the vault', o: [{p: 0.7, t: 'Hardy crops from unknown worlds; our farmers are amazed.', bt: 'bt_seeds', score: 20}, {p: 0.3, t: 'Most contents are dead, but a few samples survive.', rp: 120, score: 10}]},
+         {t: 'Leave it sealed and catalogue it', o: [{p: 1, t: 'Whoever built it meant it to last. We respect that.', rp: 80, score: 18}]}]},
+  {id: 'starcore', title: 'Strange Starlight', text: 'The star\'s spectrum shows elements in proportions that make no sense for a natural star.',
+    ch: [{t: 'Dive close and take readings', o: [{p: 0.6, t: 'The star has been tampered with, by someone, long ago. What we learn transforms our fusion technology.', bt: 'bt_fusion', score: 25}, {p: 0.4, t: 'The heat is too much for the ship.', lose: true}]},
+         {t: 'Observe from a distance', o: [{p: 1, t: 'Enough data for a generation of research.', rp: 170, score: 12}]}]},
+];
+// For the end screen and score
+const SCORE_W = {explored: 3, surveyed: 4, microbial: 10, ecosystem: 25, anomaly: 1, breakthrough: 30, tech: 6, settlement: 15, city: 40, core: 100, popLog: 20};

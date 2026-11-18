@@ -1,882 +1,520 @@
 'use strict';
-// ===================== STARWAKE — CORE ENGINE =====================
+// ===================== STARWAKE v2 — ENGINE =====================
 let S = null;
 const rnd = Math.random;
 const TAU = Math.PI * 2;
 const ri = (a, b) => a + Math.floor(rnd() * (b - a + 1));
 const pick = a => a[Math.floor(rnd() * a.length)];
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
-const hyp = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
+const r1 = v => Math.round(v * 10) / 10;
 function wpick(w) { let t = 0, k; for (k in w) t += w[k]; let r = rnd() * t; for (k in w) { r -= w[k]; if (r <= 0) return k; } return k; }
 function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
-const r1 = v => Math.round(v * 10) / 10;
-function gauss() { return (rnd() + rnd() + rnd() - 1.5) / 0.5; }
-
-const E = id => id === -1 ? S.monster : S.empires[id];
-const R = emp => emp.id === -1 ? emp.race : RACE[emp.raceId];
-const has = (emp, t) => !!(emp.techs && emp.techs[t]);
-const avail = (emp, t) => t == null || has(emp, t);
-const P = id => S.planets[id];
+const d3 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+const B = id => S.bodies[id];
 const ST = id => S.stars[id];
-const player = () => S.empires[0];
-const alive = () => S.empires.filter(e => e.alive);
+const has = t => !!(S && S.techs[t]);
 function nid() { return S.nextId++; }
-function msg(empId, text, star, kind) { if (empId === 0) S.msgs.push({text, star: star == null ? null : star, kind: kind || 'info'}); }
+function msg(text, star, kind) { S.msgs.push({text, star: star == null ? null : star, kind: kind || 'info'}); }
+function journal(text, star) { S.journal.push({year: S.year, text, star: star == null ? null : star}); }
 
-// ---------------- Galaxy generation ----------------
-function genName(used) {
-  for (let i = 0; i < 500; i++) {
-    let n = pick(SYL1) + pick(SYL2);
-    if (rnd() < 0.1) n += ' ' + pick(['Prime', 'Major', 'Minor', 'Nova']);
-    if (!used.has(n) && !/^(Orion|Vael)/.test(n)) { used.add(n); return n; }
-  }
-  return 'Star ' + used.size;
+// ---------- star types ----------
+function starKind(sp) {
+  sp = sp || 'M';
+  const s = sp.replace(/^(sd|d|esd)/, '');
+  const giant = /III|II(?!I)/.test(sp) && !/V/.test(sp.replace(/IV/, ''));
+  const c = (s.match(/[OBAFGKMLTD]/) || ['M'])[0];
+  const cls = s[0] === 'D' ? 'D' : c;
+  const word = cls === 'D' ? 'White dwarf' : giant ? (cls === 'K' ? 'Orange giant' : 'Giant star') :
+    {O: 'Blue giant', B: 'Blue-white star', A: 'White star', F: 'Yellow-white star', G: 'Sun-like star', K: 'Orange dwarf', M: 'Red dwarf', L: 'Brown dwarf', T: 'Brown dwarf'}[cls] || 'Star';
+  const color = {O: '#9bb0ff', B: '#aabfff', A: '#d8e4ff', F: '#f8f7ff', G: '#ffe9a8', K: '#ffc078', M: '#ff8a5a', D: '#e8f0ff', L: '#c05a3a', T: '#a04a5a'}[cls] || '#ff8a5a';
+  return {cls, giant, word, color};
 }
-function newPlanet(star, type, size, minerals) {
-  const p = {id: S.planets.length, star: star.id, type, size, minerals, special: null, owner: null, col: null};
-  S.planets.push(p); star.planets.push(p.id); return p;
+
+// ---------- generation ----------
+function newBody(star, o) {
+  const b = Object.assign({id: S.bodies.length, star: star.id, name: '', cls: 'rocky', size: 1, temp: 'cold', atm: 'none', life: 'none', toxicLife: false, min: 1, traits: [], of: null, owner: null, col: null, tf: 0}, o);
+  S.bodies.push(b); star.bodies.push(b.id); return b;
 }
-function randomPlanet(star, rich) {
-  const type = wpick(STAR_TYPES[star.type].w);
-  let size = +wpick({1:2, 2:3, 3:4, 4:2, 5:1});
-  if (type === 'gasgiant') size = 5;
-  if (type === 'asteroids') size = 1;
-  const minerals = clamp(+wpick({0:1, 1:2, 2:4, 3:2, 4:1}) + (rich ? (rnd() < 0.5 ? 1 : 0) : 0), 0, 4);
-  const p = newPlanet(star, type, size, minerals);
-  if (rnd() < (rich ? 0.14 : 0.07) && !PT[type].outpostOnly) {
-    p.special = wpick(PT[type].fert > 0 ? {gold:3, gems:2, artifacts:2, fertile:3} : {gold:3, gems:2, artifacts:2});
-  }
-  return p;
+function atmFor(cls, temp) {
+  if (cls === 'belt' || cls === 'dwarf') return 'none';
+  if (cls === 'gasgiant' || cls === 'icegiant' || cls === 'minineptune') return 'thick';
+  if (cls === 'molten') return wpick({none: 2, toxic: 1});
+  if (cls === 'ocean') return wpick({thick: 3, thin: 1, toxic: 1});
+  if (cls === 'ice') return wpick({none: 3, thin: 2});
+  if (cls === 'superearth') return wpick({thick: 3, toxic: 2, thin: 2});
+  if (temp === 'scorching') return wpick({none: 3, toxic: 1});
+  return wpick({none: 2, thin: 3, thick: 1, toxic: 1});
 }
-function genPoint(shape, w, h, ctx) {
-  const cx = w / 2, cy = h / 2, rx = w / 2 - 1.4, ry = h / 2 - 1.4;
-  if (shape === 'ring') { const a = rnd() * TAU, r = 0.58 + rnd() * 0.42; return [cx + Math.cos(a) * r * rx, cy + Math.sin(a) * r * ry]; }
-  if (shape === 'spiral') {
-    const arm = ri(0, ctx.arms - 1), t = Math.pow(rnd(), 0.8);
-    const a = ctx.rot + arm * TAU / ctx.arms + t * 4.6 + gauss() * 0.06;
-    const r = 0.12 + t * 0.88;
-    return [cx + Math.cos(a) * r * rx + gauss() * 0.35, cy + Math.sin(a) * r * ry + gauss() * 0.35];
-  }
-  if (shape === 'clusters') { const c = pick(ctx.centers); return [c[0] + gauss() * ctx.sd, c[1] + gauss() * ctx.sd]; }
-  const a = rnd() * TAU, r = Math.sqrt(rnd()); return [cx + Math.cos(a) * r * rx, cy + Math.sin(a) * r * ry];
-}
-function linkComponents(maxD) {
-  // ensure every star is reachable with hops <= maxD by inserting bridge stars
-  const used = new Set(S.stars.map(s => s.name));
-  for (let guard = 0; guard < 40; guard++) {
-    const comp = new Array(S.stars.length).fill(-1); let nc = 0;
-    for (let i = 0; i < S.stars.length; i++) {
-      if (comp[i] >= 0) continue;
-      const st = [i]; comp[i] = nc;
-      while (st.length) { const a = S.stars[st.pop()]; for (const b of S.stars) if (comp[b.id] < 0 && hyp(a.x, a.y, b.x, b.y) <= maxD) { comp[b.id] = nc; st.push(b.id); } }
-      nc++;
+const MIN_W = {0: 3, 1: 5, 2: 2};
+function genSystem(star) {
+  const k = starKind(star.sp);
+  const letters = 'bcdefghij';
+  let temps;
+  if (k.cls === 'D') { if (rnd() < 0.35) newBody(star, {name: star.name + ' b', cls: rnd() < 0.5 ? 'belt' : 'rocky', size: 1, temp: 'cold', atm: 'none', min: +wpick(MIN_W)}); return; }
+  if (k.cls === 'L' || k.cls === 'T') { if (rnd() < 0.4) newBody(star, {name: star.name + ' b', cls: 'rocky', size: 1, temp: 'frozen', atm: 'none', min: +wpick(MIN_W)}); return; }
+  let n;
+  if (k.giant) { n = ri(1, 2); temps = ['hot', 'cold', 'frozen']; }
+  else if (k.cls === 'A' || k.cls === 'B') { n = ri(0, 2); temps = ['cold', 'frozen', 'frozen']; }
+  else if (k.cls === 'M') { n = +wpick({0: 2, 1: 3, 2: 3, 3: 2, 4: 1}); temps = ['scorching', 'hot', 'temperate', 'cold', 'frozen']; }
+  else { n = ri(2, 6); temps = ['scorching', 'hot', 'temperate', 'cold', 'frozen', 'frozen', 'frozen']; }
+  const flare = k.cls === 'M' && rnd() < 0.45;
+  for (let i = 0; i < n; i++) {
+    let temp = temps[Math.min(temps.length - 1, i + (rnd() < 0.3 ? 1 : 0))];
+    let cls;
+    if (k.giant || k.cls === 'A' || k.cls === 'B') cls = rnd() < 0.7 ? 'gasgiant' : 'belt';
+    else if (temp === 'scorching') cls = wpick({rocky: 4, superearth: 3, molten: 2});
+    else if (temp === 'hot') cls = wpick({rocky: 3, superearth: 4, minineptune: 2, molten: 1});
+    else if (temp === 'temperate') cls = wpick({rocky: 3, superearth: 4, ocean: 2, minineptune: 1});
+    else if (temp === 'cold') cls = wpick({superearth: 2, ice: 3, minineptune: 2, gasgiant: k.cls === 'M' ? 1 : 3, belt: 1});
+    else cls = wpick({gasgiant: 3, icegiant: 3, ice: 2, dwarf: 1, belt: 1});
+    const size = {rocky: ri(1, 2), superearth: ri(2, 4), ocean: ri(2, 4), ice: ri(1, 3), molten: ri(1, 2), minineptune: 4, gasgiant: 5, icegiant: 4, belt: 1, dwarf: 1}[cls];
+    const traits = [];
+    if (k.cls === 'M' && (temp === 'temperate' || temp === 'hot' || temp === 'scorching') && PCLASS[cls].solid && cls !== 'belt' && rnd() < 0.75) traits.push('locked');
+    if (flare) traits.push('flares');
+    if ((cls === 'gasgiant' || cls === 'icegiant') && rnd() < 0.5) traits.push('moons');
+    if (cls === 'gasgiant' && rnd() < 0.25) traits.push('rings');
+    if (cls === 'ice' && rnd() < 0.35) traits.push('subocean');
+    if ((cls === 'rocky' || cls === 'superearth') && rnd() < 0.12) traits.push('volcanic');
+    const b = newBody(star, {name: star.name + ' ' + (cls === 'belt' ? 'belt' : letters[i]), cls, size, temp, atm: atmFor(cls, temp), min: +wpick(MIN_W), traits});
+    if ((cls === 'gasgiant' || cls === 'icegiant') && rnd() < 0.4) {
+      newBody(star, {name: b.name + ' I', cls: 'moon', size: ri(1, 2), temp: temp === 'temperate' ? 'temperate' : temp === 'hot' ? 'hot' : 'frozen', atm: rnd() < 0.3 ? 'thin' : 'none', min: +wpick(MIN_W), traits: rnd() < 0.4 ? ['subocean'] : [], of: b.name});
     }
-    if (nc <= 1) return;
-    let best = null, bd = 1e9;
-    for (const a of S.stars) if (comp[a.id] === 0) for (const b of S.stars) if (comp[b.id] !== 0) { const d = hyp(a.x, a.y, b.x, b.y); if (d < bd) { bd = d; best = [a, b]; } }
-    const [a, b] = best; const steps = Math.ceil(bd / (maxD - 0.6));
-    for (let k = 1; k < steps; k++) {
-      const x = a.x + (b.x - a.x) * k / steps, y = a.y + (b.y - a.y) * k / steps;
-      S.stars.push({id: S.stars.length, name: genName(used), x: x + gauss() * 0.3, y: y + gauss() * 0.3, type: wpick(STAR_FREQ), planets: []});
+  }
+}
+function knownSystem(star, list) {
+  const k = starKind(star.sp);
+  for (const [nm, cls, size, temp, traits] of list) {
+    newBody(star, {name: (nm.length <= 3 ? star.name + ' ' + nm : nm.indexOf(star.name) === 0 ? nm : (/^(Proxima)/.test(nm) ? nm : star.name + ' ' + nm)),
+      cls, size, temp, atm: atmFor(cls, temp), min: +wpick(MIN_W), traits: (traits || []).slice()});
+  }
+  if (star.name === 'Alpha Centauri') { // A and B: unknown planets, rolled
+    for (let i = 0; i < ri(1, 3); i++) { const temp = pick(['hot', 'temperate', 'cold', 'frozen']); const cls = temp === 'frozen' ? pick(['gasgiant', 'ice', 'icegiant']) : pick(['rocky', 'superearth', 'ocean']);
+      newBody(star, {name: 'Alpha Centauri ' + ['A', 'B'][i % 2] + ' ' + 'bcd'[Math.floor(i / 2)], cls, size: cls === 'gasgiant' ? 5 : ri(1, 3), temp, atm: atmFor(cls, temp), min: +wpick(MIN_W), traits: []}); }
+  }
+}
+function assignLife() {
+  for (const s of S.stars) {
+    if (s.id === 0 || s.guard) continue;
+    const bs = s.bodies.map(B);
+    const r = rnd();
+    if (r < 0.15) {
+      let cand = bs.filter(b => PCLASS[b.cls].solid && !PCLASS[b.cls].belt && b.cls !== 'molten' && b.temp === 'temperate');
+      if (!cand.length && !KNOWN_PLANETS[s.name]) {
+        cand = bs.filter(b => ['rocky', 'superearth', 'ocean', 'ice'].includes(b.cls) && b.temp !== 'scorching');
+        if (!cand.length && starKind(s.sp).cls !== 'D') cand = [newBody(s, {name: s.name + ' ' + 'bcdefghij'[bs.length], cls: pick(['rocky', 'superearth', 'ocean']), size: ri(2, 3), temp: 'temperate', atm: 'thick', min: +wpick(MIN_W), traits: []})];
+        if (cand.length) { cand = [cand[0]]; cand[0].temp = 'temperate'; if (cand[0].cls === 'ice') cand[0].cls = 'ocean'; }
+      }
+      if (cand.length) {
+        const b = pick(cand); b.life = 'ecosystem'; b.atm = rnd() < 0.55 ? 'breathable' : pick(['thick', 'thin']); b.toxicLife = rnd() < 0.5; continue;
+      }
+    }
+    if (r < 0.35) {
+      const cand = bs.filter(b => PCLASS[b.cls].solid && !PCLASS[b.cls].belt && b.cls !== 'molten' && b.temp !== 'scorching');
+      if (cand.length) pick(cand).life = 'microbial';
     }
   }
 }
 function newGame(o) {
-  const g = GAL[o.size] || GAL.medium;
-  const rivals = clamp(o.rivals == null ? g.rivals : o.rivals, g.min, g.max);
-  S = {turn: 1, stars: [], planets: [], fleets: [], empires: [], nextId: 1, msgs: [], prompts: [], pendingBattles: [], hist: [],
-    W: g.w, H: g.h, size: o.size, shape: o.shape || 'round', skill: o.skill || 'standard', over: null, version: GAME_VERSION, format: SAVE_FORMAT,
-    gameId: Date.now().toString(36) + Math.floor(rnd() * 1e6).toString(36), started: Date.now()};
-  const used = new Set();
-  const ctx = {arms: ri(2, 3), rot: rnd() * TAU, sd: 2.4, centers: []};
-  const nc = ri(3, 5) + (o.size === 'huge' ? 2 : o.size === 'large' ? 1 : 0);
-  for (let i = 0; i < nc; i++) {
-    let best = null, bd = -1;
-    for (let k = 0; k < 40; k++) { const c = [3.5 + rnd() * (g.w - 7), 3.5 + rnd() * (g.h - 7)]; const d = ctx.centers.length ? Math.min(...ctx.centers.map(o => hyp(o[0], o[1], c[0], c[1]))) : 1; if (d > bd) { bd = d; best = c; } }
-    ctx.centers.push(best);
+  const L = LENGTHS[o.len] || LENGTHS.standard;
+  const list = o.len === 'long' ? STARS_LONG : STARS_STD;
+  S = {version: GAME_VERSION, format: SAVE_FORMAT, turn: 1, year: START_YEAR, len: o.len, maxTurns: L.turns, radius: L.radius,
+    stars: [], bodies: [], fleets: [], designs: [], techs: {}, res: null, rpBank: 0, bc: 500,
+    known: {}, visited: {}, surveyed: {}, journal: [], hist: [], msgs: [], nextId: 1, story: o.story, empire: {name: o.name || 'United Earth', color: o.color || '#4aa8ff'},
+    mods: {prod: 1, rp: 1, bc: 1, growth: 1, earthFood: 0, earthTel: COLONY_TEL}, stats: {anomalies: 0, anomScore: 0, lost: 0}, awakened: false, over: null,
+    gameId: Date.now().toString(36) + Math.floor(rnd() * 1e6).toString(36), started: Date.now(), nextDesign: 1};
+  list.forEach((s, i) => S.stars.push({id: i, name: s.n, x: s.x, y: s.y, z: s.z, sp: s.sp, cnt: s.c || 1, ly: s.ly, real: s.real || null, bodies: [], anom: null, anomDone: false, guard: false, stock: 0}));
+  // the Solar System
+  for (const b of SOL_BODIES) newBody(S.stars[0], Object.assign({}, b, {traits: b.traits.slice()}));
+  for (const s of S.stars) { if (s.id === 0) continue; const kp = KNOWN_PLANETS[s.name]; if (kp) knownSystem(s, kp); else genSystem(s); }
+  // guardian machines
+  const gc = shuffle(S.stars.filter(s => s.ly >= 10 && s.ly <= L.radius - 2 && s.name !== 'Alpha Centauri' && s.bodies.length));
+  gc.slice(0, o.len === 'long' ? 3 : 2).forEach(s => s.guard = true);
+  assignLife();
+  // anomalies
+  const ev = shuffle(EVENTS.map(e => e.id));
+  let k = 0;
+  for (const s of shuffle(S.stars.filter(s => s.id !== 0 && !s.guard))) { if (rnd() < 0.38) { s.anom = ev[k % ev.length]; k++; } }
+  // designs
+  for (const d of DEFAULT_DESIGNS) S.designs.push(Object.assign({}, d, {mods: d.mods.slice(), std: true}));
+  S.designs.push({id: 'probe', name: 'Starshot Probe', hull: 'light', mods: ['tel_m'], std: true, hidden: true});
+  // backstory
+  const st = o.story || {};
+  const sun = S.stars[0];
+  const body = n => sun.bodies.map(B).find(b => b.name === n);
+  const earth = body('Earth');
+  earth.col = {pop: 9500, focus: 'balanced', proj: {shipyard: 1}, queue: [], prog: 0, home: true, founded: START_YEAR};
+  earth.owner = 0;
+  const settle = (n, pop) => { const b = body(n); b.owner = 0; b.col = {pop, focus: 'balanced', proj: {}, queue: [], prog: 0, founded: START_YEAR - 60}; return b; };
+  if (st.e0 === 'green') { S.mods.earthFood += 20; S.mods.growth += 0.1; }
+  if (st.e0 === 'fortress') { S.mods.prod += 0.15; earth.col.pop -= 1500; }
+  if (st.e0 === 'corporate') { S.mods.bc += 0.25; S.bc += 300; }
+  if (st.e1 === 'moonmars') { settle('Moon', 0.08); settle('Mars', 0.09); }
+  if (st.e1 === 'belt') { settle('Ceres', 0.07); const ab = body('Asteroid belt'); ab.owner = 0; ab.col = {pop: 0, outpost: true, focus: 'balanced', proj: {}, queue: [], prog: 0}; S.mods.prod += 0.1; }
+  if (st.e1 === 'venus') { const v = settle('Venus', 2.5); v.clouds = true; S.mods.rp += 0.1; }
+  if (st.e2 === 'unity') { S.mods.bc += 0.15; S.mods.growth += 0.1; }
+  if (st.e2 === 'fracture') { S.mods.prod += 0.15; settle('Titan', 0.04); }
+  if (st.e2 === 'transcend') { S.mods.rp += 0.2; }
+  const home = s => newFleetAt(0, s);
+  home('scout'); home('science'); home('colony');
+  if (st.e3 === 'ark') { home('colony'); home('colony'); }
+  if (st.e3 === 'telescope') { S.mods.earthTel = 24; S.techs.biosignatures = 1; }
+  if (st.e3 === 'probes') {
+    const near = S.stars.filter(s => s.id !== 0).sort((a, b) => a.ly - b.ly).slice(0, 6);
+    shuffle(near).slice(0, 4).forEach((t, i) => { const f = newFleetAt(0, 'probe'); const k2 = 1 - (1 + i * 0.5) * 0.3 / Math.max(1, t.ly); f.star = null; f.x = t.x * k2; f.y = t.y * k2; f.z = t.z * k2; f.dest = t.id; });
   }
-  ctx.sd = 1.3 + Math.sqrt(g.n / nc) * 0.45;
-  if (S.shape === 'spiral') {
-    // walk along each arm placing stars about 3 parsecs apart
-    const arms = g.n >= 40 ? 3 : 2, cx = g.w / 2, cy = g.h / 2, rx = g.w / 2 - 1.6, ry = g.h / 2 - 1.6;
-    const per = Math.floor((g.n - 4) / arms);
-    for (let k = 0; k < 4; k++) { const a = rnd() * TAU, r = rnd() * 2.2; const x = cx + Math.cos(a) * r * 1.4, y = cy + Math.sin(a) * r; if (S.stars.every(o => hyp(o.x, o.y, x, y) > 2.4)) S.stars.push({id: S.stars.length, name: genName(used), x, y, type: wpick(STAR_FREQ), planets: []}); }
-    for (let arm = 0; arm < arms; arm++) {
-      let placed = 0;
-      for (let i = 0; i < 400 && placed < per; i++) {
-        const t = 0.12 + i / 400 * 0.88;
-        const a = ctx.rot + arm * TAU / arms + t * 4.4;
-        const side = (placed % 2 ? 1 : -1) * (0.3 + rnd() * 0.7);
-        const x = cx + Math.cos(a) * t * rx + Math.cos(a + Math.PI / 2) * side, y = cy + Math.sin(a) * t * ry + Math.sin(a + Math.PI / 2) * side;
-        if (x < 1 || y < 1 || x > g.w - 1 || y > g.h - 1) continue;
-        if (S.stars.some(o => hyp(o.x, o.y, x, y) < 2.6)) continue;
-        S.stars.push({id: S.stars.length, name: genName(used), x, y, type: wpick(STAR_FREQ), planets: []}); placed++;
-      }
-    }
-  }
-  let tries = 0;
-  while (S.stars.length < g.n && tries < 30000) {
-    tries++;
-    let [x, y] = genPoint(S.shape, g.w, g.h, ctx);
-    if (x < 1 || y < 1 || x > g.w - 1 || y > g.h - 1) continue;
-    if (S.stars.some(s => hyp(s.x, s.y, x, y) < 2.6)) continue;
-    S.stars.push({id: S.stars.length, name: genName(used), x, y, type: wpick(STAR_FREQ), planets: []});
-  }
-  linkComponents(4.6);
-  for (const s of S.stars) {
-    s.rich = wpick({poor: 3, normal: 5, rich: 2});
-    const n = s.rich === 'poor' ? ri(1, 2) : s.rich === 'normal' ? ri(2, 4) : ri(4, 6);
-    for (let i = 0; i < n; i++) randomPlanet(s, s.rich === 'rich');
-  }
-  const nEmp = 1 + rivals;
-  const colors = EMP_COLORS.filter(c => c !== o.color);
-  const races = shuffle(RACES.filter(r => r.id !== o.raceId).slice());
-  const homes = [];
-  homes.push(pick(S.stars));
-  // first home: pick the star farthest from centroid-ish to leave room
-  while (homes.length < nEmp) {
-    let best = null, bd = -1;
-    for (const s of S.stars) { if (homes.includes(s)) continue; const d = Math.min(...homes.map(h => hyp(h.x, h.y, s.x, s.y))) + rnd() * 1.5; if (d > bd) { bd = d; best = s; } }
-    homes.push(best);
-  }
-  for (let i = 0; i < nEmp; i++) {
-    const raceId = i === 0 ? o.raceId : races[(i - 1) % races.length].id;
-    S.empires.push({
-      id: i, raceId, name: i === 0 ? (o.empName || RACE[raceId].name) : RACE[raceId].name,
-      color: i === 0 ? o.color : colors[(i - 1) % colors.length], ai: i !== 0, alive: true,
-      bc: 100, techs: {}, tier: FIELDS.map(() => 0), res: null, rpBank: 0, designs: [], nextDesign: 1,
-      rel: {}, explored: {}, capital: null, drive: 0, range: 5, scan: 3, fscan: 1.5, compLvl: 0, techVer: 1,
-      aiData: {target: null, rally: null, lastDesignVer: -1}, broke: false
-    });
-  }
-  for (const a of S.empires) for (const b of S.empires) if (a !== b) a.rel[b.id] = {contact: false, status: 'peace', treaty: false, att: 0, warTurns: 0};
-  S.empires.forEach((emp, i) => setupHome(emp, homes[i]));
-  setupMonsters(homes);
-  for (const emp of S.empires) { updateCaches(emp); updateExploration(emp); }
-  for (const emp of S.empires) if (emp.ai) aiPickResearch(emp);
+  for (const s of sun.bodies.map(B)) S.visited[0] = S.surveyed[0] = S.known[0] = 1;
+  updateKnowledge();
   recordHistory();
-  S.msgs.push({text: 'Welcome, ruler of the ' + player().name + '. Pick a research topic, then send your scouts and colony ship out to the stars.', star: homes[0].id, kind: 'info'});
+  msg('The year is ' + START_YEAR + '. For the first time, humanity is ready to leave the Solar System. Choose a research project, then send your ships to the stars.', 0, 'info');
   return S;
 }
-function setupHome(emp, star) {
-  const r = R(emp);
-  const others = S.stars.filter(s => s !== star).sort((a, b) => hyp(a.x, a.y, star.x, star.y) - hyp(b.x, b.y, star.x, star.y));
-  for (let i = 0; i < 3; i++) {
-    const o = others[i]; if (!o || hyp(o.x, o.y, star.x, star.y) <= 4.6) continue;
-    for (let t = 0; t < 60; t++) {
-      const a = rnd() * TAU, rr = 3 + rnd() * 1.5;
-      const nx = clamp(star.x + Math.cos(a) * rr, 1, S.W - 1), ny = clamp(star.y + Math.sin(a) * rr, 1, S.H - 1);
-      if (S.stars.every(q => q === o || hyp(q.x, q.y, nx, ny) > 2.3)) { o.x = nx; o.y = ny; break; }
-    }
-  }
-  while (star.planets.length > 3) { const pid = star.planets.pop(); S.planets[pid].star = -1; }
-  if (star.planets.length < 2) randomPlanet(star, false);
-  star.rich = 'normal';
-  const hw = newPlanet(star, r.aquatic ? 'ocean' : 'terran', 4, 2);
-  hw.isHome = true;
-  newColony(emp, hw, 8);
-  hw.col.capital = true;
-  hw.col.bld.shipyard = 1;
-  emp.capital = hw.id;
-  emp.explored[star.id] = true;
-  const near = others.slice(0, 3);
-  let good = 0;
-  for (const s of near) if (s.planets.map(P).some(p => ['terran', 'ocean', 'arid', 'jungle', 'tundra', 'gaia'].includes(p.type) && p.size >= 2)) good++;
-  if (good < 2) for (const s of near.slice(0, 2 - good)) { if (s.planets.length >= 6) { const pid = s.planets.pop(); S.planets[pid].star = -1; } newPlanet(s, pick(['terran', 'arid', 'tundra', 'ocean', 'jungle']), ri(2, 4), ri(1, 3)); }
-  for (const sp of ['scout', 'colony', 'outpost', 'transport']) emp.designs.push({id: 's_' + sp, name: SPECIAL_SHIPS[sp].name, special: sp});
-  updateCaches(emp);
-  const fr = autoDesign(emp, 'corvette'); addDesign(emp, fr);
-  const de = autoDesign(emp, 'destroyer'); addDesign(emp, de);
-  const mk = dids => { const f = newFleet(emp.id, star.id); for (const d of dids) addShip(emp, f, d); return f; };
-  mk([fr.id, fr.id]);
-  mk(['s_scout']); mk(['s_scout']); mk(['s_colony']);
-}
-function setupMonsters(homes) {
-  S.monster = {id: -1, name: 'Void Leviathans', color: '#b8c0cc', race: {attack: 2, defense: 0}, techs: {}, techVer: 1, drive: 0, alive: true, rel: {},
-    designs: [
-      {id: 'm_leviathan', name: 'Void Leviathan', fixed: {hp: 110, attack: 2, defense: 1, shield: 2, speed: 3, weapons: [{id: 'ma', name: 'Acid Spray', type: 'beam', dmg: [3, 10], n: 4, range: 4, color: '#a0ff40'}]}},
-      {id: 'm_matriarch', name: 'Leviathan Matriarch', fixed: {hp: 260, attack: 3, defense: 0, shield: 4, speed: 2, weapons: [{id: 'mb', name: 'Corrosive Torrent', type: 'beam', dmg: [5, 14], n: 5, range: 5, color: '#c0ff40'}, {id: 'mc', name: 'Spore Burst', type: 'missile', dmg: [12, 12], n: 2, range: 8, ammo: 3, color: '#e0ffa0'}]}},
-    ]};
-  const cand = shuffle(S.stars.filter(s => homes.every(h => hyp(h.x, h.y, s.x, s.y) > 7) && s.planets.length > 0));
-  const n = Math.max(1, Math.round(S.stars.length / 11));
-  cand.sort((a, b) => (b.rich === 'rich') - (a.rich === 'rich'));
-  for (const s of cand.slice(0, n)) {
-    const f = newFleet(-1, s.id); addShip(S.monster, f, s.rich === 'rich' ? 'm_matriarch' : 'm_leviathan');
-    const best = s.planets.map(P).sort((a, b) => b.minerals - a.minerals)[0]; if (best) best.minerals = Math.min(4, best.minerals + 1);
-  }
-}
 
-// ---------------- Fleets & ships ----------------
-function newFleet(owner, starId) {
+// ---------- ships & designs ----------
+function design(id) { return S.designs.find(d => d.id === id); }
+function designMass(d) { let m = HULLS[d.hull].mass; for (const k of d.mods) m += MODULES[k].mass; return m; }
+function designCost(d) { let c = HULLS[d.hull].cost; for (const k of d.mods) c += MODULES[k].cost; return Math.round(c * (has('orbital_construction') ? 0.85 : 1)); }
+function massFactor(m) { return clamp(1.1 - 0.04 * m + (has('bt_alloys') ? 0.1 : 0), 0.5, 1); }
+function driveLevel() { let l = 0; DRIVE_TECH.forEach((t, i) => { if (t && has(t)) l = Math.max(l, i); }); return l; }
+function topSpeed() { return DRIVE_SPEEDS[driveLevel()]; }
+function designSpeed(d) { return topSpeed() * massFactor(designMass(d)); }
+function telBonus(r) { return r * (has('interferometry') ? 1.5 : 1) + (has('bt_lensing') ? 4 : 0); }
+function designTel(d) { return telBonus(d.mods.includes('tel_l') ? 16 : d.mods.includes('tel_m') ? 8 : SHIP_TEL); }
+function designHas(d, m) { return d.mods.includes(m); }
+function newFleetAt(starId, did) {
   const s = ST(starId);
-  const f = {id: nid(), owner, ships: [], star: starId, x: s.x, y: s.y, dest: null};
+  const f = {id: nid(), ships: [{id: nid(), d: did}], star: starId, x: s.x, y: s.y, z: s.z, dest: null, task: null};
   S.fleets.push(f); return f;
 }
-function designOf(emp, did) { return emp.designs.find(d => d.id === did); }
-function addShip(emp, f, did) { const d = designOf(emp, did); const st = shipStats(emp, d); const sh = {id: nid(), d: did, hp: st.hp}; f.ships.push(sh); return sh; }
-function shipRole(emp, ship) { const d = designOf(emp, ship.d); return d.special || 'war'; }
-function fleetRole(f) {
-  const emp = E(f.owner); let r = null;
-  for (const s of f.ships) { const x = shipRole(emp, s); if (r == null) r = x; else if (r !== x) return 'mixed'; }
-  return r || 'empty';
-}
-function fleetSpeed(f) { return f.owner === -1 ? 0 : DRIVES[E(f.owner).drive].speed; }
-function spawnShip(emp, did, starId) {
-  const d = designOf(emp, did); const role = d.special || 'war';
-  let f = null;
-  if (role === 'war' || role === 'transport') f = S.fleets.find(x => x.owner === emp.id && x.star === starId && x.dest == null && fleetRole(x) === role);
-  if (!f) f = newFleet(emp.id, starId);
-  return addShip(emp, f, did);
-}
-function armed(emp, f) { return f.ships.some(s => shipStats(emp, designOf(emp, s.d)).weapons.length > 0); }
-function fleetPower(f) {
-  const emp = E(f.owner); let hp = 0, dpr = 0;
-  for (const s of f.ships) { const st = shipStats(emp, designOf(emp, s.d)); hp += s.hp; dpr += st.dpr; }
-  return Math.sqrt(hp * dpr);
-}
-function powerOf(hp, dpr) { return Math.sqrt(Math.max(0, hp) * Math.max(0, dpr)); }
-function cleanupFleets() { S.fleets = S.fleets.filter(f => f.ships.length > 0); }
-function mergeFleets(a, b) { a.ships.push(...b.ships); b.ships = []; cleanupFleets(); }
-function splitFleet(f, shipIds) {
-  const nf = {id: nid(), owner: f.owner, ships: [], star: f.star, x: f.x, y: f.y, dest: null};
-  nf.ships = f.ships.filter(s => shipIds.includes(s.id));
-  f.ships = f.ships.filter(s => !shipIds.includes(s.id));
-  S.fleets.push(nf); cleanupFleets(); return nf;
-}
-
-// ---------------- Designs ----------------
-function designSpace(d) {
-  if (d.special || d.fixed) return 0;
-  const h = HULLS[d.hull]; let s = 0;
-  for (const w of d.weapons) s += WEAPONS[w.id].space * w.n;
-  if (d.shield > 0) s += Math.ceil(h.space * 0.12);
-  if (d.comp > 0) s += Math.ceil(h.space * 0.08);
-  for (const m of (d.mods || [])) s += Math.ceil(h.space * MODULES[m].space);
-  return s;
-}
-function designCost(emp, d) {
-  if (d.fixed) return 500;
-  if (d.special) return SPECIAL_SHIPS[d.special].cost;
-  const h = HULLS[d.hull];
-  let c = h.cost + d.armor * h.cost * 0.12 + d.shield * h.cost * 0.15 + d.comp * h.cost * 0.1;
-  for (const w of d.weapons) c += WEAPONS[w.id].cost * w.n;
-  for (const m of (d.mods || [])) c += h.cost * MODULES[m].cost;
-  return Math.round(c);
-}
-function shipStats(emp, d) {
-  if (d._s && d._sv === emp.techVer) return d._s;
-  const r = R(emp); let s;
-  const defBonus = (has(emp, 'phase_dampers') ? 2 : 0) + (has(emp, 'ecm_suite') ? 1 : 0) + (r.defense || 0);
-  const atkBonus = (r.attack || 0) + (has(emp, 'war_college') ? 1 : 0) + (has(emp, 'fire_control_ai') ? 2 : 0);
-  const spdBonus = (has(emp, 'vector_thrusters') ? 1 : 0) + (emp.drive >= 2 ? 1 : 0) + (emp.drive >= 4 ? 1 : 0);
-  if (d.fixed) {
-    s = Object.assign({}, d.fixed); s.weapons = d.fixed.weapons.map(w => Object.assign({ammo: 0}, w)); s.special = null; s.troops = 0; s.cspeed = d.fixed.speed;
-  } else if (d.special) {
-    const sp = SPECIAL_SHIPS[d.special];
-    s = {hp: sp.hp, attack: 0, defense: 2 + defBonus, shield: 0, weapons: [], special: d.special, cspeed: sp.cspeed + spdBonus,
-      troops: d.special === 'transport' ? (has(emp, 'drop_pods') ? 8 : 4) : 0};
-  } else {
-    const h = HULLS[d.hull], mods = d.mods || [];
-    const mult = 1 + (has(emp, 'reinforced_frames') ? 0.25 : 0) + (has(emp, 'bastion_frames') ? 0.5 : 0);
-    const dm = has(emp, 'heavy_mounts') ? 1.25 : 1;
-    s = {hp: Math.round(h.hp * mult + ARMOR[d.armor].hp * h.armorMult * (mods.includes('plating') ? 1.5 : 1)), attack: COMPUTERS[d.comp].val + atkBonus, defense: h.def + defBonus,
-      shield: Math.floor(SHIELDS[d.shield].val * (has(emp, 'hardlight_shields') ? 1.5 : 1)), special: null,
-      troops: mods.includes('troopbay') ? 2 : 0, ecm: mods.includes('ecm'), drones: mods.includes('drones'),
-      cspeed: h.cspeed + spdBonus + (mods.includes('thrusters') ? 2 : 0),
-      weapons: d.weapons.filter(w => w.n > 0).map(w => { const W = WEAPONS[w.id]; return {id: w.id, name: W.name, type: W.type, dmg: [Math.round(W.dmg[0] * dm), Math.round(W.dmg[1] * dm)], n: w.n, range: W.range, ammo: W.ammo || 0, color: W.color}; })};
-  }
-  s.dpr = 0;
-  for (const w of s.weapons) s.dpr += w.n * (w.dmg[0] + w.dmg[1]) / 2 * 0.6 * (w.type === 'missile' ? 0.6 : 1);
-  s.cost = designCost(emp, d);
-  d._s = s; d._sv = emp.techVer; return s;
-}
-function bestIdx(arr, emp) { let b = 0; arr.forEach((a, i) => { if (avail(emp, a.tech)) b = i; }); return b; }
-const bestArmor = emp => bestIdx(ARMOR, emp), bestShield = emp => bestIdx(SHIELDS, emp), bestComp = emp => bestIdx(COMPUTERS, emp);
-function knownWeapons(emp) { return Object.keys(WEAPONS).filter(k => avail(emp, WEAPONS[k].tech)); }
-function bestWeapon(emp, type) {
-  let b = null, bv = -1;
-  for (const k of knownWeapons(emp)) { const w = WEAPONS[k]; if (type && w.type !== type) continue; if (w.dmg[0] + w.dmg[1] > bv) { bv = w.dmg[0] + w.dmg[1]; b = k; } }
-  return b;
-}
-const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
-function autoDesign(emp, hull) {
-  const h = HULLS[hull];
-  const d = {id: null, name: '', hull, armor: bestArmor(emp), shield: bestShield(emp), comp: bestComp(emp), weapons: [], mods: []};
-  if (avail(emp, 'nanite_repair') && h.size >= 3) d.mods.push('drones');
-  const beam = bestWeapon(emp, 'beam'), mis = bestWeapon(emp, 'missile');
-  const fill = () => {
-    d.weapons = [];
-    let free = h.space - designSpace(d);
-    const B = WEAPONS[beam], M = WEAPONS[mis];
-    const useMis = !!mis && h.size >= 2;
-    let nb = Math.floor(free * (useMis ? 0.65 : 1) / B.space);
-    if (nb < 1 && free >= B.space) nb = 1;
-    free -= nb * B.space;
-    const nm = useMis ? Math.floor(free / M.space) : 0;
-    free -= nm * M.space;
-    nb += Math.floor(free / B.space);
-    if (nb > 0) d.weapons.push({id: beam, n: nb});
-    if (nm > 0) d.weapons.push({id: mis, n: nm});
-  };
-  fill();
-  const cnt = () => d.weapons.reduce((a, w) => a + w.n, 0);
-  if (cnt() < 2 && d.mods.length) { d.mods = []; fill(); }
-  if (cnt() < 2) { d.comp = 0; fill(); }
-  if (cnt() < 2) { d.shield = 0; fill(); }
-  const pre = {corvette: 'Lancer', destroyer: 'Warden', cruiser: 'Vindicator', battleship: 'Bulwark', dreadnought: 'Sovereign'}[hull];
-  d.name = pre + ' ' + ROMAN[Math.min(11, emp.designs.filter(x => x.hull === hull).length)];
-  return d;
-}
-function addDesign(emp, d) { d.id = 'd' + (emp.nextDesign++); d.obsolete = false; emp.designs.push(d); return d; }
-function designInUse(emp, did) {
-  return S.fleets.some(f => f.owner === emp.id && f.ships.some(s => s.d === did)) ||
-    colonies(emp, true).some(p => p.col.queue.some(q => q.kind === 'ship' && q.id === did));
-}
-
-// ---------------- Tech ----------------
-function updateCaches(emp) {
-  emp.drive = bestIdx(DRIVES, emp);
-  emp.range = 5 + (has(emp, 'fuel_cells') ? 2 : 0) + (has(emp, 'subspace_tanks') ? 4 : 0);
-  emp.scan = 3 + (has(emp, 'deep_scanners') ? 2 : 0);
-  emp.fscan = 1.5 + (has(emp, 'deep_scanners') ? 1 : 0);
-  emp.compLvl = bestComp(emp);
-  emp.techVer = (emp.techVer || 0) + 1;
-}
-function techCost(fi, ti) { return Math.round(FIELDS[fi].tiers[ti].cost * (1 + ti * 0.5) / 10) * 10; }
-function availableTechs(emp) {
-  const out = [];
-  FIELDS.forEach((f, fi) => {
-    const ti = emp.tier[fi]; if (ti >= f.tiers.length) return;
-    for (const o of f.tiers[ti].opts) if (!has(emp, o)) out.push({tech: o, f: fi, t: ti, cost: techCost(fi, ti)});
-  });
-  return out;
-}
-function learnTech(emp, id, how) {
-  if (has(emp, id)) return;
-  emp.techs[id] = 1;
-  const loc = TECH_LOC[id];
-  const learned = [id];
-  if (loc && emp.tier[loc.f] === loc.t && !loc.bonus) {
-    const tier = FIELDS[loc.f].tiers[loc.t];
-    if (R(emp).creative) for (const o of tier.opts) if (!emp.techs[o]) { emp.techs[o] = 1; learned.push(o); }
-    for (const b of (tier.bonus || [])) if (!emp.techs[b]) { emp.techs[b] = 1; learned.push(b); }
-    emp.tier[loc.f]++;
-  }
-  updateCaches(emp);
-  if (emp.id === 0) {
-    msg(0, (how || 'Research complete') + ': ' + learned.map(t => TECH[t].name).join(', ') + '.', null, 'tech');
-    const comp = learned.some(t => /^hull_/.test(t) || Object.values(WEAPONS).some(w => w.tech === t) || ARMOR.some(a => a.tech === t) || SHIELDS.some(a => a.tech === t) || COMPUTERS.some(a => a.tech === t) || t === 'nanite_repair' || t === 'ecm_suite');
-    if (comp) msg(0, 'New ship parts are available. Open Ship Design to create better warships.', null, 'design');
-  }
-}
-function processResearch(emp, rp) {
-  if (!emp.res && emp.ai) aiPickResearch(emp);
-  if (!emp.res) { emp.rpBank += rp; return; }
-  emp.res.prog += rp + emp.rpBank; emp.rpBank = 0;
-  const loc = TECH_LOC[emp.res.tech];
-  const cost = techCost(loc.f, loc.t);
-  if (emp.res.prog >= cost) {
-    emp.rpBank = Math.min(emp.res.prog - cost, cost);
-    learnTech(emp, emp.res.tech);
-    emp.res = null;
-    if (emp.ai) aiPickResearch(emp);
-  }
-}
-function setResearch(emp, tech) {
-  const av = availableTechs(emp).find(t => t.tech === tech); if (!av) return false;
-  if (emp.res && emp.res.tech !== tech) emp.rpBank += emp.res.prog;
-  if (!emp.res || emp.res.tech !== tech) emp.res = {tech, prog: 0};
-  return true;
-}
-
-// ---------------- Colonies & economy ----------------
-function colonies(emp, includeOutposts) { return S.planets.filter(p => p.owner === emp.id && p.star >= 0 && (includeOutposts || !p.col.outpost)); }
-function newColony(emp, pl, pop) {
-  pl.owner = emp.id;
-  pl.col = {pop, bld: {}, queue: [], prog: 0, defHp: 0, capital: false, founded: S.turn};
-  emp.explored[pl.star] = true;
-  if (pl.special === 'artifacts' && !pl.artUsed) {
-    pl.artUsed = true;
-    const av = availableTechs(emp); if (av.length) { const t = pick(av); learnTech(emp, t.tech, 'Colonists decipher the Precursor Ruins on ' + planetName(pl)); }
-  }
-}
-function newOutpost(emp, pl) { pl.owner = emp.id; pl.col = {outpost: true, pop: 0, bld: {}, queue: [], prog: 0, defHp: 0}; emp.explored[pl.star] = true; }
-function planetName(pl) { const s = ST(pl.star); const idx = s.planets.indexOf(pl.id); return s.name + ' ' + ROMAN[idx]; }
-function popF(emp, pl) {
-  const t = PT[pl.type], r = R(emp);
-  if (t.outpostOnly) return 0;
-  let f = t.popF;
-  if (r.aquatic && (pl.type === 'ocean' || pl.type === 'jungle')) f = 5;
-  if (t.hostile) f = has(emp, 'hostile_habitats') ? 1 : 0;
-  if (r.lithovore) f = Math.max(f, 2);
-  return f;
-}
-function bldEff(c) {
-  const e = {};
-  for (const k in c.bld) { const b = BUILDINGS[k]; if (!b) continue; for (const x in b.e) e[x] = (x === 'shield') ? Math.max(e[x] || 0, b.e[x]) : (e[x] || 0) + b.e[x]; }
-  return e;
-}
-function maxPop(emp, pl) {
-  const f = popF(emp, pl); if (f <= 0) return 0;
-  let m = Math.max(1, Math.round(SIZE_BASE[pl.size] * f / 2));
-  if (pl.owner === emp.id && pl.col) m += bldEff(pl.col).maxPop || 0;
-  if (has(emp, 'gene_crafting')) m += 2;
-  if (has(emp, 'hyper_growth')) m += 3;
-  return m;
-}
-function baseFert(emp, pl) {
-  const r = R(emp); if (r.lithovore) return 0;
-  let f = PT[pl.type].fert;
-  if (r.aquatic && (pl.type === 'ocean' || pl.type === 'jungle')) f = 1.5;
-  return f;
-}
-function slotsOf(pl) { return SIZE_SLOTS[pl.size] + (pl.col && pl.col.capital ? 1 : 0); }
-function slotsUsed(pl) { const c = pl.col; return Object.keys(c.bld).length + c.queue.filter(q => q.kind === 'bld').length; }
-function colStats(pl) {
-  const emp = E(pl.owner), c = pl.col, r = R(emp);
-  if (c.outpost) return {outpost: true, food: 0, use: 0, prod: 0, rp: 0, bc: 0, up: 0, maxPop: 0, growth: 0};
-  const e = bldEff(c), pop = c.pop;
-  const bf = baseFert(emp, pl);
-  let fpp = bf > 0 ? bf + (r.foodPop || 0) + (pl.special === 'fertile' ? 0.5 : 0) + (e.foodPop || 0) : 0;
-  const food = r1(pop * fpp + (e.foodFlat || 0) + (c.capital ? 2 : 0));
-  const use = r.lithovore ? 0 : r1(pop);
-  const ppp = MIN_MULT[pl.minerals] + (r.prodPop || 0) + (e.prodPop || 0);
-  let prod = pop * ppp + (e.prodFlat || 0) + (c.capital ? 4 : 0);
-  prod *= 1 + (has(emp, 'unified_government') ? 0.1 : 0) + (has(emp, 'imperial_charter') ? 0.2 : 0);
-  if (emp.broke) prod *= 0.5;
-  let rp = pop * (0.5 + (e.rpPop || 0)) + (e.rpFlat || 0) + (c.capital ? 3 : 0) + (pl.special === 'artifacts' ? 5 : 0) + (has(emp, 'sentient_core') ? 5 : 0);
-  rp *= (r.research || 1) * (1 + (has(emp, 'neural_net') ? 0.2 : 0) + (has(emp, 'imperial_charter') ? 0.2 : 0));
-  let bc = pop * (0.4 + (e.bcPop || 0)) + (e.bcFlat || 0) + (pl.special === 'gold' ? 5 : 0) + (pl.special === 'gems' ? 8 : 0) + (c.capital ? 5 : 0);
-  bc *= (r.bc || 1) * (1 + (has(emp, 'galactic_bank') ? 0.2 : 0) + (has(emp, 'unified_government') ? 0.1 : 0));
-  let up = 0; for (const k in c.bld) up += BUILDINGS[k] ? BUILDINGS[k].up : 0;
-  const mp = maxPop(emp, pl);
-  return {food, use, prod: Math.floor(prod), rp: r1(rp), bc: r1(bc), up, maxPop: mp, growth: growthOf(emp, pl, mp), fpp: r1(fpp), ppp: r1(ppp), e};
-}
-function growthOf(emp, pl, mp) {
-  const c = pl.col; if (mp <= 0) return 0;
-  if (c.pop > mp) return -Math.min(c.pop - mp, Math.max(0.2, (c.pop - mp) * 0.25));
-  if (c.pop >= mp) return 0;
-  let g = (0.16 * c.pop * (1 - c.pop / mp) + 0.1) * (R(emp).growth || 1);
-  if (bldEff(c).growth) g *= 2;
-  if (has(emp, 'hyper_growth')) g *= 1.5;
-  return Math.min(g, mp - c.pop);
-}
-function empPop(emp) { let p = 0; for (const pl of colonies(emp)) p += pl.col.pop; return p; }
-function empTotals(emp) {
-  const t = {food: 0, use: 0, prod: 0, rp: 0, bc: 0, up: 0, ship: 0, trade: 0, pop: 0, cols: 0};
-  for (const pl of colonies(emp)) { const s = colStats(pl); t.food += s.food; t.use += s.use; t.prod += s.prod; t.rp += s.rp; t.bc += s.bc; t.up += s.up; t.pop += pl.col.pop; t.cols++; }
-  for (const f of S.fleets) if (f.owner === emp.id) for (const s of f.ships) t.ship += shipStats(emp, designOf(emp, s.d)).cost * 0.02;
-  if (has(emp, 'war_college')) t.ship *= 0.5;
-  t.ship = r1(t.ship);
-  for (const k in emp.rel) { const rel = emp.rel[k]; const o = E(+k); if (rel.treaty && o.alive) t.trade += 0.1 * Math.min(t.pop, empPop(o)) * (has(emp, 'xeno_relations') ? 1.5 : 1); }
-  t.trade = r1(t.trade); t.rp = r1(t.rp); t.bc = r1(t.bc); t.food = r1(t.food); t.use = r1(t.use);
-  t.foodNet = r1(t.food - t.use);
-  t.net = r1(t.bc + t.trade - t.up - t.ship + Math.max(0, t.foodNet) * 0.5);
-  return t;
-}
-
-// ---------------- Production ----------------
-function bldCost(emp, id) { return Math.round(BUILDINGS[id].cost * (has(emp, 'civil_engineering') ? 0.8 : 1)); }
-function itemCost(emp, pl, it) {
-  if (it.kind === 'bld') return bldCost(emp, it.id);
-  if (it.kind === 'ship') { const d = designOf(emp, it.id); return d ? designCost(emp, d) : 0; }
-  if (it.kind === 'proj') return it.id === 'terraform' ? 100 + pl.size * 40 : 250 + pl.size * 60;
-  return 0;
-}
-function itemName(emp, it) {
-  if (it.kind === 'bld') return BUILDINGS[it.id].name;
-  if (it.kind === 'ship') { const d = designOf(emp, it.id); return d ? d.name : '?'; }
-  if (it.kind === 'proj') return PROJECTS[it.id].name;
-  return 'Trade Goods';
-}
-function bldReason(emp, pl, id) {
-  const c = pl.col, b = BUILDINGS[id];
-  if (c.outpost) return 'Outposts cannot build';
-  if (c.bld[id]) return 'Already built';
-  if (!avail(emp, b.tech)) return 'Not researched';
-  if (c.queue.some(q => q.kind === 'bld' && q.id === id)) return 'Already queued';
-  if (b.fertile && baseFert(emp, pl) <= 0) return 'Needs a fertile world';
-  if (id === 'drydock' && !c.bld.shipyard && !c.queue.some(q => q.id === 'shipyard')) return 'Needs a Shipyard';
-  if (slotsUsed(pl) >= slotsOf(pl)) return 'No free building slots';
-  return null;
-}
-function canBuildBld(emp, pl, id) { return !bldReason(emp, pl, id); }
-function canProject(emp, pl, id) {
-  const c = pl.col; if (c.outpost || !has(emp, PROJECTS[id].tech)) return false;
-  if (c.queue.some(q => q.kind === 'proj')) return false;
-  if (id === 'terraform') return !!TERRAFORM[pl.type] && (!PT[pl.type].hostile || has(emp, 'hostile_habitats') || R(emp).lithovore);
-  return pl.type === 'terran' || pl.type === 'ocean';
-}
-function shipReason(emp, pl, d) {
-  if (pl.col.outpost) return 'Outposts cannot build';
-  if (!pl.col.bld.shipyard) return 'Needs a Shipyard';
-  if (d.hull && HULLS[d.hull].drydock && !pl.col.bld.drydock) return 'Needs a Drydock';
-  return null;
-}
-function itemValid(emp, pl, it) {
-  if (it.kind === 'bld') return !pl.col.bld[it.id];
-  if (it.kind === 'ship') { const d = designOf(emp, it.id); return !!d && !shipReason(emp, pl, d); }
-  if (it.kind === 'proj') return it.id === 'terraform' ? !!TERRAFORM[pl.type] : (pl.type === 'terran' || pl.type === 'ocean');
-  return true;
-}
-function completeItem(emp, pl, it) {
-  const c = pl.col;
-  if (it.kind === 'bld') {
-    c.bld[it.id] = 1;
-    const e = BUILDINGS[it.id].e;
-    if (e.defHp) c.defHp = Math.min(planetDefMax(pl), c.defHp + e.defHp * (has(emp, 'hardened_colonies') ? 1.5 : 1));
-    msg(emp.id, planetName(pl) + ' completed ' + BUILDINGS[it.id].name + '.', pl.star, 'build');
-  } else if (it.kind === 'ship') {
-    spawnShip(emp, it.id, pl.star);
-    msg(emp.id, planetName(pl) + ' launched a new ' + designOf(emp, it.id).name + '.', pl.star, 'ship');
-  } else if (it.kind === 'proj') {
-    const old = PT[pl.type].name;
-    pl.type = it.id === 'gaia' ? 'gaia' : TERRAFORM[pl.type];
-    msg(emp.id, planetName(pl) + ' transformed from ' + old + ' to ' + PT[pl.type].name + '.', pl.star, 'build');
-  }
-}
-function processProduction(emp, pl, prod) {
-  const c = pl.col;
-  while (c.queue.length && !itemValid(emp, pl, c.queue[0])) c.queue.shift();
-  if (!c.queue.length) { emp.bc += prod * 0.5; c.prog = 0; return; }
-  c.prog += prod;
-  const it = c.queue[0];
-  const cost = itemCost(emp, pl, it);
-  if (c.prog >= cost) {
-    completeItem(emp, pl, it);
-    c.prog = Math.min(c.prog - cost, cost);
-    if (it.n && it.n > 1) it.n--; else c.queue.shift();
-    if (!c.queue.length) { emp.bc += c.prog * 0.5; c.prog = 0; }
-  }
-}
-function buyCost(emp, pl) {
-  const c = pl.col; if (!c.queue.length) return 0;
-  const cost = itemCost(emp, pl, c.queue[0]); const rem = Math.max(0, cost - c.prog);
-  return Math.ceil(rem * (c.prog > 0 ? 2 : 3));
-}
-function buyItem(emp, pl) {
-  const bc = buyCost(emp, pl); if (bc <= 0 || emp.bc < bc) return false;
-  emp.bc = r1(emp.bc - bc); pl.col.prog = itemCost(emp, pl, pl.col.queue[0]); return true;
-}
-function demolish(emp, pl, id) {
-  const c = pl.col; if (!c.bld[id]) return;
-  delete c.bld[id];
-  c.defHp = Math.min(c.defHp, planetDefMax(pl));
-  if (id === 'shipyard') { delete c.bld.drydock; c.queue = c.queue.filter(q => q.kind !== 'ship'); }
-}
-
-// ---------------- Planet defense / troops ----------------
-function planetDefMax(pl) {
-  const c = pl.col; if (!c || c.outpost) return 0; const emp = E(pl.owner);
-  return Math.round((bldEff(c).defHp || 0) * (has(emp, 'hardened_colonies') ? 1.5 : 1));
-}
-function planetDef(pl) {
-  const c = pl.col; if (!c || c.outpost) return null; const emp = E(pl.owner);
-  const e = bldEff(c); if (!e.defN) return null;
-  const bw = bestWeapon(emp, 'beam'); const W = WEAPONS[bw];
-  const dm = has(emp, 'heavy_mounts') ? 1.25 : 1;
-  const weapons = [{id: bw, name: W.name, type: 'beam', dmg: [Math.round(W.dmg[0] * dm), Math.round(W.dmg[1] * dm)], n: e.defN, range: W.range + 3, ammo: 0, color: W.color}];
-  return {maxHp: planetDefMax(pl), shield: e.shield || 0, attack: emp.compLvl + 1 + (has(emp, 'fire_control_ai') ? 2 : 0), defense: 0, weapons, dpr: e.defN * (W.dmg[0] + W.dmg[1]) / 2 * 0.6};
-}
-function garrison(pl) {
-  const c = pl.col; if (!c || c.outpost) return 0; const emp = E(pl.owner);
-  return Math.round((2 + c.pop * 0.5 + (bldEff(c).troops || 0)) * (has(emp, 'hardened_colonies') ? 1.5 : 1));
-}
-function troopStr(emp, attacking) { const r = R(emp); return (r.ground || 1) * (attacking ? (has(emp, 'assault_armor') ? 1.5 : 1) : (has(emp, 'personal_shields') ? 1.5 : 1)); }
-
-// ---------------- Range / visibility ----------------
-function distToOwned(emp, x, y) {
-  let d = 1e9; for (const p of S.planets) if (p.owner === emp.id && p.star >= 0) { const s = ST(p.star); const dd = hyp(s.x, s.y, x, y); if (dd < d) d = dd; }
-  return d;
-}
-function inRange(emp, starId) { const s = ST(starId); return distToOwned(emp, s.x, s.y) <= emp.range + 1e-6; }
-function eta(f, starId) { const s = ST(starId); return Math.max(1, Math.ceil((hyp(f.x, f.y, s.x, s.y) - 1e-6) / fleetSpeed(f))); }
+function fleetSpeed(f) { let v = 1; for (const sh of f.ships) v = Math.min(v, designSpeed(design(sh.d))); return v; }
+function fleetTel(f) { let v = 0; for (const sh of f.ships) v = Math.max(v, designTel(design(sh.d))); return v; }
+function fleetHas(f, m) { return f.ships.some(sh => designHas(design(sh.d), m)); }
+function fleetCargo(f) { let n = 0; for (const sh of f.ships) n += design(sh.d).mods.filter(m => m === 'cargo').length; return n * (has('interstellar_commerce') ? 2 : 1); }
+function etaTo(f, starId) { const s = ST(starId); return Math.max(1, Math.ceil((d3(f, s) - 1e-6) / fleetSpeed(f))); }
+function cleanupFleets() { S.fleets = S.fleets.filter(f => f.ships.length); }
 function orderMove(f, starId) {
-  const emp = E(f.owner);
   if (f.star === starId) { f.dest = null; return null; }
-  if (!inRange(emp, starId)) return 'Out of fuel range';
-  if (!f.ships.length) return 'Empty fleet';
-  f.dest = starId; return null;
+  const s = ST(starId);
+  if (s.guard && s.guardKnown && has('bt_machines')) return 'Guardian machines hold that system. Your ships refuse to enter.';
+  if (!S.known[starId]) return 'Unknown destination';
+  f.dest = starId; if (f.task && f.task.type !== 'route') f.task = null; return null;
 }
-function scanCircles(emp) {
-  const c = []; const seen = new Set();
-  for (const p of S.planets) if (p.owner === emp.id && p.star >= 0 && !seen.has(p.star)) { seen.add(p.star); const s = ST(p.star); c.push([s.x, s.y, emp.scan]); }
-  for (const f of S.fleets) if (f.owner === emp.id) { const scout = f.ships.some(s => s.d === 's_scout'); c.push([f.x, f.y, emp.fscan + (scout ? 1.5 : 0)]); }
+function splitFleet(f, ids) { const nf = {id: nid(), ships: f.ships.filter(s => ids.includes(s.id)), star: f.star, x: f.x, y: f.y, z: f.z, dest: null, task: null}; f.ships = f.ships.filter(s => !ids.includes(s.id)); S.fleets.push(nf); cleanupFleets(); return nf; }
+function mergeFleets(a, b) { a.ships.push(...b.ships); b.ships = []; cleanupFleets(); }
+
+// ---------- habitability & colonies ----------
+function hab(b) {
+  if (b.star === 0 && b.name === 'Earth') return 'garden';
+  if (b.clouds) return 'harsh';
+  const c = PCLASS[b.cls];
+  if (!c.solid || c.belt) return 'outpost';
+  if (c.burning) return 'none';
+  if (b.temp === 'scorching') return 'outpost';
+  let h;
+  if (b.temp === 'temperate') {
+    if (b.atm === 'breathable') h = (b.life === 'ecosystem' && b.toxicLife && !has('xenobiochem')) ? 'harsh' : 'garden';
+    else if (b.atm === 'toxic') h = 'harsh';
+    else if (b.atm === 'none') h = 'hostile';
+    else h = 'livable';
+    if (h !== 'garden' && b.life === 'ecosystem' && b.toxicLife && !has('xenobiochem')) h = 'harsh';
+  } else if (b.temp === 'hot' || b.temp === 'cold') h = (b.atm === 'none' || b.atm === 'toxic') ? 'hostile' : 'harsh';
+  else h = 'hostile';
+  if (b.tf) h = HAB_ORDER[Math.min(5, HAB_ORDER.indexOf(h) + b.tf)];
+  return h;
+}
+function popCap(b) {
+  if (b.star === 0 && b.name === 'Earth') return 12000 * (has('arcologies') ? 1.25 : 1);
+  const h = hab(b);
+  let c = b.clouds ? 40 : HAB[h].cap * b.size;
+  if (h === 'harsh' && has('gene_adaptation')) c *= 1.5;
+  if (has('arcologies')) c *= 1.25;
+  if (b.col && b.col.proj.habitat) c *= 1.5;
   return c;
 }
-function inCircles(cs, x, y) { for (const c of cs) if (hyp(c[0], c[1], x, y) <= c[2] + 1e-6) return true; return false; }
-function updateExploration(emp) {
-  const cs = scanCircles(emp);
-  for (const s of S.stars) if (!emp.explored[s.id] && inCircles(cs, s.x, s.y)) emp.explored[s.id] = true;
+function stageOf(b) {
+  const c = b.col; if (!c) return null;
+  if (c.home) return 'home';
+  if (c.outpost || c.pop <= 0) return 'outpost';
+  if (c.pop < 0.1) return 'settlement';
+  if (c.pop < 10) return 'city';
+  return 'core';
 }
-function establishContacts() {
-  const es = alive(); const circ = {}, pts = {};
-  for (const e of es) {
-    circ[e.id] = scanCircles(e); pts[e.id] = [];
-    for (const p of S.planets) if (p.owner === e.id && p.star >= 0) { const s = ST(p.star); pts[e.id].push([s.x, s.y]); }
-    for (const f of S.fleets) if (f.owner === e.id) pts[e.id].push([f.x, f.y]);
+function colonies(includeOutposts) { return S.bodies.filter(b => b.owner === 0 && b.col && (includeOutposts || !b.col.outpost)); }
+function colOut(b) {
+  const c = b.col, stg = stageOf(b), st = STAGES[stg], h = hab(b);
+  const fm = {prod: 1, rp: 1, bc: 1, food: 1};
+  if (c.focus === 'industry') { fm.prod = 1.75; fm.rp = fm.bc = 0.8; }
+  if (c.focus === 'science') { fm.rp = 1.75; fm.prod = fm.bc = 0.8; }
+  if (c.focus === 'trade') { fm.bc = 1.75; fm.prod = fm.rp = 0.8; }
+  if (c.focus === 'farming') { fm.food = 2; fm.prod = fm.rp = fm.bc = 0.8; }
+  const p = c.proj;
+  let prod = st.prod * MIN_MULT[b.min] * fm.prod * (p.mines ? 1.5 : 1) * S.mods.prod * (has('autofactories') ? 1.2 : 1) * (has('antimatter_production') ? 1.1 : 1) * (has('bt_fusion') ? 1.15 : 1);
+  let rp = st.rp * fm.rp * (p.campus ? 1.5 : 1) * S.mods.rp * (has('quantum_computing') ? 1.15 : 1) * (has('unified_science') ? 1.2 : 1) * (has('bt_signal') ? 1.15 : 1);
+  let bc = st.bc * fm.bc * (p.tradeport ? 1.5 : 1) * S.mods.bc * (has('interstellar_commerce') ? 1.2 : 1);
+  let fert = HAB[h].fert * ((h === 'harsh' || h === 'hostile') && has('closed_ecology') ? 1.5 : 1);
+  const lvl = Math.max(0, STAGE_ORDER.indexOf(stg) - 1);
+  let food = st.food * fert * fm.food + (p.agridomes ? (3 + 3 * Math.max(0, lvl - 0)) * (has('bt_seeds') ? 2 : 1) : 0) + (c.home ? S.mods.earthFood : 0);
+  if (stg === 'outpost') { food = 0; }
+  return {stage: stg, prod: r1(prod), rp: r1(rp), bc: r1(bc), food: r1(food), eat: st.eat, cap: popCap(b), hab: h};
+}
+function systemFood(starId) {
+  let made = 0, eaten = 0;
+  for (const bid of ST(starId).bodies) { const b = B(bid); if (b.owner !== 0 || !b.col) continue; const o = colOut(b); made += o.food; eaten += o.eat; }
+  return {made: r1(made), eaten: r1(eaten), net: r1(made - eaten), stock: Math.floor(ST(starId).stock || 0)};
+}
+function colonyStars() { return [...new Set(colonies(true).map(b => b.star))]; }
+function growthRate(b) {
+  const h = hab(b), stg = stageOf(b);
+  let g = HAB[h].grow * S.mods.growth;
+  if (stg === 'settlement' && has('colonial_charter')) g *= 1.5;
+  if (h === 'harsh' && has('gene_adaptation')) g *= 1.5;
+  if (has('longevity')) g *= 1.25;
+  if (has('bt_genome') && b.life !== 'none') g *= 1.25;
+  if (stg === 'home') g = 0.004 * S.mods.growth;
+  return g;
+}
+function shipCost(d, b) { return Math.round(designCost(d) * (b && b.col.proj.elevator ? 0.75 : 1)); }
+function projCost(id) { return Math.round(PROJECTS[id].cost * (has('megastructures') ? 0.75 : 1)); }
+function itemCost(b, it) { return it.kind === 'proj' ? projCost(it.id) : shipCost(design(it.id), b); }
+function itemName(it) { return it.kind === 'proj' ? PROJECTS[it.id].name : design(it.id).name; }
+function projReason(b, id) {
+  const P = PROJECTS[id], c = b.col;
+  if (c.outpost) return 'Outposts cannot build';
+  if (P.tech && !has(P.tech)) return 'Needs ' + TECH[P.tech].name;
+  if (c.proj[id] && !P.repeat) return 'Already built';
+  if (c.queue.some(q => q.kind === 'proj' && q.id === id)) return 'Already queued';
+  if (STAGE_ORDER.indexOf(stageOf(b)) < STAGE_ORDER.indexOf(P.stage)) return 'Needs a ' + STAGES[P.stage].name;
+  if (id === 'terraform' && (hab(b) === 'garden' || hab(b) === 'none' || hab(b) === 'outpost' || c.home)) return 'Cannot be improved further';
+  return null;
+}
+function shipReason(b) { if (b.col.outpost) return 'Outposts cannot build'; if (!b.col.proj.shipyard) return 'Needs an Orbital Shipyard'; return null; }
+function buyCost(b) { const c = b.col; if (!c.queue.length) return 0; const cost = itemCost(b, c.queue[0]); return Math.ceil(Math.max(0, cost - c.prog) * (c.prog > 0 ? 2 : 3)); }
+function buyItem(b) { const k = buyCost(b); if (k <= 0 || S.bc < k) return false; S.bc = r1(S.bc - k); b.col.prog = itemCost(b, b.col.queue[0]); return true; }
+function completeItem(b, it) {
+  if (it.kind === 'proj') {
+    if (it.id === 'terraform') {
+      b.tf = (b.tf || 0) + 1;
+      if (b.life === 'ecosystem') { b.life = 'microbial'; msg('Terraforming on ' + b.name + ' has wiped out most of its native ecosystem.', b.star, 'warn'); }
+      msg(b.name + ' is now ' + HAB[hab(b)].name + ' after a terraforming stage.', b.star, 'build');
+    } else { b.col.proj[it.id] = 1; msg(b.name + ' completed ' + PROJECTS[it.id].name + '.', b.star, 'build'); }
+  } else {
+    newFleetAt(b.star, it.id);
+    msg(b.name + ' launched a ' + design(it.id).name + '.', b.star, 'ship');
   }
-  for (const a of es) for (const b of es) {
-    if (a.id >= b.id || a.rel[b.id].contact) continue;
-    if (pts[b.id].some(p => inCircles(circ[a.id], p[0], p[1])) || pts[a.id].some(p => inCircles(circ[b.id], p[0], p[1]))) makeContact(a, b);
+}
+function settlerCount() { return has('hibernation') ? 0.04 : 0.02; }
+function colonizeCheck(f, b, kind) {
+  if (f.star !== b.star || f.dest != null) return 'The ship must be in orbit';
+  if (kind === 'colony') {
+    if (!fleetHas(f, 'colony')) return 'No Colony Pod in this fleet';
+    const h = hab(b);
+    if (b.owner === 0 && b.col && !b.col.outpost) return null; // add settlers
+    if (h === 'none' || h === 'outpost') return 'People cannot live there (use an Outpost Kit)';
+    if (b.owner === 0 && b.col && b.col.outpost) return null;
+    return null;
   }
+  if (!fleetHas(f, 'outpost')) return 'No Outpost Kit in this fleet';
+  if (b.owner === 0) return 'Already ours';
+  if (hab(b) === 'none') return 'Nothing can be built there';
+  return null;
 }
-function makeContact(a, b) {
-  for (const [x, y] of [[a, b], [b, a]]) {
-    const rel = x.rel[y.id]; rel.contact = true; rel.status = 'peace'; rel.peaceTurn = S.turn;
-    rel.att = ri(-10, 10) + (R(y).diplo || 0) + (has(y, 'xeno_relations') ? 20 : 0) + (has(y, 'xeno_psychology') ? 30 : 0) - ((R(x).aggressive || 1) - 1) * 30;
-  }
-  const other = a.id === 0 ? b : b.id === 0 ? a : null;
-  if (other) msg(0, 'First contact: we have met the ' + other.name + ' (' + R(other).species + ').', null, 'diplo');
-}
-
-// ---------------- Colonize / invade ----------------
-function hostile(a, b) { if (a === b) return false; if (a === -1 || b === -1) return true; return E(a).rel[b].status === 'war'; }
-function hostileArmedAt(empId, starId) {
-  return S.fleets.some(f => f.star === starId && f.dest == null && hostile(empId, f.owner) && armed(E(f.owner), f));
-}
-function colonizeCheck(emp, f, pl) {
-  if (pl.star !== f.star || f.dest != null) return 'Fleet must be in orbit';
-  if (pl.owner != null && !(pl.owner === emp.id && pl.col.outpost)) return 'Planet is already claimed';
-  if (hostileArmedAt(emp.id, pl.star)) return 'Hostile ships control this system';
-  const mp = maxPop(emp, pl);
-  const hasCol = f.ships.some(s => s.d === 's_colony'), hasOut = f.ships.some(s => s.d === 's_outpost');
-  if (pl.owner === emp.id) return (hasCol && mp > 0) ? null : 'Needs a Colony Ship to settle this outpost';
-  if (mp > 0 && hasCol) return null;
-  if (hasOut) return null;
-  if (mp <= 0 && hasCol) return 'Uninhabitable for your species: needs an Outpost Ship';
-  return 'No Colony or Outpost Ship in this fleet';
-}
-function colonize(emp, f, pl, preferOutpost) {
-  if (colonizeCheck(emp, f, pl)) return false;
-  const mp = maxPop(emp, pl);
-  const useCol = !preferOutpost && mp > 0 && f.ships.some(s => s.d === 's_colony');
-  const sid = useCol ? 's_colony' : 's_outpost';
-  const idx = f.ships.findIndex(s => s.d === sid); if (idx < 0) return false;
+function colonize(f, b, kind) {
+  if (colonizeCheck(f, b, kind)) return false;
+  const idx = f.ships.findIndex(sh => designHas(design(sh.d), kind === 'colony' ? 'colony' : 'outpost'));
+  const sh = f.ships[idx];
+  const pods = kind === 'colony' ? design(sh.d).mods.filter(m => m === 'colony').length : 0;
   f.ships.splice(idx, 1);
-  if (useCol) { newColony(emp, pl, 1); msg(emp.id, 'New colony founded on ' + planetName(pl) + '.', pl.star, 'colony'); }
-  else { newOutpost(emp, pl); msg(emp.id, 'Outpost established on ' + planetName(pl) + '.', pl.star, 'colony'); }
+  if (kind === 'colony') {
+    const add = settlerCount() * pods;
+    if (b.owner === 0 && b.col && !b.col.outpost) { b.col.pop += add; msg(Math.round(add * 1e6).toLocaleString() + ' new settlers arrived on ' + b.name + '.', b.star, 'colony'); }
+    else { const old = b.col; b.owner = 0; b.col = {pop: add, focus: 'balanced', proj: old ? old.proj : {}, queue: [], prog: 0, founded: S.year}; msg('A new colony is founded on ' + b.name + ' with ' + Math.round(add * 1e6).toLocaleString() + ' settlers.', b.star, 'colony'); journal('Founded a colony on ' + b.name + '.', b.star); }
+  } else { b.owner = 0; b.col = {pop: 0, outpost: true, focus: 'balanced', proj: {}, queue: [], prog: 0, founded: S.year}; msg('A mining outpost is established on ' + b.name + '.', b.star, 'colony'); }
   cleanupFleets();
   return true;
 }
-function fleetTroops(f) { const emp = E(f.owner); let t = 0; for (const s of f.ships) { if (s.troopsUsed === S.turn) continue; t += shipStats(emp, designOf(emp, s.d)).troops || 0; } return t; }
-function invadeCheck(emp, f, pl) {
-  if (pl.star !== f.star || f.dest != null) return 'Fleet must be in orbit';
-  if (pl.owner == null || pl.owner === emp.id || pl.owner < 0) return 'Not an enemy colony';
-  if (!hostile(emp.id, pl.owner)) return 'You are not at war with them';
-  if (S.fleets.some(x => x.star === pl.star && x.owner === pl.owner && armed(E(x.owner), x))) return 'Their warships still defend this system';
-  if (S.fleets.some(x => x.star === pl.star && x.owner === -1)) return 'A monster guards this system';
-  if (pl.col.outpost) return (armed(emp, f) || fleetTroops(f)) ? null : 'Needs warships or marines to seize an outpost';
-  if (!fleetTroops(f)) return 'No marines in this fleet';
-  if (planetDef(pl) && pl.col.defHp > 0) return 'Planet defenses must be destroyed first';
-  return null;
+
+// ---------- research ----------
+function techCost(id) { const t = TECH[id]; return Math.round(t.cost * (id === 'exotic_matter' && has('bt_exotic') ? 0.5 : 1)); }
+function availableTechs() { return TECHS.filter(t => !has(t.id) && t.req.every(has)); }
+function setResearch(id) { if (!TECH[id] || has(id) || !TECH[id].req.every(has)) return false; if (S.res && S.res.tech !== id) S.rpBank += S.res.prog; if (!S.res || S.res.tech !== id) S.res = {tech: id, prog: 0}; return true; }
+function learn(id, how) { if (has(id)) return; S.techs[id] = 1; msg((how || 'Research complete') + ': ' + TECH[id].name + '. ' + TECH[id].desc, null, 'tech'); }
+
+// ---------- knowledge ----------
+function telescopes() {
+  const out = [];
+  const seen = new Set();
+  for (const b of colonies(true)) { if (seen.has(b.star)) continue; seen.add(b.star); const s = ST(b.star);
+    let r = COLONY_TEL; if (b.star === 0) r = S.mods.earthTel; for (const bb of s.bodies.map(B)) if (bb.owner === 0 && bb.col && bb.col.proj.observatory) r = Math.max(r, 24);
+    out.push({x: s.x, y: s.y, z: s.z, r: telBonus(r)}); }
+  for (const f of S.fleets) out.push({x: f.x, y: f.y, z: f.z, r: fleetTel(f)});
+  return out;
 }
-function invade(emp, f, pl) {
-  if (invadeCheck(emp, f, pl)) return null;
-  const def = E(pl.owner);
-  if (pl.col.outpost) {
-    const old = pl.owner; newOutpost(emp, pl);
-    msg(emp.id, 'We seized the ' + def.name + ' outpost on ' + planetName(pl) + '.', pl.star, 'war');
-    msg(old, 'The ' + emp.name + ' seized our outpost on ' + planetName(pl) + '.', pl.star, 'war');
-    return {win: true};
+function updateKnowledge() {
+  const tel = telescopes();
+  for (const s of S.stars) {
+    if (!S.known[s.id] && tel.some(t => d3(t, s) <= t.r + 1e-6)) { S.known[s.id] = 1; if (S.turn > 1) msg('Telescopes have spotted ' + s.name + ' (' + starKind(s.sp).word.toLowerCase() + ', ' + s.ly + ' light-years from the Sun).', s.id, 'spot'); }
+    if (!S.visited[s.id]) for (const f of S.fleets) if (d3(f, s) <= DETAIL_RANGE + 1e-6) { visit(s); break; }
   }
-  let a = fleetTroops(f); const a0 = a;
-  let d = garrison(pl); const d0 = d;
-  const as = troopStr(emp, true), ds = troopStr(def, false);
-  while (a > 0 && d > 0) { if (rnd() * as > rnd() * ds) d--; else a--; }
-  // marines are spent: transports and troop bays are used up
-  f.ships = f.ships.filter(s => s.d !== 's_transport');
-  for (const s of f.ships) { const st = shipStats(emp, designOf(emp, s.d)); if (st.troops) s.troopsUsed = S.turn; }
-  cleanupFleets();
-  const res = {win: d <= 0, a0, d0, aLeft: a, dLeft: d, planet: pl.id};
-  if (res.win) {
-    msg(emp.id, 'Our ' + a0 + ' marines captured ' + planetName(pl) + ' from the ' + def.name + ' (' + d0 + ' defenders).', pl.star, 'war');
-    msg(pl.owner, 'The ' + emp.name + ' invaded and captured ' + planetName(pl) + '!', pl.star, 'war');
-    capture(pl, emp);
-  } else {
-    msg(emp.id, 'Our invasion of ' + planetName(pl) + ' failed: ' + a0 + ' marines against ' + d0 + ' defenders.', pl.star, 'war');
-    msg(pl.owner, 'We repelled a ' + emp.name + ' invasion of ' + planetName(pl) + '.', pl.star, 'war');
-  }
+}
+function visit(s) {
+  S.visited[s.id] = 1; S.known[s.id] = 1;
+  const n = s.bodies.length;
+  msg('Our ship reached ' + s.name + ': ' + (n ? n + ' world' + (n > 1 ? 's' : '') + ' found' : 'no planets') + (s.anom ? '. Strange readings detected!' : '.'), s.id, 'arrive');
+  journal('First visit to ' + s.name + (s.anom ? ' (strange readings)' : '') + '.', s.id);
+}
+function lifeVisible(s) { return S.surveyed[s.id] || (has('biosignatures') && S.known[s.id]); }
+
+// ---------- anomalies ----------
+function eventOf(s) { return EVENTS.find(e => e.id === s.anom); }
+function canInvestigate(f) { if (!f || f.star == null || f.dest != null) return false; const s = ST(f.star); return !!(s.anom && !s.anomDone && S.visited[s.id] && fleetHas(f, 'lab')); }
+function resolveChoice(f, ci) {
+  const s = ST(f.star), ev = eventOf(s); const ch = ev.ch[ci];
+  let r = rnd(), o = ch.o[ch.o.length - 1];
+  for (const x of ch.o) { if (r < x.p) { o = x; break; } r -= x.p; }
+  s.anomDone = true; S.stats.anomalies++;
+  const res = {text: o.t, gains: []};
+  if (o.rp) { const v = Math.round(o.rp * (has('xenology') ? 1.5 : 1) * (1 + S.turn / 150)); S.rpBank += v; res.gains.push('+' + v + ' research'); }
+  if (o.bc) { const v = Math.round(o.bc * (1 + S.turn / 200)); S.bc += v; res.gains.push('+' + v + ' credits'); }
+  if (o.bt) { if (!has(o.bt)) { S.techs[o.bt] = 1; res.gains.push('Breakthrough: ' + TECH[o.bt].name + ' (' + TECH[o.bt].desc + ')'); } else { S.rpBank += 150; res.gains.push('+150 research'); } }
+  if (o.reveal) { const unk = S.stars.filter(x => !S.known[x.id]).sort((a, b) => d3(a, s) - d3(b, s)).slice(0, o.reveal); unk.forEach(x => S.known[x.id] = 1); if (unk.length) res.gains.push('Revealed: ' + unk.map(x => x.name).join(', ')); }
+  if (o.score) S.stats.anomScore += o.score;
+  if (o.lose) { const i = f.ships.findIndex(sh => designHas(design(sh.d), 'lab')); f.ships.splice(i >= 0 ? i : 0, 1); S.stats.lost++; res.gains.push('The ship was lost'); res.lost = true; cleanupFleets(); }
+  journal(ev.title + ' at ' + s.name + ': ' + o.t, s.id);
   return res;
 }
-function capture(pl, emp) {
-  const old = E(pl.owner); const c = pl.col;
-  pl.owner = emp.id;
-  if (!has(emp, 'xeno_psychology')) c.pop = Math.max(1, c.pop * 0.7);
-  c.queue = []; c.prog = 0; c.defHp = 0;
-  const wasCap = c.capital; c.capital = false;
-  while (Object.keys(c.bld).length > slotsOf(pl)) delete c.bld[Object.keys(c.bld).pop()];
-  old.rel[emp.id].att -= 25;
-  if (wasCap) {
-    const rest = colonies(old).sort((a, b) => b.col.pop - a.col.pop);
-    if (rest.length) { rest[0].col.capital = true; old.capital = rest[0].id; } else old.capital = null;
-  }
-  const av = availableTechs(emp).filter(t => has(old, t.tech));
-  if (av.length && rnd() < 0.6) learnTech(emp, pick(av).tech, 'Captured research archives reveal');
-}
 
-// ---------------- Diplomacy ----------------
-function declareWar(a, b) {
-  const ra = a.rel[b.id], rb = b.rel[a.id];
-  if (ra.status === 'war') return;
-  const broke = ra.treaty;
-  ra.status = rb.status = 'war'; ra.treaty = rb.treaty = false; ra.warTurns = rb.warTurns = 0;
-  rb.att -= 40;
-  for (const o of alive()) if (o !== a && o !== b && o.rel[a.id].contact) o.rel[a.id].att -= broke ? 10 : 4;
-  if (b.id === 0) S.msgs.push({text: 'The ' + a.name + ' have DECLARED WAR on us!', star: null, kind: 'war'});
-  else if (a.id === 0) S.msgs.push({text: 'We are now at war with the ' + b.name + '.', star: null, kind: 'war'});
-  else if (player().rel[a.id].contact && player().rel[b.id].contact) S.msgs.push({text: 'The ' + a.name + ' declared war on the ' + b.name + '.', star: null, kind: 'diplo'});
-}
-function makePeace(a, b) {
-  const ra = a.rel[b.id], rb = b.rel[a.id];
-  ra.status = rb.status = 'peace'; ra.warTurns = rb.warTurns = 0; ra.att += 10; rb.att += 10;
-  ra.peaceTurn = rb.peaceTurn = S.turn;
-  if (a.id === 0 || b.id === 0) S.msgs.push({text: 'Peace treaty signed with the ' + (a.id === 0 ? b : a).name + '.', star: null, kind: 'diplo'});
-}
-function signTrade(a, b) {
-  a.rel[b.id].treaty = b.rel[a.id].treaty = true; a.rel[b.id].att += 5; b.rel[a.id].att += 5;
-  if (a.id === 0 || b.id === 0) S.msgs.push({text: 'Trade treaty signed with the ' + (a.id === 0 ? b : a).name + '.', star: null, kind: 'diplo'});
-}
-function empMilitary(emp) { let v = 0; for (const f of S.fleets) if (f.owner === emp.id) for (const s of f.ships) { const st = shipStats(emp, designOf(emp, s.d)); if (st.weapons.length) v += st.cost; } return v; }
-function empStrength(emp) {
-  let v = empMilitary(emp);
-  for (const p of colonies(emp)) { v += p.col.pop * 4; const d = planetDef(p); if (d) v += d.maxHp; }
-  return v;
-}
-function attText(a) { return a >= 40 ? 'Friendly' : a >= 10 ? 'Cordial' : a > -10 ? 'Neutral' : a > -40 ? 'Wary' : 'Hostile'; }
-function aiAcceptPeace(ai, other) {
-  const rel = ai.rel[other.id];
-  const ratio = empStrength(ai) / Math.max(1, empStrength(other));
-  let chance = 0.15 + (rel.warTurns > 12 ? 0.25 : 0) + (ratio < 0.8 ? 0.45 : 0) - (ratio > 1.6 ? 0.4 : 0) + rel.att / 200;
-  if (rel.warTurns < 5) chance -= 0.3;
-  return rnd() < chance;
-}
-function aiAcceptTrade(ai, other) { const rel = ai.rel[other.id]; return rel.status === 'peace' && rel.att > -5 + rnd() * 20; }
-function tributeAmount(payer) { return Math.max(20, Math.round(Math.min(payer.bc * 0.5, 40 + S.turn * 2) / 5) * 5); }
-function aiAcceptDemand(ai, demander) {
-  const ratio = empStrength(ai) / Math.max(1, empStrength(demander));
-  return ratio < 0.6 && rnd() < 0.75 && ai.rel[demander.id].status === 'peace';
-}
-function payTribute(payer, to, amt) {
-  amt = Math.min(amt, Math.floor(payer.bc)); payer.bc = r1(payer.bc - amt); to.bc = r1(to.bc + amt);
-  payer.rel[to.id].att -= 10;
-  return amt;
-}
-
-// ---------------- Turn processing ----------------
-// Phase 1: orders + movement + contacts, then collect battles. Player battles are left in S.pendingBattles.
-function endTurnStart() {
-  S.msgs = []; S.prompts = []; S.pendingBattles = [];
-  for (const emp of alive()) if (emp.ai) aiTurn(emp);
-  moveFleets();
-  for (const emp of alive()) updateExploration(emp);
-  establishContacts();
-  for (const sid of battleStars()) {
-    const owners = battleOwners(sid);
-    if (owners.includes(0)) S.pendingBattles.push(sid);
-    else autoBattle(sid);
-  }
-  cleanupFleets();
-}
-// Phase 2: after all battles are resolved
-function endTurnFinish() {
-  for (const emp of alive()) if (emp.ai) aiPostMove(emp);
-  cleanupFleets();
-  for (const emp of alive()) processEconomy(emp);
-  repairAndRegen();
-  for (const emp of alive()) for (const k in emp.rel) { const r = emp.rel[k]; if (r.status === 'war') r.warTurns++; }
-  for (const emp of alive()) if (emp.ai) aiDiplomacy(emp);
-  checkEliminations();
-  S.turn++;
-  recordHistory();
-  checkVictory();
-}
-function endTurnAuto() { endTurnStart(); for (const sid of S.pendingBattles) autoBattle(sid); S.pendingBattles = []; endTurnFinish(); }
+// ---------- turn ----------
 function moveFleets() {
   for (const f of S.fleets) {
     if (f.dest == null) continue;
     const d = ST(f.dest), spd = fleetSpeed(f);
-    if (spd <= 0) { f.dest = null; continue; }
-    f.from = f.star != null ? f.star : f.from;
     f.star = null;
-    const L = hyp(f.x, f.y, d.x, d.y);
-    if (L <= spd + 1e-6) {
-      f.x = d.x; f.y = d.y; f.star = f.dest; f.dest = null; f.arrived = S.turn;
-      const emp = E(f.owner); if (emp.explored) emp.explored[f.star] = true;
-    } else { f.x += (d.x - f.x) / L * spd; f.y += (d.y - f.y) / L * spd; }
-  }
-  for (const emp of alive()) if (emp.ai) {
-    const byStar = {};
-    for (const f of S.fleets) if (f.owner === emp.id && f.star != null && f.dest == null) {
-      const role = fleetRole(f); if (role !== 'war' && role !== 'transport') continue;
-      const k = f.star + ':' + role; if (byStar[k]) mergeFleets(byStar[k], f); else byStar[k] = f;
-    }
+    const L = d3(f, d);
+    if (L <= spd + 1e-6) { f.x = d.x; f.y = d.y; f.z = d.z; f.star = f.dest; f.dest = null; f.arrived = S.turn; arrive(f); }
+    else { f.x += (d.x - f.x) / L * spd; f.y += (d.y - f.y) / L * spd; f.z += (d.z - f.z) / L * spd; }
   }
   cleanupFleets();
 }
-function processEconomy(emp) {
-  const t = empTotals(emp);
-  if (t.foodNet < 0) {
-    const tp = Math.max(1, t.pop);
-    for (const pl of colonies(emp)) pl.col.pop = Math.max(1, pl.col.pop - (-t.foodNet) * 0.25 * pl.col.pop / tp);
-    msg(emp.id, 'Food shortage of ' + (-t.foodNet) + '! Colonists are starving. Build farms (Hydroponic Bays, Agri-Domes) or settle fertile worlds.', null, 'warn');
+function arrive(f) {
+  const s = ST(f.star);
+  if (s.guard) {
+    S.stats.lost += f.ships.length; f.ships = [];
+    s.guardKnown = true; S.visited[s.id] = 1;
+    const first = !S.awakened; S.awakened = true;
+    msg('Contact with our ships at ' + s.name + ' was lost. Their last transmissions show machines, ancient and artificial, opening fire. ' + (first ? 'We are not alone, and space is not safe.' : ''), s.id, 'lost');
+    journal('Guardian machines destroyed our ships at ' + s.name + '.', s.id);
+    return;
   }
-  processResearch(emp, t.rp);
-  for (const pl of colonies(emp)) {
-    const s = colStats(pl);
-    processProduction(emp, pl, s.prod);
-    const g = growthOf(emp, pl, s.maxPop);
-    pl.col.pop = Math.max(1, pl.col.pop + (t.foodNet < 0 ? Math.min(0, g) : g));
-  }
-  emp.bc = r1(emp.bc + t.net);
-  emp.broke = false;
-  if (emp.bc < 0) { emp.bc = 0; emp.broke = true; msg(emp.id, 'The treasury is empty! Production is halved until income is positive. Scrap ships, demolish buildings or let colonies build Trade Goods.', null, 'warn'); }
+  if (f.task && f.task.type === 'route') routeArrive(f);
 }
-function repairAndRegen() {
+function routeArrive(f) {
+  const t = f.task, here = f.star;
+  const cap = fleetCargo(f) * 4;
+  if (here === t.a) {
+    if (t.cargo === 'food') { const s = ST(here); const take = Math.min(cap, Math.floor(s.stock)); s.stock -= take; t.load = take; }
+    else { const src = ST(here).bodies.map(B).filter(b => b.owner === 0 && b.col && !b.col.outpost && b.col.pop > 0.2).sort((a, b) => b.col.pop - a.col.pop)[0]; const n = fleetCargo(f) * 0.002; if (src) { src.col.pop -= n; t.load = n; } else t.load = 0; }
+    f.dest = t.b;
+  } else if (here === t.b) {
+    if (t.load) {
+      if (t.cargo === 'food') { ST(here).stock += t.load; }
+      else { const dst = ST(here).bodies.map(B).filter(b => b.owner === 0 && b.col && !b.col.outpost).sort((a, b) => a.col.pop - b.col.pop)[0]; if (dst) dst.col.pop += t.load; }
+      t.delivered = (t.delivered || 0) + 1;
+    }
+    t.load = 0; f.dest = t.a;
+  }
+}
+function processSurveys() {
   for (const f of S.fleets) {
-    const emp = E(f.owner);
-    let rate = 0.1;
-    if (f.owner === -1) rate = 0.1;
-    else if (f.star != null) {
-      const own = ST(f.star).planets.map(P).filter(p => p.owner === emp.id && !p.col.outpost);
-      if (own.some(p => p.col.bld.shipyard)) rate = 1; else if (own.length) rate = 0.25;
-    }
-    if (f.owner !== -1 && has(emp, 'nanite_repair')) rate = Math.max(rate, 0.25);
-    for (const s of f.ships) { const st = shipStats(emp, designOf(emp, s.d)); s.hp = Math.min(st.hp, Math.round(s.hp + st.hp * rate)); }
-  }
-  for (const p of S.planets) if (p.col && !p.col.outpost) { const m = planetDefMax(p); p.col.defHp = Math.min(m, p.col.defHp + Math.max(5, m * 0.25)); }
-}
-function checkEliminations() {
-  for (const emp of alive()) {
-    const colonyShips = S.fleets.some(f => f.owner === emp.id && f.ships.some(s => s.d === 's_colony'));
-    if (!colonies(emp).length && !colonyShips) {
-      emp.alive = false; emp.diedTurn = S.turn;
-      for (const p of colonies(emp, true)) { p.owner = null; p.col = null; }
-      S.fleets = S.fleets.filter(f => f.owner !== emp.id);
-      if (emp.id !== 0) S.msgs.push({text: 'The ' + emp.name + ' have been wiped from the galaxy!', star: null, kind: 'war'});
+    if (!f.task || f.task.type !== 'survey' || f.star == null || f.dest != null) continue;
+    if (--f.task.left <= 0) {
+      const s = ST(f.star); f.task = null; if (S.surveyed[s.id]) continue; S.surveyed[s.id] = 1;
+      const life = s.bodies.map(B).filter(b => b.life !== 'none');
+      msg('Survey of ' + s.name + ' complete' + (life.length ? ': ' + life.map(b => LIFE[b.life].toLowerCase() + ' on ' + b.name).join(', ') + '!' : '. No life found.'), s.id, 'survey');
+      if (life.length) journal('Found ' + life.map(b => LIFE[b.life].toLowerCase() + ' on ' + b.name).join(', ') + '.', s.id);
     }
   }
 }
-function powerIndex(emp) {
-  if (!emp.alive) return 0;
-  return Math.round(empPop(emp) * 1.5 + empMilitary(emp) / 12 + Object.keys(emp.techs).length * 3 + colonies(emp, true).length * 2);
+function processEconomy() {
+  let rp = 0, bc = 0;
+  const broke = S.bc < 0;
+  for (const b of colonies(true)) {
+    const o = colOut(b), c = b.col;
+    rp += o.rp; bc += o.bc;
+    if (c.outpost) { bc += o.prod; continue; }
+    let prod = o.prod * (broke ? 0.5 : 1);
+    while (c.queue.length && !itemValid(b, c.queue[0])) c.queue.shift();
+    if (!c.queue.length) { bc += prod * 0.5; c.prog = 0; continue; }
+    c.prog += prod;
+    const it = c.queue[0], cost = itemCost(b, it);
+    if (c.prog >= cost) { completeItem(b, it); c.prog = Math.min(c.prog - cost, cost); if (it.n > 1) it.n--; else c.queue.shift(); }
+  }
+  // food per system
+  const stars = colonyStars();
+  for (const sid of stars) {
+    const s = ST(sid), f = systemFood(sid);
+    s.short = false;
+    if (f.net >= 0) { s.stock += f.net; if (s.stock > 60) { bc += (s.stock - 60) * 0.2; s.stock = 60; } }
+    else { s.stock += f.net; if (s.stock < 0) { s.stock = 0; s.short = true; msg('Food is running out in the ' + s.name + ' system. Colonies there are shrinking. Switch a colony to Farming, build Agri-Domes, or send food by Freighter.', sid, 'warn'); } }
+  }
+  // growth
+  for (const b of colonies()) {
+    const c = b.col, before = stageOf(b), cap = popCap(b);
+    if (ST(b.star).short) c.pop -= c.pop * 0.03;
+    else if (c.pop < cap) c.pop += c.pop * growthRate(b) * (1 - c.pop / cap);
+    else c.pop -= (c.pop - cap) * 0.1;
+    c.pop = Math.max(0.001, c.pop);
+    const after = stageOf(b);
+    if (after !== before && STAGE_ORDER.indexOf(after) > STAGE_ORDER.indexOf(before)) { msg(b.name + ' has grown into a ' + STAGES[after].name + '.', b.star, 'stage'); journal(b.name + ' became a ' + STAGES[after].name + '.', b.star); }
+  }
+  // research
+  if (!S.res) { S.rpBank += rp; }
+  else {
+    S.res.prog += rp + S.rpBank; S.rpBank = 0;
+    const cost = techCost(S.res.tech);
+    if (S.res.prog >= cost) { S.rpBank = Math.min(S.res.prog - cost, cost); learn(S.res.tech); S.res = null; }
+  }
+  // upkeep
+  let up = 0; for (const f of S.fleets) for (const sh of f.ships) up += designCost(design(sh.d)) * 0.01;
+  S.bc = r1(S.bc + bc - up);
+  if (S.bc < 0) msg('The treasury is empty. Production is halved until credits recover: scrap idle ships or set a colony to Trade.', null, 'warn');
 }
-function recordHistory() {
-  const row = {t: S.turn, p: {}};
-  for (const e of S.empires) row.p[e.id] = powerIndex(e);
-  S.hist.push(row);
+function itemValid(b, it) {
+  if (it.kind === 'ship') return !!design(it.id) && !shipReason(b);
+  const P = PROJECTS[it.id], c = b.col;
+  if (c.outpost || (P.tech && !has(P.tech))) return false;
+  if (c.proj[it.id] && !P.repeat) return false;
+  if (it.id === 'terraform' && (hab(b) === 'garden' || hab(b) === 'none' || hab(b) === 'outpost' || c.home)) return false;
+  return true;
 }
-function checkVictory() {
-  if (S.over) return;
-  if (!player().alive) { S.over = {result: 'defeat', why: 'Your empire has fallen. The last of your colonies is gone.', turn: S.turn}; return; }
-  if (alive().length === 1) S.over = {result: 'victory', kind: 'conquest', why: 'Every rival empire has been destroyed. The galaxy is yours!', turn: S.turn};
+function totals() {
+  let prod = 0, rp = 0, bc = 0, pop = 0, food = 0;
+  for (const b of colonies(true)) { const o = colOut(b); prod += o.prod; rp += o.rp; bc += o.bc; pop += b.col.pop; }
+  let up = 0; for (const f of S.fleets) for (const sh of f.ships) up += designCost(design(sh.d)) * 0.01;
+  const short = colonyStars().filter(s => ST(s).short || systemFood(s).net < 0 && ST(s).stock < 5);
+  return {prod: r1(prod), rp: r1(rp), bc: r1(bc), up: r1(up), net: r1(bc - up), pop, short};
 }
-function finalScore() {
-  const p = player();
-  const base = Math.round(empPop(p) * 2 + Object.keys(p.techs).length * 5 + colonies(p, true).length * 6 + empMilitary(p) / 20);
-  let bonus = 0;
-  if (S.over && S.over.result === 'victory') bonus = 400 + Math.max(0, 150 - S.turn) * 4;
-  const rivals = S.empires.length - 1;
-  const killed = S.empires.filter(e => e.id !== 0 && !e.alive).length;
-  return {base, bonus, rivalBonus: killed * 60, total: base + bonus + killed * 60, rivals};
+function endTurn() {
+  S.msgs = [];
+  moveFleets();
+  updateKnowledge();
+  processSurveys();
+  processEconomy();
+  S.turn++; S.year++;
+  recordHistory();
+  if (S.turn > S.maxTurns && !S.over) S.over = {result: 'complete', why: 'The age of exploration draws to a close in the year ' + S.year + '.'};
+}
+function recordHistory() { S.hist.push({t: S.turn, y: S.year, pop: Math.round(totals().pop), exp: Object.keys(S.visited).length, score: score().total}); }
+function score() {
+  let micro = 0, eco = 0, settle = 0, city = 0, core = 0;
+  for (const sid in S.surveyed) for (const bid of ST(+sid).bodies) { const b = B(bid); if (b.star === 0) continue; if (b.life === 'microbial') micro++; if (b.life === 'ecosystem') eco++; }
+  for (const b of colonies()) { if (b.star === 0) continue; const s = stageOf(b); if (s === 'settlement') settle++; if (s === 'city') city++; if (s === 'core') core++; }
+  const pop = colonies().reduce((a, b) => a + b.col.pop, 0);
+  const bts = Object.keys(S.techs).filter(t => TECH[t] && TECH[t].breakthrough).length;
+  const techs = Object.keys(S.techs).filter(t => TECH[t] && !TECH[t].breakthrough).length;
+  const p = {
+    explored: (Object.keys(S.visited).length - 1) * SCORE_W.explored, surveyed: Math.max(0, Object.keys(S.surveyed).length - 1) * SCORE_W.surveyed,
+    life: micro * SCORE_W.microbial + eco * SCORE_W.ecosystem, anomalies: S.stats.anomScore, breakthroughs: bts * SCORE_W.breakthrough, techs: techs * SCORE_W.tech,
+    colonies: settle * SCORE_W.settlement + city * SCORE_W.city + core * SCORE_W.core, population: Math.round(Math.log10(1 + pop) * SCORE_W.popLog),
+  };
+  p.total = Object.values(p).reduce((a, b) => a + b, 0);
+  return p;
 }

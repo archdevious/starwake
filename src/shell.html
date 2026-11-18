@@ -15,18 +15,20 @@
     <div class="brand">STAR<b>WAKE</b></div>
     <div id="res"></div>
     <div class="tbtns">
-      <button class="btn" data-a="openColonies" title="Planets (P)">Planets</button>
+      <button class="btn" data-a="openColonies" title="Colonies (C)">Colonies</button>
       <button class="btn" data-a="openResearch" title="Research (R)">Research</button>
-      <button class="btn" data-a="openDesign" title="Ship Design (D)">Ship Design</button>
-      <button class="btn" data-a="openEmpires" title="Empires (E)">Empires</button>
+      <button class="btn" data-a="openDesign" title="Ship Design (D)">Ships</button>
+      <button class="btn" data-a="openJournal" title="Journal (J)">Journal</button>
       <button class="btn" data-a="openMenu">Menu</button>
-      <button class="btn primary" id="endturn" data-a="endTurn" title="End turn (Enter)">End Turn ▸</button>
+      <button class="btn" id="ffwd" data-a="skip" title="Skip years until something happens (F)">Skip ⏩</button>
+      <button class="btn primary" id="endturn" data-a="endTurn" title="End the year (Enter)">End Year ▸</button>
     </div>
   </div>
   <div id="main">
     <canvas id="map"></canvas>
+    <div id="news"></div>
     <div id="side"></div>
-    <div class="zoom"><button class="btn" data-a="zoom" data-v="1" title="Zoom in">+</button><button class="btn" data-a="zoom" data-v="-1" title="Zoom out">−</button><button class="btn" data-a="fit" title="Show whole galaxy">⤢</button></div>
+    <div class="camctl"><button class="btn" data-a="camZoom" data-v="1" title="Zoom in">+</button><button class="btn" data-a="camZoom" data-v="-1" title="Zoom out">−</button><button class="btn" data-a="camRot" data-v="-1" title="Rotate left">⟲</button><button class="btn" data-a="camRot" data-v="1" title="Rotate right">⟳</button><button class="btn" data-a="camTop" title="Toggle top-down / tilted view">Top / Tilt</button><button class="btn" data-a="camSun" title="Centre on the Sun (H)">Sun</button><button class="btn" data-a="camFit" title="Show the whole map">Whole map</button></div>
     <div id="hint"></div>
     <div id="toast"></div>
   </div>

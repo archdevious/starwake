@@ -132,3 +132,36 @@ table.list tr.click{cursor:pointer}table.list tr.click:hover td{background:#121d
   #topbar{gap:6px;padding:0 6px;overflow-x:auto}
   .tbtns .btn{padding:4px 7px;font-size:12px}
 }
+/* ---- v2 additions ---- */
+#news{position:absolute;left:10px;top:10px;width:340px;max-height:42%;overflow:auto;background:#0b1120e0;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12.5px;display:none}
+#news.show{display:block}
+#news .ni{padding:4px 2px;border-bottom:1px solid #16213a;cursor:default}
+#news .ni.click{cursor:pointer}#news .ni.click:hover{color:#fff}
+#news .nh{display:flex;justify-content:space-between;align-items:center;color:var(--acc);font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:4px}
+.camctl{position:absolute;left:10px;bottom:10px;display:flex;gap:4px}
+.camctl .btn{height:32px;min-width:32px;padding:0 8px}
+#hint{left:auto;right:390px;bottom:12px}
+.body{display:flex;gap:9px;align-items:flex-start}
+.facts{display:flex;flex-wrap:wrap;gap:2px;margin-top:4px}
+.habtag{font-weight:600}
+.era{max-width:960px;margin:0 auto}
+.eraopts{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
+.eraopt{border:1px solid var(--line);border-radius:12px;padding:14px;background:#0b1224cc;cursor:pointer;transition:.12s}
+.eraopt:hover{border-color:var(--line2)}
+.eraopt.sel{border-color:var(--acc);box-shadow:0 0 18px #5ad1ff44;background:#0f1d3acc}
+.eraopt h3{font-size:16px;margin-bottom:6px}
+.eraopt p{color:var(--dim);font-size:13px;margin:0 0 8px}
+.eraopt ul{margin:0;padding-left:18px;font-size:12.5px;color:var(--acc2)}
+.steps{display:flex;gap:6px;justify-content:center;margin:8px 0 4px}
+.steps i{width:34px;height:4px;border-radius:2px;background:#22314f;display:block}
+.steps i.on{background:var(--acc)}
+.evt{font-size:14px;line-height:1.6}
+.evt .choice{display:block;width:100%;text-align:left;margin-top:8px;padding:10px 12px}
+.tcol{display:flex;flex-direction:column;gap:6px;min-width:200px;flex:1}
+.tgrid{display:flex;gap:10px;align-items:flex-start;overflow-x:auto;padding-bottom:6px}
+.tech .req{font-size:10.5px;color:#ff9a7a}
+.slotrow{display:flex;gap:6px;align-items:center;margin:4px 0}
+.slotrow select{flex:1}
+
+.chip .ell{max-width:150px;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:1700px){.chip .k{font-size:10px;letter-spacing:.04em}.chip{padding:3px 7px;gap:5px}}

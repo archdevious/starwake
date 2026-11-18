@@ -1,281 +1,232 @@
 'use strict';
-// ===================== STARWAKE — UI CORE, ART, GALAXY MAP =====================
+// ===================== STARWAKE v2 — UI CORE & 3D STAR MAP =====================
 const $ = s => document.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 const fmt = v => (Math.round(v * 10) / 10).toLocaleString();
 const sgn = v => (v >= 0 ? '+' : '') + fmt(v);
-const UI = {selStar: null, selFleet: null, view: null, viewId: null, cam: {x: 0, y: 0, z: 30}, hoverStar: null, hoverFleet: null, fleetBoxes: [], drag: null,
-  showRange: false, busy: false, buildTab: 'bld', designEdit: null, fleetSel: {}, t0: performance.now()};
-const ACT = {}; // click actions: data-a="name" data-v="value"
-document.addEventListener('click', e => {
-  const el = e.target.closest('[data-a]'); if (!el || el.disabled) return;
-  const f = ACT[el.dataset.a]; if (f) { e.stopPropagation(); f(el.dataset.v, el, e); }
-});
-document.addEventListener('change', e => {
-  const el = e.target.closest('[data-c]'); if (!el) return;
-  const f = ACT[el.dataset.c]; if (f) f(el.value, el, e);
-});
-function toast(t, ms) { const el = $('#toast'); el.textContent = t; el.classList.add('show'); clearTimeout(UI._tt); UI._tt = setTimeout(() => el.classList.remove('show'), ms || 2200); }
+function people(m) { // millions -> words
+  if (m <= 0) return 'none';
+  if (m >= 1000) return (m / 1000).toFixed(1).replace(/\.0$/, '') + ' billion';
+  if (m >= 1) return (m >= 100 ? Math.round(m) : +m.toFixed(1)) + ' million';
+  const n = m * 1e6; return (n < 10000 ? Math.round(n / 100) * 100 : Math.round(n / 1000) * 1000).toLocaleString();
+}
+function pct(v) { return v >= 0.9999 ? '99.99%' : Math.round(v * 100) + '%'; }
 function hexA(c, a) { const n = parseInt(c.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; }
-function planetBall(type, px, special) {
-  const t = PT[type]; px = px || 30;
-  const ring = type === 'gasgiant' ? `,0 0 0 2px ${hexA('#d6b088', 0.25)}` : '';
-  const bg = type === 'asteroids' ? `radial-gradient(circle at 30% 30%,#aaa 0 10%,transparent 11%),radial-gradient(circle at 70% 60%,#888 0 12%,transparent 13%),radial-gradient(circle at 45% 75%,#999 0 9%,transparent 10%),radial-gradient(circle at 60% 25%,#777 0 7%,transparent 8%)`
-    : `radial-gradient(circle at 32% 30%, ${t.color} 0%, ${t.c2} 70%, #05070d 100%)`;
-  return `<div class="pball" style="width:${px}px;height:${px}px;background:${bg}${type === 'asteroids' ? ';box-shadow:none' : ''};${special ? `outline:1px dashed #ffb84a88;outline-offset:2px` : ''}${ring ? ';box-shadow:inset -6px -6px 10px #0009' + ring : ''}"></div>`;
+const UI = {cam: {tx: 0, ty: 0, tz: 0, yaw: 0.6, pitch: 0.95, zoom: 14}, selStar: null, selFleet: null, view: null, viewId: null, hoverStar: null, busy: false,
+  dirty: true, drag: null, pts: [], fleetBoxes: [], newsOpen: true, buildTab: 'proj', fleetSel: {}, routeSetup: null};
+const ACT = {};
+document.addEventListener('click', e => { const el = e.target.closest('[data-a]'); if (!el || el.disabled) return; const f = ACT[el.dataset.a]; if (f) { e.stopPropagation(); f(el.dataset.v, el, e); } });
+document.addEventListener('change', e => { const el = e.target.closest('[data-c]'); if (!el) return; const f = ACT[el.dataset.c]; if (f) f(el.value, el, e); });
+function toast(t, ms) { const el = $('#toast'); el.textContent = t; el.classList.add('show'); clearTimeout(UI._tt); UI._tt = setTimeout(() => el.classList.remove('show'), ms || 2400); }
+function bodyColor(b) {
+  const m = {gasgiant: ['#d6b088', '#7a5a3a'], icegiant: ['#8fd0e8', '#2a5a7a'], minineptune: ['#9ec4e8', '#3a5a8a'], ocean: ['#3a7ae0', '#123a80'], ice: ['#dfeaf2', '#7890a0'],
+    molten: ['#ff7a3a', '#6a1a08'], belt: ['#9a948c', '#4a4642'], dwarf: ['#b8b0a8', '#5a5450'], moon: ['#bdb6ae', '#55504a'], rocky: ['#b08a6a', '#5a3a2a'], superearth: ['#a8906a', '#4a3a2a']}[b.cls] || ['#aaa', '#444'];
+  if (b.life === 'ecosystem' && (lifeKnown(b))) return ['#5fc070', '#1f5a2a'];
+  if (b.name === 'Earth') return ['#4a9be0', '#2e7d3a'];
+  if (b.temp === 'scorching' && b.cls !== 'molten') return ['#e0a070', '#7a3a1a'];
+  return m;
 }
-// ---------- vector ship art ----------
-const HULL_SHAPES = {
-  corvette:   [[1, 0], [-0.7, 0.55], [-0.4, 0], [-0.7, -0.55]],
-  destroyer:  [[1, 0], [0.2, 0.35], [-0.2, 0.8], [-0.8, 0.45], [-0.6, 0], [-0.8, -0.45], [-0.2, -0.8], [0.2, -0.35]],
-  cruiser:    [[1, 0], [0.5, 0.25], [0.1, 0.3], [-0.1, 0.75], [-0.6, 0.75], [-0.5, 0.3], [-1, 0.25], [-1, -0.25], [-0.5, -0.3], [-0.6, -0.75], [-0.1, -0.75], [0.1, -0.3], [0.5, -0.25]],
-  battleship: [[1, 0], [0.7, 0.3], [0.2, 0.4], [0, 0.85], [-0.5, 0.85], [-0.6, 0.45], [-1, 0.4], [-1, -0.4], [-0.6, -0.45], [-0.5, -0.85], [0, -0.85], [0.2, -0.4], [0.7, -0.3]],
-  dreadnought:[[1, 0], [0.8, 0.22], [0.4, 0.3], [0.3, 0.6], [0.1, 0.95], [-0.3, 0.95], [-0.4, 0.55], [-0.75, 0.6], [-1, 0.35], [-0.85, 0], [-1, -0.35], [-0.75, -0.6], [-0.4, -0.55], [-0.3, -0.95], [0.1, -0.95], [0.3, -0.6], [0.4, -0.3], [0.8, -0.22]],
-  scout:      [[1, 0], [0, 0.4], [-0.8, 0], [0, -0.4]],
-  colony:     [[0.8, 0.2], [0.6, 0.55], [-0.7, 0.55], [-0.9, 0.2], [-0.9, -0.2], [-0.7, -0.55], [0.6, -0.55], [0.8, -0.2]],
-  outpost:    [[0.7, 0.5], [-0.7, 0.5], [-0.7, -0.5], [0.7, -0.5]],
-  transport:  [[0.9, 0.3], [0.5, 0.6], [-0.9, 0.6], [-0.9, -0.6], [0.5, -0.6], [0.9, -0.3]],
-};
-const HULL_SCALE = {corvette: 0.55, destroyer: 0.7, cruiser: 0.85, battleship: 1, dreadnought: 1.2, scout: 0.5, colony: 0.75, outpost: 0.6, transport: 0.7, monster: 1.25};
-function drawShip(ctx, x, y, r, hull, color, ang) {
-  ctx.save(); ctx.translate(x, y); ctx.rotate(ang || 0);
-  if (hull === 'monster') {
-    const t = (performance.now() - UI.t0) / 600;
-    ctx.fillStyle = hexA('#9fe060', 0.85); ctx.strokeStyle = '#e8ffd0'; ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    for (let i = 0; i <= 24; i++) { const a = i / 24 * TAU; const rr = r * (0.75 + 0.18 * Math.sin(a * 5 + t)); ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
-    ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#1a2a08'; ctx.beginPath(); ctx.arc(r * 0.25, 0, r * 0.22, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#ff4040'; ctx.beginPath(); ctx.arc(r * 0.3, 0, r * 0.08, 0, TAU); ctx.fill();
-    ctx.restore(); return;
-  }
-  const pts = HULL_SHAPES[hull] || HULL_SHAPES.corvette;
-  const g = ctx.createLinearGradient(-r, -r, r, r); g.addColorStop(0, '#e8eef8'); g.addColorStop(0.45, color); g.addColorStop(1, '#101624');
-  ctx.fillStyle = g; ctx.strokeStyle = hexA('#ffffff', 0.7); ctx.lineWidth = 1;
-  ctx.beginPath(); pts.forEach(([px, py], i) => i ? ctx.lineTo(px * r, py * r) : ctx.moveTo(px * r, py * r)); ctx.closePath(); ctx.fill(); ctx.stroke();
-  ctx.fillStyle = hexA('#9fe8ff', 0.9); ctx.beginPath(); ctx.arc(-r * 0.75, 0, Math.max(1.2, r * 0.12), 0, TAU); ctx.fill();
-  ctx.restore();
+function lifeKnown(b) { return b.star === 0 || b.owner === 0 || S.surveyed[b.star] || has('biosignatures'); }
+function planetBall(b, px) {
+  px = px || 30; const [c1, c2] = bodyColor(b);
+  const bg = b.cls === 'belt' ? `radial-gradient(circle at 30% 30%,#aaa 0 10%,transparent 11%),radial-gradient(circle at 70% 60%,#888 0 12%,transparent 13%),radial-gradient(circle at 45% 75%,#999 0 9%,transparent 10%),radial-gradient(circle at 60% 25%,#777 0 7%,transparent 8%)`
+    : `radial-gradient(circle at 32% 30%, ${c1} 0%, ${c2} 70%, #05070d 100%)`;
+  const ring = b.traits.includes('rings') ? ';box-shadow:inset -6px -6px 10px #0009,0 0 0 2px #d6b08855' : '';
+  return `<div class="pball" style="width:${px}px;height:${px}px;background:${bg}${b.cls === 'belt' ? ';box-shadow:none' : ring}"></div>`;
 }
-function shipIconCanvas(hull, color, px) {
-  const c = document.createElement('canvas'); c.width = c.height = px * 2; c.style.width = c.style.height = px + 'px';
-  const x = c.getContext('2d'); x.scale(2, 2); drawShip(x, px / 2, px / 2, px * 0.42 * (HULL_SCALE[hull] || 1) / 1.1, hull, color, -Math.PI / 4);
-  return c.toDataURL();
-}
-const _iconCache = {};
-function shipIcon(hull, color, px) { const k = hull + color + px; return _iconCache[k] || (_iconCache[k] = shipIconCanvas(hull, color, px)); }
-function hullOf(emp, did) { const d = designOf(emp, did); return d.fixed ? 'monster' : (d.special || d.hull); }
-// race emblems
-function drawEmblem(ctx, id, s, color) {
-  ctx.save(); ctx.translate(s / 2, s / 2);
-  const r = s * 0.42;
-  const g = ctx.createRadialGradient(-r * 0.3, -r * 0.3, 2, 0, 0, r); g.addColorStop(0, hexA(color, 0.9)); g.addColorStop(1, '#0a0f1c');
-  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fill();
-  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
-  ctx.fillStyle = '#eef4ff'; ctx.strokeStyle = '#eef4ff'; ctx.lineWidth = 2;
-  const poly = (pts) => { ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x * r, y * r) : ctx.moveTo(x * r, y * r)); ctx.closePath(); ctx.fill(); };
-  switch (id) {
-    case 'human': ctx.beginPath(); ctx.arc(0, 0, r * 0.35, 0, TAU); ctx.stroke(); ctx.beginPath(); ctx.ellipse(0, 0, r * 0.7, r * 0.22, -0.5, 0, TAU); ctx.stroke(); break;
-    case 'vashari': poly([[0, -0.65], [0.18, -0.1], [0.6, 0.35], [0, 0.15], [-0.6, 0.35], [-0.18, -0.1]]); ctx.fillStyle = color; ctx.beginPath(); ctx.arc(0, -0.15 * r, r * 0.12, 0, TAU); ctx.fill(); break;
-    case 'thrunn': for (let i = 0; i < 6; i++) { const a = i / 6 * TAU; ctx.beginPath(); ctx.arc(Math.cos(a) * r * 0.36, Math.sin(a) * r * 0.36, r * 0.16, 0, TAU); ctx.fill(); } break;
-    case 'ixari': poly([[0, -0.7], [0.15, -0.1], [0.55, 0.55], [0, 0.25], [-0.55, 0.55], [-0.15, -0.1]]); break;
-    case 'ondine': for (let k = 0; k < 3; k++) { ctx.beginPath(); for (let i = 0; i <= 20; i++) { const x = (-0.6 + i * 0.06) * r; const y = (-0.3 + k * 0.3) * r + Math.sin(i / 20 * TAU * 1.5) * r * 0.08; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); } break;
-    case 'groak': poly([[-0.45, 0.45], [-0.55, -0.1], [-0.15, -0.55], [0.4, -0.4], [0.55, 0.15], [0.2, 0.5]]); ctx.strokeStyle = '#0a0f1c'; ctx.beginPath(); ctx.moveTo(-0.3 * r, 0); ctx.lineTo(0.3 * r, -0.2 * r); ctx.stroke(); break;
-    case 'myrrhine': poly([[0, -0.2], [0.7, -0.45], [0.35, 0.1], [0, 0.55], [-0.35, 0.1], [-0.7, -0.45]]); break;
-    case 'selari': ctx.beginPath(); ctx.ellipse(0, 0, r * 0.62, r * 0.32, 0, 0, TAU); ctx.stroke(); ctx.beginPath(); ctx.arc(0, 0, r * 0.2, 0, TAU); ctx.fill(); break;
-  }
-  ctx.restore();
-}
-function emblemURL(id, color, px) { const k = 'em' + id + color + px; if (_iconCache[k]) return _iconCache[k]; const c = document.createElement('canvas'); c.width = c.height = px * 2; const x = c.getContext('2d'); x.scale(2, 2); drawEmblem(x, id, px, color); return _iconCache[k] = c.toDataURL(); }
 
-// ---------- Top bar ----------
+// ---------- top bar ----------
 function renderTop() {
   if (!S) return;
-  const p = player(), t = empTotals(p);
-  const res = p.res ? TECH[p.res.tech] : null;
-  const loc = p.res ? TECH_LOC[p.res.tech] : null;
-  const cost = loc ? techCost(loc.f, loc.t) : 0;
-  const idle = S.fleets.filter(f => f.owner === 0 && f.dest == null && fleetRole(f) !== 'empty').length;
+  const t = totals(); const res = S.res ? TECH[S.res.tech] : null;
+  const short = colonyStars().filter(s => ST(s).short);
   $('#res').innerHTML = `
-    <div class="chip"><span class="k">Turn</span><b>${S.turn}</b></div>
-    <div class="chip" title="Credits: income minus building and ship upkeep"><span class="k">Credits</span><b>${fmt(Math.floor(p.bc))}</b><span class="${t.net >= 0 ? 'good' : 'bad'}">${sgn(t.net)}</span></div>
-    <div class="chip" title="Food produced minus food eaten. Surplus is sold for credits; a shortage starves colonies."><span class="k">Food</span><span class="${t.foodNet >= 0 ? 'good' : 'bad'}">${sgn(t.foodNet)}</span></div>
-    <div class="chip"><span class="k">Production</span><b>${fmt(t.prod)}</b></div>
-    <div class="chip click" data-a="openResearch" title="Open research"><span class="k">Research</span>${res ? `<span>${esc(res.name)}</span><span class="dim">${Math.floor(p.res.prog + p.rpBank)}/${cost}</span>` : '<span class="warn">Choose a tech!</span>'}<span class="acc">+${fmt(t.rp)}</span></div>
-    ${idle ? `<div class="chip click" data-a="nextIdle" title="Cycle through idle fleets (N)"><span class="k">Idle fleets</span><b>${idle}</b></div>` : ''}`;
+    <div class="chip"><span class="k">Year</span><b>${S.year}</b><span class="dim small">${S.turn}/${S.maxTurns}</span></div>
+    <div class="chip" title="Income minus ship upkeep"><span class="k">Credits</span><b>${fmt(Math.floor(S.bc))}</b><span class="${t.net >= 0 ? 'good' : 'bad'}">${sgn(t.net)}</span></div>
+    <div class="chip"><span class="k">Population</span><b>${people(t.pop)}</b></div>
+    <div class="chip click" data-a="openResearch"><span class="k">Research</span>${res ? `<span class="ell" title="${esc(res.name)}">${esc(res.name)}</span><span class="dim">${Math.floor(S.res.prog + S.rpBank)}/${techCost(S.res.tech)}</span>` : (availableTechs().length ? '<span class="warn">Choose research!</span>' : '<span class="dim">All known</span>')}<span class="acc">+${fmt(t.rp)}</span></div>
+    ${short.length ? `<div class="chip click" data-a="goStar" data-v="${short[0]}"><span class="bad">Food shortage: ${short.map(s => esc(ST(s).name)).join(', ')}</span></div>` : ''}
+    <div class="chip"><span class="k">Top speed</span><b>${pct(topSpeed())}</b></div>`;
 }
-ACT.nextIdle = () => {
-  const list = S.fleets.filter(f => f.owner === 0 && f.dest == null);
-  if (!list.length) return;
-  UI._idleIdx = ((UI._idleIdx || 0) + 1) % list.length;
-  const f = list[UI._idleIdx]; selectFleet(f.id); centerOn(f.x, f.y);
-};
 
-// ---------- Galaxy map ----------
+// ---------- 3D map ----------
 const cv = () => $('#map');
 function mapSize() { const c = cv(); return {w: c.clientWidth, h: c.clientHeight}; }
-function w2s(x, y) { const {w, h} = mapSize(); return [(x - UI.cam.x) * UI.cam.z + w / 2, (y - UI.cam.y) * UI.cam.z + h / 2]; }
-function s2w(sx, sy) { const {w, h} = mapSize(); return [(sx - w / 2) / UI.cam.z + UI.cam.x, (sy - h / 2) / UI.cam.z + UI.cam.y]; }
-function centerOn(x, y) { UI.cam.x = x; UI.cam.y = y; }
-function fitGalaxy() {
-  const {w, h} = mapSize(); const xs = S.stars.map(s => s.x), ys = S.stars.map(s => s.y);
-  const x0 = Math.min(...xs) - 1.5, x1 = Math.max(...xs) + 1.5, y0 = Math.min(...ys) - 1.5, y1 = Math.max(...ys) + 2;
-  const pw = UI.view ? w - 390 : w;
-  UI.cam.z = clamp(Math.min((pw - 40) / (x1 - x0), (h - 40) / (y1 - y0)), 8, 90); UI.cam.x = (x0 + x1) / 2 + (UI.view ? 195 / UI.cam.z : 0); UI.cam.y = (y0 + y1) / 2;
+function proj(x, y, z) {
+  const C = UI.cam, {w, h} = mapSize();
+  const dx = x - C.tx, dy = y - C.ty, dz = z - C.tz;
+  const cy = Math.cos(C.yaw), sy = Math.sin(C.yaw);
+  const x1 = dx * cy - dy * sy, y1 = dx * sy + dy * cy;
+  return [w / 2 + x1 * C.zoom, h / 2 + (y1 * Math.sin(C.pitch) - dz * Math.cos(C.pitch)) * C.zoom, y1 * Math.cos(C.pitch) + dz * Math.sin(C.pitch)];
 }
-function ensureNebulae() {
-  if (S.neb) return;
-  S.neb = []; const cols = ['#3a2a7a', '#1e4a7a', '#6a2050', '#1e5a5a', '#4a2a6a'];
-  for (let i = 0; i < 7; i++) S.neb.push({x: rnd() * S.W, y: rnd() * S.H, r: 4 + rnd() * 8, c: pick(cols)});
+let FAR = null;
+function farField() {
+  if (FAR) return FAR;
+  let sd = 12345; const r = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
+  const g = () => r() + r() + r() - 1.5;
+  FAR = {pts: [], haze: [], bg: []};
+  const R = S.radius;
+  for (let i = 0; i < 9000; i++) { const a = r() * TAU, d = R + 2 + Math.pow(r(), 0.55) * 90; FAR.pts.push([Math.cos(a) * d, Math.sin(a) * d, g() * (2.5 + d * 0.1), d, r()]); }
+  for (let i = 0; i < 360; i++) { const a = r() * TAU, d = R + 3 + Math.pow(r(), 0.7) * 80; FAR.haze.push([Math.cos(a) * d, Math.sin(a) * d, g() * (2 + d * 0.08), d, 18 + r() * 40, Math.floor(r() * 4)]); }
+  for (let i = 0; i < 500; i++) FAR.bg.push([r(), r(), r()]);
+  return FAR;
 }
-let BGSTARS = null;
-function bgStars() { if (BGSTARS) return BGSTARS; BGSTARS = []; for (let i = 0; i < 500; i++) BGSTARS.push([rnd(), rnd(), rnd() * 1.2 + 0.2, rnd()]); return BGSTARS; }
-function knownOwners(starId) {
-  const p = player(); if (!p.explored[starId]) return [];
-  const o = new Set(); for (const pid of ST(starId).planets) { const pl = P(pid); if (pl.owner != null) o.add(pl.owner); } return [...o];
-}
-function visibleFleets() {
-  const cs = scanCircles(player());
-  return S.fleets.filter(f => f.owner === 0 || inCircles(cs, f.x, f.y) || (f.owner === -1 && player().explored[f.star]));
-}
+function fleetsAtStar(sid) { return S.fleets.filter(f => f.star === sid && f.dest == null); }
 function drawMap() {
   const c = cv(); if (!c || !S) return;
-  const dpr = window.devicePixelRatio || 1; const {w, h} = mapSize();
+  const dpr = window.devicePixelRatio || 1, {w, h} = mapSize();
   if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
-  const ctx = c.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const z = UI.cam.z, now = performance.now();
-  ctx.fillStyle = '#03050b'; ctx.fillRect(0, 0, w, h);
-  // parallax background stars
-  for (const [sx, sy, sr, tw] of bgStars()) {
-    const x = ((sx * w * 1.6 - UI.cam.x * z * 0.12) % w + w) % w, y = ((sy * h * 1.6 - UI.cam.y * z * 0.12) % h + h) % h;
-    ctx.fillStyle = `rgba(200,215,255,${0.25 + 0.35 * Math.abs(Math.sin(now / 1800 + tw * 10))})`; ctx.fillRect(x, y, sr, sr);
-  }
-  ensureNebulae();
-  for (const n of S.neb) { const [x, y] = w2s(n.x, n.y); const r = n.r * z; const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, hexA(n.c, 0.22)); g.addColorStop(1, hexA(n.c, 0)); ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2); }
-  const p = player();
-  const selF = UI.selFleet != null ? S.fleets.find(f => f.id === UI.selFleet) : null;
-  // fuel range overlay
-  if ((selF && selF.owner === 0) || UI.showRange) {
-    const off = UI._off || (UI._off = document.createElement('canvas'));
-    off.width = c.width; off.height = c.height; const o = off.getContext('2d'); o.setTransform(dpr, 0, 0, dpr, 0, 0);
-    o.fillStyle = '#2e6fb0';
-    const seen = new Set();
-    for (const pl of S.planets) if (pl.owner === 0 && pl.star >= 0 && !seen.has(pl.star)) { seen.add(pl.star); const s = ST(pl.star); const [x, y] = w2s(s.x, s.y); o.beginPath(); o.arc(x, y, p.range * z, 0, TAU); o.fill(); }
-    ctx.globalAlpha = 0.12; ctx.drawImage(off, 0, 0, w, h); ctx.globalAlpha = 1;
-  }
-  // scan circles faint
+  const x = c.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const C = UI.cam, R = S.radius, F = farField();
+  const g0 = x.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.8); g0.addColorStop(0, '#071022'); g0.addColorStop(1, '#010208'); x.fillStyle = g0; x.fillRect(0, 0, w, h);
+  for (const [a, b2, t] of F.bg) { x.fillStyle = `rgba(200,215,255,${t * 0.35})`; x.fillRect(a * w, b2 * h, 1, 1); }
+  // distant galaxy beyond reach
+  const hz = ['120,100,170', '170,120,90', '90,120,180', '150,90,130'];
+  for (const p of F.haze) { const [sx, sy] = proj(p[0], p[1], p[2]); const al = Math.max(0, 0.05 - (p[3] - R) / 2400); const rad = p[4] * C.zoom / 14; const g = x.createRadialGradient(sx, sy, 0, sx, sy, rad); g.addColorStop(0, `rgba(${hz[p[5]]},${al})`); g.addColorStop(1, `rgba(${hz[p[5]]},0)`); x.fillStyle = g; x.fillRect(sx - rad, sy - rad, rad * 2, rad * 2); }
+  for (const p of F.pts) { const [sx, sy] = proj(p[0], p[1], p[2]); if (sx < -5 || sy < -5 || sx > w + 5 || sy > h + 5) continue; const fade = Math.min(1, (p[3] - R) / 6); const al = Math.max(0.05, 0.85 - (p[3] - R) / 110) * fade; x.fillStyle = p[4] < 0.55 ? `rgba(255,175,135,${al})` : p[4] < 0.85 ? `rgba(255,238,205,${al})` : `rgba(175,200,255,${al})`; const sz = p[4] < 0.04 ? 1.8 : p[4] < 0.3 ? 1.2 : 0.8; x.fillRect(sx, sy, sz, sz); }
+  // grid on the reference plane (through the Sun)
+  const ring = (rad, cx0, cy0, style, width, dash) => { x.strokeStyle = style; x.lineWidth = width || 1; if (dash) x.setLineDash(dash); x.beginPath(); for (let i = 0; i <= 120; i++) { const a = i / 120 * TAU; const [sx, sy] = proj(cx0 + Math.cos(a) * rad, cy0 + Math.sin(a) * rad, 0); i ? x.lineTo(sx, sy) : x.moveTo(sx, sy); } x.stroke(); x.setLineDash([]); };
+  for (let r = 5; r <= R; r += 5) { ring(r, 0, 0, 'rgba(70,100,160,.16)'); const [lx, ly] = proj(r, 0, 0); x.fillStyle = 'rgba(120,150,200,.45)'; x.font = '10px Segoe UI, sans-serif'; x.textAlign = 'left'; x.fillText(r + ' ly', lx + 3, ly - 2); }
+  for (let i = 0; i < 12; i++) { const a = i / 12 * TAU; const [ax, ay] = proj(0, 0, 0), [bx, by] = proj(Math.cos(a) * R, Math.sin(a) * R, 0); x.strokeStyle = 'rgba(70,100,160,.09)'; x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, by); x.stroke(); }
+  ring(R + 1, 0, 0, 'rgba(120,200,255,.5)', 1.5, [7, 6]);
+  { const [ex, ey] = proj(0, -(R + 1), 0); x.fillStyle = 'rgba(150,210,255,.7)'; x.font = 'italic 12px Segoe UI, sans-serif'; x.textAlign = 'center'; x.fillText('Limit of reach: beyond lies centuries of travel', ex, ey + 16); }
+  // telescope coverage of colonies (faint)
+  const seen = new Set();
+  for (const b of colonies(true)) { if (seen.has(b.star)) continue; seen.add(b.star); const s = ST(b.star); x.fillStyle = 'rgba(74,168,255,.035)'; x.beginPath(); for (let i = 0; i <= 80; i++) { const a = i / 80 * TAU; const [sx, sy] = proj(s.x + Math.cos(a) * 16, s.y + Math.sin(a) * 16, 0); i ? x.lineTo(sx, sy) : x.moveTo(sx, sy); } x.fill(); }
+  // distant beacons
+  x.textAlign = 'left';
+  for (const f of FAR_STARS) { const [sx, sy] = proj(f.d[0] * (R + 9), f.d[1] * (R + 9), f.d[2] * (R + 9)); x.fillStyle = 'rgba(150,165,200,.6)'; x.font = '13px Segoe UI, sans-serif'; x.fillText('✧', sx - 5, sy + 4); x.font = 'italic 10.5px Segoe UI, sans-serif'; x.fillStyle = 'rgba(130,145,180,.6)'; x.fillText(f.n + ' · ' + f.ly + ' ly', sx + 8, sy + 4); }
+  // fleets in transit (lines under stars)
+  for (const f of S.fleets) { if (f.dest == null) continue; const d = ST(f.dest); const [ax, ay] = proj(f.x, f.y, f.z), [bx, by] = proj(d.x, d.y, d.z); x.strokeStyle = f.task && f.task.type === 'route' ? 'rgba(255,200,90,.45)' : 'rgba(127,224,255,.6)'; x.setLineDash([5, 5]); x.lineWidth = 1.3; x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, by); x.stroke(); x.setLineDash([]); }
   // stars
-  const starR = clamp(z * 0.28, 4, 11);
-  ctx.textAlign = 'center'; ctx.font = `${clamp(z * 0.38, 10, 13)}px Segoe UI, system-ui, sans-serif`;
-  for (const s of S.stars) {
-    const [x, y] = w2s(s.x, s.y); if (x < -60 || y < -60 || x > w + 60 || y > h + 60) continue;
-    const ex = !!p.explored[s.id]; const col = STAR_TYPES[s.type].color;
-    const g = ctx.createRadialGradient(x, y, 0, x, y, starR * 3); g.addColorStop(0, hexA(col, ex ? 0.55 : 0.25)); g.addColorStop(1, hexA(col, 0));
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, starR * 3, 0, TAU); ctx.fill();
-    ctx.fillStyle = ex ? col : hexA(col, 0.55); ctx.beginPath(); ctx.arc(x, y, starR * (ex ? 0.55 : 0.4), 0, TAU); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, starR * 0.22, 0, TAU); ctx.fill();
-    const owners = knownOwners(s.id);
-    if (owners.length) {
-      const seg = TAU / owners.length;
-      owners.forEach((o, i) => { ctx.strokeStyle = E(o).color; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(x, y, starR * 1.35, i * seg - Math.PI / 2 + 0.08, (i + 1) * seg - Math.PI / 2 - 0.08); ctx.stroke(); });
-    }
-    if (UI.selStar === s.id) { ctx.strokeStyle = '#ffffffcc'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]); ctx.lineDashOffset = -now / 60; ctx.beginPath(); ctx.arc(x, y, starR * 2, 0, TAU); ctx.stroke(); ctx.setLineDash([]); }
-    if (UI.hoverStar === s.id) { ctx.strokeStyle = '#ffffff55'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, starR * 1.9, 0, TAU); ctx.stroke(); }
-    ctx.fillStyle = owners.length === 1 ? E(owners[0]).color : ex ? '#c8d2e8' : '#5a6684';
-    ctx.fillText(s.name, x, y + starR * 1.6 + 11);
-    if (ex) { const n = s.planets.length; for (let i = 0; i < n; i++) { ctx.fillStyle = '#8fa0c0'; ctx.fillRect(x - n * 2.5 + i * 5 + 1, y + starR * 1.6 + 15, 3, 3); } }
+  const showPins = C.pitch < 1.45;
+  const items = [];
+  UI.pts = [];
+  for (const s of S.stars) { if (!S.known[s.id]) continue; const p = proj(s.x, s.y, s.z); items.push({s, p}); UI.pts.push({id: s.id, x: p[0], y: p[1]}); }
+  items.sort((a, b) => a.p[2] - b.p[2]);
+  const LABELS = [];
+  for (const {s, p} of items) {
+    const vis = !!S.visited[s.id]; const k = starKind(s.sp);
+    if (showPins) { const f = proj(s.x, s.y, 0); x.strokeStyle = s.z >= 0 ? 'rgba(140,170,220,.33)' : 'rgba(150,120,180,.3)'; x.lineWidth = 1; x.beginPath(); x.moveTo(f[0], f[1]); x.lineTo(p[0], p[1]); x.stroke(); x.beginPath(); x.ellipse(f[0], f[1], 3, 3 * Math.cos(C.pitch), 0, 0, TAU); x.stroke(); }
+    const rr = (vis ? 5 : 3.4) * clamp(C.zoom / 14, 0.75, 1.6) * (k.giant || k.cls === 'A' || k.cls === 'B' ? 1.3 : 1);
+    const gg = x.createRadialGradient(p[0], p[1], 0, p[0], p[1], rr * 3.2); gg.addColorStop(0, k.color + (vis ? 'cc' : '77')); gg.addColorStop(1, k.color + '00'); x.fillStyle = gg; x.beginPath(); x.arc(p[0], p[1], rr * 3.2, 0, TAU); x.fill();
+    x.fillStyle = vis ? k.color : k.color + 'aa'; x.beginPath(); x.arc(p[0], p[1], rr * 0.6, 0, TAU); x.fill();
+    const ours = s.bodies.some(bid => B(bid).owner === 0);
+    if (ours) { x.strokeStyle = S.empire.color; x.lineWidth = 2; x.beginPath(); x.arc(p[0], p[1], rr + 4, 0, TAU); x.stroke(); }
+    if (UI.selStar === s.id) { x.strokeStyle = '#ffffffcc'; x.lineWidth = 1.5; x.setLineDash([4, 4]); x.beginPath(); x.arc(p[0], p[1], rr + 9, 0, TAU); x.stroke(); x.setLineDash([]); }
+    if (UI.hoverStar === s.id) { x.strokeStyle = '#ffffff66'; x.lineWidth = 1; x.beginPath(); x.arc(p[0], p[1], rr + 8, 0, TAU); x.stroke(); }
+    let mk = '';
+    if (s.guardKnown) mk += '⚠';
+    if (vis && s.anom && !s.anomDone) mk += '◆';
+    if (mk) { x.font = '12px Segoe UI, sans-serif'; x.textAlign = 'left'; x.fillStyle = s.guardKnown ? '#ff5d5d' : '#ffb84a'; x.fillText(mk, p[0] + rr + 3, p[1] - rr - 1); }
+    if (lifeVisible(s)) { const lf = s.bodies.map(B).some(b => b.life === 'ecosystem' && b.star !== 0) ? '#5be08a' : s.bodies.map(B).some(b => b.life === 'microbial' && b.star !== 0) ? '#2ee6d6' : null; if (lf) { x.fillStyle = lf; x.beginPath(); x.arc(p[0] - rr - 4, p[1] - rr - 2, 2.6, 0, TAU); x.fill(); } }
+    LABELS.push({s, p, rr, pri: s.id === 0 ? 4 : ours ? 3 : UI.selStar === s.id ? 3.5 : vis ? 2 : 1});
+  }
+  // labels with de-cluttering
+  const boxes = []; x.textAlign = 'center';
+  for (const L of LABELS.sort((a, b) => b.pri - a.pri)) {
+    const {s, p, rr} = L; const vis = !!S.visited[s.id];
+    x.font = (vis ? '600 ' : '') + '11.5px Segoe UI, sans-serif';
+    const wd = x.measureText(s.name).width + 6; const bx = {x: p[0] - wd / 2, y: p[1] + rr + 3, w: wd, h: 14};
+    if (L.pri < 3 && boxes.some(o => bx.x < o.x + o.w && bx.x + bx.w > o.x && bx.y < o.y + o.h && bx.y + bx.h > o.y)) continue;
+    boxes.push(bx); x.fillStyle = s.bodies.some(bid => B(bid).owner === 0) ? '#8ccaff' : vis ? '#e8eef8' : '#8a94aa'; x.fillText(s.name, p[0], p[1] + rr + 13);
   }
   // fleets
   UI.fleetBoxes = [];
-  const vis = visibleFleets();
-  const atStar = {};
-  for (const f of vis) {
-    if (f.star != null && f.dest == null) { (atStar[f.star] = atStar[f.star] || []).push(f); continue; }
-    // in transit
-    const d = f.dest != null ? ST(f.dest) : null; const [x, y] = w2s(f.x, f.y);
-    const ang = d ? Math.atan2(d.y - f.y, d.x - f.x) : 0;
-    if (d && f.owner === 0) {
-      const [dx, dy] = w2s(d.x, d.y);
-      ctx.strokeStyle = hexA(E(0).color, 0.6); ctx.setLineDash([5, 5]); ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(dx, dy); ctx.stroke(); ctx.setLineDash([]);
-      ctx.fillStyle = '#cfe6ff'; ctx.font = '11px Segoe UI, sans-serif'; ctx.fillText(eta(f, f.dest) + 't', (x + dx) / 2, (y + dy) / 2 - 5);
-    }
-    const r = clamp(z * 0.3, 6, 10);
-    drawShip(ctx, x, y, r, f.owner === -1 ? 'monster' : hullOf(E(f.owner), f.ships[0].d), E(f.owner).color, ang);
-    if (UI.selFleet === f.id) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(x, y, r + 4, 0, TAU); ctx.stroke(); }
-    UI.fleetBoxes.push({x: x - r - 2, y: y - r - 2, w: r * 2 + 4, h: r * 2 + 4, f: f.id});
+  const byStar = {};
+  for (const f of S.fleets) {
+    if (f.dest == null && f.star != null) { (byStar[f.star] = byStar[f.star] || []).push(f); continue; }
+    const p = proj(f.x, f.y, f.z), d = ST(f.dest), q = proj(d.x, d.y, d.z);
+    const ang = Math.atan2(q[1] - p[1], q[0] - p[0]);
+    drawShipIcon(x, p[0], p[1], f, ang, UI.selFleet === f.id);
+    if (!(f.task && f.task.type === 'route')) { x.fillStyle = '#a8dcff'; x.font = '10.5px Segoe UI, sans-serif'; x.textAlign = 'left'; x.fillText(etaTo(f, f.dest) + ' yr', p[0] + 9, p[1] - 6); }
+    UI.fleetBoxes.push({x: p[0] - 9, y: p[1] - 9, w: 18, h: 18, f: f.id});
   }
-  for (const sid in atStar) {
-    const s = ST(+sid); const [x, y] = w2s(s.x, s.y);
-    atStar[sid].forEach((f, i) => {
-      const fx = x + starR * 1.9 + 9, fy = y - starR * 1.6 + i * 15;
-      const r = 6;
-      drawShip(ctx, fx, fy, r, f.owner === -1 ? 'monster' : hullOf(E(f.owner), f.ships[0].d), E(f.owner).color, 0);
-      ctx.fillStyle = '#e8eef8'; ctx.font = '10px Segoe UI, sans-serif'; ctx.textAlign = 'left'; ctx.fillText(f.ships.length, fx + 9, fy + 3.5); ctx.textAlign = 'center';
-      if (UI.selFleet === f.id) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.2; ctx.strokeRect(fx - 9, fy - 7, 26, 14); }
-      UI.fleetBoxes.push({x: fx - 9, y: fy - 7, w: 26, h: 14, f: f.id});
-    });
+  for (const sid in byStar) {
+    const s = ST(+sid); const p = proj(s.x, s.y, s.z);
+    byStar[sid].forEach((f, i) => { const fx = p[0] + 16, fy = p[1] - 12 + i * 13; drawShipIcon(x, fx, fy, f, 0, UI.selFleet === f.id); x.fillStyle = '#d8e6f8'; x.font = '10px Segoe UI, sans-serif'; x.textAlign = 'left'; if (f.ships.length > 1) x.fillText(f.ships.length, fx + 8, fy + 3.5); UI.fleetBoxes.push({x: fx - 8, y: fy - 6, w: 22, h: 12, f: f.id}); });
   }
   // move preview
-  if (selF && selF.owner === 0 && UI.hoverStar != null && UI.hoverStar !== selF.star) {
-    const s = ST(UI.hoverStar); const [x, y] = w2s(selF.x, selF.y); const [dx, dy] = w2s(s.x, s.y);
-    const ok = inRange(p, s.id);
-    ctx.strokeStyle = ok ? '#7fe0ff' : '#ff6060'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(dx, dy); ctx.stroke();
-    ctx.font = 'bold 12px Segoe UI, sans-serif'; ctx.fillStyle = ok ? '#7fe0ff' : '#ff8080';
-    ctx.fillText(ok ? eta(selF, s.id) + ' turn' + (eta(selF, s.id) > 1 ? 's' : '') : 'Out of fuel range', dx, dy - starR * 2 - 6);
+  const sf = UI.selFleet != null ? S.fleets.find(f => f.id === UI.selFleet) : null;
+  if (sf && UI.hoverStar != null && UI.hoverStar !== sf.star) {
+    const s = ST(UI.hoverStar); const a = proj(sf.x, sf.y, sf.z), b = proj(s.x, s.y, s.z);
+    x.strokeStyle = '#7fe0ff'; x.lineWidth = 1.6; x.beginPath(); x.moveTo(a[0], a[1]); x.lineTo(b[0], b[1]); x.stroke();
+    const yrs = etaTo(sf, s.id), dist = d3(sf, s);
+    x.font = 'bold 12px Segoe UI, sans-serif'; x.textAlign = 'center'; x.fillStyle = '#7fe0ff';
+    x.fillText(dist.toFixed(1) + ' ly · ' + yrs + ' year' + (yrs > 1 ? 's' : '') + ' at ' + pct(fleetSpeed(sf)) + ' light speed', b[0], b[1] - 18);
   }
+  UI.dirty = false;
 }
-function mapLoop() { if (S && $('#app').style.display !== 'none') drawMap(); requestAnimationFrame(mapLoop); }
-function hitStar(sx, sy) { let best = null, bd = 18; for (const s of S.stars) { const [x, y] = w2s(s.x, s.y); const d = Math.hypot(x - sx, y - sy); if (d < bd) { bd = d; best = s.id; } } return best; }
+function drawShipIcon(x, px, py, f, ang, sel) {
+  const route = f.task && f.task.type === 'route';
+  const col = route ? '#ffcf6a' : fleetHas(f, 'colony') ? '#9cff9c' : fleetHas(f, 'lab') ? '#d0a8ff' : '#7fe0ff';
+  x.save(); x.translate(px, py); x.rotate(ang);
+  x.fillStyle = col; x.beginPath(); x.moveTo(7, 0); x.lineTo(-5, -4.5); x.lineTo(-3, 0); x.lineTo(-5, 4.5); x.closePath(); x.fill();
+  if (sel) { x.strokeStyle = '#fff'; x.lineWidth = 1.2; x.beginPath(); x.arc(0, 0, 9, 0, TAU); x.stroke(); }
+  x.restore();
+}
+function mapLoop() { if (S && UI.dirty && $('#app').style.display !== 'none') drawMap(); requestAnimationFrame(mapLoop); }
+function hitStar(sx, sy) { let best = null, bd = 16; for (const p of UI.pts) { const d = Math.hypot(p.x - sx, p.y - sy); if (d < bd) { bd = d; best = p.id; } } return best; }
 function hitFleet(sx, sy) { for (let i = UI.fleetBoxes.length - 1; i >= 0; i--) { const b = UI.fleetBoxes[i]; if (sx >= b.x && sx <= b.x + b.w && sy >= b.y && sy <= b.y + b.h) return b.f; } return null; }
 function initMapInput() {
   const c = cv();
   c.addEventListener('contextmenu', e => e.preventDefault());
-  c.addEventListener('pointerdown', e => { UI.drag = {x: e.clientX, y: e.clientY, cx: UI.cam.x, cy: UI.cam.y, moved: false, btn: e.button}; c.setPointerCapture(e.pointerId); });
+  c.addEventListener('pointerdown', e => { UI.drag = {x: e.clientX, y: e.clientY, moved: false, btn: e.button, shift: e.shiftKey, cam: Object.assign({}, UI.cam)}; c.setPointerCapture(e.pointerId); });
   c.addEventListener('pointermove', e => {
     const r = c.getBoundingClientRect(); const sx = e.clientX - r.left, sy = e.clientY - r.top;
-    if (UI.drag && UI.drag.btn === 0) {
-      const dx = e.clientX - UI.drag.x, dy = e.clientY - UI.drag.y;
-      if (Math.abs(dx) + Math.abs(dy) > 4) UI.drag.moved = true;
-      if (UI.drag.moved) { UI.cam.x = UI.drag.cx - dx / UI.cam.z; UI.cam.y = UI.drag.cy - dy / UI.cam.z; c.style.cursor = 'grabbing'; }
+    const D = UI.drag;
+    if (D) {
+      const dx = e.clientX - D.x, dy = e.clientY - D.y;
+      if (Math.abs(dx) + Math.abs(dy) > 4) D.moved = true;
+      if (D.moved) {
+        if (D.btn === 2 || D.shift) { // pan along the plane
+          const C = UI.cam; const cy = Math.cos(C.yaw), syw = Math.sin(C.yaw);
+          const mx = -dx / C.zoom, my = -dy / C.zoom / Math.max(0.3, Math.sin(C.pitch));
+          C.tx = D.cam.tx + mx * cy + my * syw; C.ty = D.cam.ty - mx * syw + my * cy;
+        } else { UI.cam.yaw = D.cam.yaw + dx * 0.006; UI.cam.pitch = clamp(D.cam.pitch + dy * 0.005, 0.2, Math.PI / 2); }
+        UI.dirty = true;
+      }
     }
-    UI.hoverStar = hitStar(sx, sy); UI.hoverFleet = hitFleet(sx, sy);
-    c.style.cursor = UI.drag && UI.drag.moved ? 'grabbing' : (UI.hoverFleet != null || UI.hoverStar != null ? 'pointer' : 'default');
+    const hs = hitStar(sx, sy); if (hs !== UI.hoverStar) { UI.hoverStar = hs; UI.dirty = true; }
+    c.style.cursor = D && D.moved ? 'grabbing' : (hs != null || hitFleet(sx, sy) != null ? 'pointer' : 'default');
     updateHint();
   });
   c.addEventListener('pointerup', e => {
-    const d = UI.drag; UI.drag = null; c.style.cursor = 'default';
-    if (!d || d.moved || UI.busy) return;
+    const D = UI.drag; UI.drag = null; c.style.cursor = 'default';
+    if (!D || D.moved || UI.busy) return;
     const r = c.getBoundingClientRect(); const sx = e.clientX - r.left, sy = e.clientY - r.top;
     const fid = hitFleet(sx, sy), sid = hitStar(sx, sy);
-    const selF = UI.selFleet != null ? S.fleets.find(f => f.id === UI.selFleet) : null;
-    if (e.button === 2) { if (selF && selF.owner === 0 && sid != null) sendFleet(selF, sid); return; }
+    const sf = UI.selFleet != null ? S.fleets.find(f => f.id === UI.selFleet) : null;
+    if (e.button === 2) { if (sf && sid != null) sendFleet(sf, sid); return; }
     if (fid != null) { selectFleet(fid); return; }
-    if (sid != null) {
-      if (selF && selF.owner === 0 && sid !== selF.star) { sendFleet(selF, sid); return; }
-      selectStar(sid); return;
-    }
+    if (sid != null) { if (sf && sid !== sf.star) { sendFleet(sf, sid); return; } selectStar(sid); return; }
     UI.selFleet = null; UI.selStar = null; closeSide();
   });
-  c.addEventListener('wheel', e => {
-    e.preventDefault();
-    const r = c.getBoundingClientRect(); const sx = e.clientX - r.left, sy = e.clientY - r.top;
-    const [wx, wy] = s2w(sx, sy);
-    UI.cam.z = clamp(UI.cam.z * (e.deltaY < 0 ? 1.15 : 1 / 1.15), 8, 90);
-    const [nx, ny] = s2w(sx, sy); UI.cam.x += wx - nx; UI.cam.y += wy - ny;
-  }, {passive: false});
+  c.addEventListener('dblclick', e => { const r = c.getBoundingClientRect(); const sid = hitStar(e.clientX - r.left, e.clientY - r.top); if (sid != null) centerOn(sid); });
+  c.addEventListener('wheel', e => { e.preventDefault(); UI.cam.zoom = clamp(UI.cam.zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15), 4, 120); UI.dirty = true; }, {passive: false});
+  window.addEventListener('resize', () => UI.dirty = true);
 }
+function sideShift() { const o = UI.view ? 190 / UI.cam.zoom : 0; return [o * Math.cos(UI.cam.yaw), -o * Math.sin(UI.cam.yaw)]; }
+function centerOn(sid) { const s = ST(sid), [ox, oy] = sideShift(); UI.cam.tx = s.x + ox; UI.cam.ty = s.y + oy; UI.cam.tz = 0; UI.dirty = true; }
+function fitView() { const {w, h} = mapSize(); UI.cam.zoom = clamp(Math.min((w - (UI.view ? 400 : 40)) / (2 * S.radius + 14), (h - 60) / (2 * S.radius + 10)), 4, 120); const [ox, oy] = sideShift(); UI.cam.tx = ox; UI.cam.ty = oy; UI.cam.tz = 0; UI.dirty = true; }
+ACT.camTop = () => { UI.cam.pitch = Math.abs(UI.cam.pitch - Math.PI / 2) < 0.05 ? 0.95 : Math.PI / 2; UI.dirty = true; };
+ACT.camRot = v => { UI.cam.yaw += (+v) * Math.PI / 8; UI.dirty = true; };
+ACT.camZoom = v => { UI.cam.zoom = clamp(UI.cam.zoom * (+v > 0 ? 1.25 : 0.8), 4, 120); UI.dirty = true; };
+ACT.camSun = () => { centerOn(0); };
+ACT.camFit = () => fitView();
 function updateHint() {
-  const el = $('#hint'); const selF = UI.selFleet != null ? S.fleets.find(f => f.id === UI.selFleet) : null;
-  if (selF && selF.owner === 0) el.textContent = 'Fleet selected: click a star to send it there (or right-click). Click empty space to deselect.';
-  else if (UI.hoverStar != null) { const s = ST(UI.hoverStar); el.textContent = s.name + ' — ' + STAR_TYPES[s.type].name + ' star' + (player().explored[s.id] ? ', ' + s.planets.length + ' planet' + (s.planets.length !== 1 ? 's' : '') : ', unexplored'); }
-  else el.textContent = 'Drag to pan, scroll to zoom. Click a star or fleet. Enter ends the turn.';
+  const el = $('#hint'); const sf = UI.selFleet != null ? S.fleets.find(f => f.id === UI.selFleet) : null;
+  if (sf) el.textContent = 'Fleet selected: click a star to send it there. Click empty space to deselect.';
+  else if (UI.hoverStar != null) { const s = ST(UI.hoverStar); el.textContent = s.name + ' · ' + starKind(s.sp).word + ' · ' + s.ly + ' ly from the Sun' + (S.visited[s.id] ? '' : ' · not yet visited'); }
+  else el.textContent = 'Drag to rotate · right-drag or Shift-drag to pan · scroll to zoom · Enter ends the year';
 }
 function sendFleet(f, sid) {
-  const err = orderMove(f, sid);
-  if (err) { toast(err); return; }
-  toast('Fleet heading to ' + ST(sid).name + ' — ' + eta(f, sid) + ' turn' + (eta(f, sid) > 1 ? 's' : ''));
-  renderSide();
+  const err = orderMove(f, sid); if (err) { toast(err); return; }
+  toast('Heading to ' + ST(sid).name + ': ' + etaTo(f, sid) + ' year' + (etaTo(f, sid) > 1 ? 's' : ''));
+  UI.dirty = true; renderSide();
 }
-function selectStar(sid) { UI.selStar = sid; UI.selFleet = null; UI.view = 'star'; UI.viewId = sid; renderSide(); }
-function selectFleet(fid) { const f = S.fleets.find(x => x.id === fid); if (!f) return; UI.selFleet = fid; UI.selStar = f.star; UI.view = 'fleet'; UI.viewId = fid; UI.fleetSel = {}; renderSide(); }
-function selectColony(pid) { UI.selStar = P(pid).star; UI.selFleet = null; UI.view = 'colony'; UI.viewId = pid; renderSide(); }
-function closeSide() { UI.view = null; $('#side').classList.remove('show'); updateHint(); }
+function selectStar(sid) { UI.selStar = sid; UI.selFleet = null; UI.view = 'star'; UI.viewId = sid; UI.dirty = true; renderSide(); }
+function selectFleet(fid) { const f = S.fleets.find(x => x.id === fid); if (!f) return; UI.selFleet = fid; UI.selStar = f.star; UI.view = 'fleet'; UI.viewId = fid; UI.fleetSel = {}; UI.routeSetup = null; UI.dirty = true; renderSide(); }
+function selectColony(bid) { UI.selStar = B(bid).star; UI.selFleet = null; UI.view = 'colony'; UI.viewId = bid; UI.dirty = true; renderSide(); }
+function closeSide() { UI.view = null; $('#side').classList.remove('show'); UI.dirty = true; updateHint(); }
+ACT.goStar = v => { selectStar(+v); centerOn(+v); };
