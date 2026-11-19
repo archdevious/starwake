@@ -385,8 +385,8 @@ function renderFilters() {
 }
 ACT.mapFilter = k => { UI.mapFilter = UI.mapFilter === k ? null : k; renderFilters(); UI.dirty = true; };
 function shipRole(f) { return fleetHas(f, 'colony') ? 'colony' : fleetHas(f, 'outpost') ? 'outpost' : fleetHas(f, 'lab') ? 'chart' : fleetCargo(f) ? 'trade' : 'unexp'; }
-function shipTarget(f) {
-  const role = shipRole(f), pos = f.dest == null ? ST(f.star) : f, spd = fleetSpeed(f);
+function shipTarget(f, forceRole) {
+  const role = forceRole || shipRole(f), pos = f.dest == null ? ST(f.star) : f, spd = fleetSpeed(f);
   // the earliest any competing ship reaches each star (0 = already there, surveying or waiting)
   const rival = {};
   for (const o of S.fleets) {
@@ -416,7 +416,10 @@ function shipTarget(f) {
     if ((role === 'colony' || role === 'outpost') && ourStar(s)) { if (d < hd) { hd = d; held = s; } continue; }
     if (d < bd) { bd = d; best = s; }
   }
-  return best || held;
+  const t = best || held;
+  // a Science Lab ship with nothing charted left scouts the nearest unexplored star itself
+  if (!t && role === 'chart' && !forceRole) return shipTarget(f, 'unexp');
+  return t;
 }
 function drawFilterAndTarget(x) {
   if (UI.mapFilter) {
