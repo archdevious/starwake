@@ -56,6 +56,7 @@ function starPanel(sid) {
   let h = `<div class="hdr"><div><h2>${esc(s.name)}${canRenameStar(s) ? ` <button class="x ren" data-a="renStar" data-v="${s.id}" title="Rename this star">✎</button>` : ''}</h2>${s.orig ? `<div class="tiny faint">Charted as ${esc(s.orig)}</div>` : ''}<div class="dim small">${starTitle(s)}</div></div><button class="x" data-a="close">✕</button></div>`;
   h += `<div class="sdesc">${esc(starDesc(s))}</div>`;
   if (s.guardKnown) h += `<div class="card" style="border-color:#7a2a2a"><b class="bad">Guardian machines.</b> Ancient automated defenses destroy any ship that enters this system.</div>`;
+  h += civStarHTML(s);
   if (!worldsKnown(s)) {
     h += `<div class="card dim"><b>Unexplored.</b> Its worlds are unknown. Send any ship into orbit here, or get a ship's telescope within range (2.5 or 4 light-years, by module), to chart it.</div>`;
   } else {
@@ -70,7 +71,7 @@ function starPanel(sid) {
       const b = B(bid), ours = b.owner === 0 && b.col;
       const st = ours ? stageOf(b) : null;
       const idle = ours && !b.col.queue.length && !supplyTarget(b);
-      h += `<div class="card ${ours ? 'click' : ''} ${idle ? 'idlecard' : ''}" ${ours ? `data-a="colony" data-v="${b.id}"` : ''} ${idle ? 'title="Nothing is being built here"' : ''}><div class="body">${planetBall(b, 32)}<div style="flex:1;min-width:0"><b>${bodyName(b)}</b><div class="dim small">${sizeWord(b)}${lc(PCLASS[b.cls].name)}</div>${bodyFacts(b)}
+      h += `<div class="card ${ours ? 'click' : ''} ${idle ? 'idlecard' : ''}" ${ours ? `data-a="colony" data-v="${b.id}"` : ''} ${idle ? 'title="Nothing is being built here"' : ''}><div class="body">${planetBall(b, 32)}<div style="flex:1;min-width:0"><b>${bodyName(b)}</b><div class="dim small">${sizeWord(b)}${lc(PCLASS[b.cls].name)}</div>${civBodyLine(b)}${bodyFacts(b)}
         ${ours ? `<div class="row sb small" style="margin-top:5px"><span class="good">Ours · ${STAGES[st].name}${b.col.outpost ? '' : ' · ' + people(b.col.pop)}</span><span class="acc" style="white-space:nowrap">Manage ▸</span></div><div class="small" style="margin-top:2px">${buildLine(b)}</div>` : ''}
         ${bodyActions(b) ? `<div class="row wrap" style="margin-top:6px;gap:5px">${bodyActions(b)}</div>` : ''}</div></div></div>`;
     }
@@ -96,8 +97,9 @@ function buildLine(b) {
   const it = c.queue[0], o = colOut(b), cost = itemCost(b, it), yrs = o.prod > 0 ? Math.max(1, Math.ceil((cost - c.prog) / o.prod)) : '∞';
   return `<span class="dim">Building:</span> ${esc(itemName(it))}${it.n > 1 ? ' ×' + it.n : ''} <span class="dim">(${yrs} yr)${c.queue.length > 1 ? ' +' + (c.queue.length - 1) + ' more' : ''}</span>`;
 }
+function shipNotes(list) { const lost = list.filter(sh => sh.lost && sh.lost.length).length, pods = list.reduce((a, sh) => a + shipPods(sh), 0), tr = list.reduce((a, sh) => a + shipTroops(sh), 0); return (lost ? `<div class="tiny bad">Science Lab lost on ${lost === list.length ? (list.length > 1 ? 'all' : 'this ship') : lost}</div>` : '') + (pods ? `<div class="tiny ${tr ? 'good' : 'dim'}">Troops ${people(tr / 1e6)} of ${people(pods * TROOPS_PER_POD / 1e6)}${tr < pods * TROOPS_PER_POD ? ' (refill at a star with one of our colonies)' : ''}</div>` : ''); }
 function fleetName(f) { const cnt = {}; for (const sh of f.ships) { const n = design(sh.d).name; cnt[n] = (cnt[n] || 0) + 1; } return Object.entries(cnt).map(([n, c]) => (c > 1 ? c + '× ' : '') + esc(n)).join(', '); }
-function taskText(f) { const t = f.task; if (!t) return ''; if (t.type === 'survey') return (t.probe ? 'probe survey' : 'surveying') + ' (' + t.left + ' yr left)'; if (t.type === 'route') return 'trade route ' + esc(routeName(t)); return ''; }
+function taskText(f) { const t = f.task; if (!t) return ''; if (t.type === 'survey') return (t.probe ? 'probe survey' : 'surveying') + ' (' + t.left + ' yr left)'; if (t.type === 'route') return 'trade route ' + esc(routeName(t)); if (t.type === 'study') { const c = civAt(f.star); return 'studying their language' + (c ? ' (' + Math.floor(c.lang) + '%)' : ''); } return ''; }
 
 // ---------- colony ----------
 function outputHTML(b, o) {
@@ -140,11 +142,11 @@ function colonyPanel(b) {
     h += `<div class="tiny dim" style="padding:2px 6px 6px">Interplanetary expansion within this star system: no ship needed. The outpost or settlement appears as soon as the project is done.</div>`;
     if (!nWorlds) h += `<div class="small dim" style="padding:6px">Every world in this system is already claimed.</div>`;
     const robo = ots.filter(t => HAB[habSeen(t)].cap <= 0), live = ots.filter(t => HAB[habSeen(t)].cap > 0);
-    const anyQ = t => c.queue.some(x => (x.kind === 'outpost' || x.kind === 'settle') && x.id === t.id);
+    const claim = t => claimedAt(t), anyQ = t => !!claim(t);
     const row = (t, kind) => { const cost = itemCost(b, {kind, id: t.id}), hs = habSeen(t), q = anyQ(t), own = t.owner === 0;
       const label = kind === 'settle' ? (own ? 'Turn the outpost on ' + esc(t.name) + ' into a colony' : 'Settle ' + esc(t.name)) : 'Outpost on ' + esc(t.name);
       const info = kind === 'settle' ? `${people(settlerCount())} settlers · grows to ${people(popCap(t))}` : `${lc(PCLASS[t.cls].name)}${S.surveyed[b.star] ? ' · ' + MINERALS[t.min].toLowerCase() + ' minerals' : ''}${HAB[hs].cap > 0 ? ` · <span style="color:${HAB[hs].color}">${HAB[hs].name}</span> · ${people(popCap(t, hs))}` : ''}`;
-      return `<div class="opt" ${q ? 'style="opacity:.45;cursor:default"' : `data-a="qadd" data-v="${b.id}:${kind}:${t.id}"`}><span class="nm">${label}<div class="tiny dim">${info}${q ? ' · queued' : ''}</div></span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`; };
+      const qb = q ? claim(t) : null; return `<div class="opt" ${q ? 'style="opacity:.45;cursor:default"' : `data-a="qadd" data-v="${b.id}:${kind}:${t.id}"`}><span class="nm">${label}<div class="tiny dim">${info}${q ? (qb === b ? ' · queued' : ' · queued at ' + esc(qb.name)) : ''}</div></span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`; };
     if (robo.length) h += `<div class="sec" style="margin-top:4px">Robotic only</div>` + robo.map(t => row(t, 'outpost')).join('');
     if (live.length || ownOut.length) {
       h += `<div class="sec">Could hold people</div><div class="tiny dim" style="padding:0 6px 4px">Settle a world to found a colony, or claim it as an outpost first and settle it later.</div>`;
@@ -182,9 +184,9 @@ function designSummary(d) {
 }
 ACT.focus = v => { const [bid, k] = v.split(':'); B(+bid).col.focus = k; renderSide(); };
 ACT.btab = v => { UI.buildTab = v; renderSide(); };
-ACT.qadd = v => { const [bid, kind, id] = v.split(':'); const c = B(+bid).col; if (kind === 'outpost' || kind === 'settle') { c.queue.push({kind, id: +id}); renderSide(); return; } if (kind === 'ship') { const last = c.queue[c.queue.length - 1]; if (last && last.kind === 'ship' && last.id === id) last.n = (last.n || 1) + 1; else c.queue.push({kind, id, n: 1}); } else c.queue.push({kind, id}); renderSide(); };
+ACT.qadd = v => { const [bid, kind, id] = v.split(':'); const c = B(+bid).col; if (kind === 'outpost' || kind === 'settle') { if (claimedAt(B(+id))) { toast('Already queued at ' + claimedAt(B(+id)).name); return; } c.queue.push({kind, id: +id}); renderSide(); return; } if (kind === 'ship') { const last = c.queue[c.queue.length - 1]; if (last && last.kind === 'ship' && last.id === id) last.n = (last.n || 1) + 1; else c.queue.push({kind, id, n: 1}); } else c.queue.push({kind, id}); renderSide(); };
 ACT.qdel = v => { const [bid, i] = v.split(':').map(Number); const c = B(bid).col; if (i === 0) c.prog = Math.floor(c.prog * 0.5); c.queue.splice(i, 1); renderSide(); };
-ACT.qup = v => { const [bid, i] = v.split(':').map(Number); const q = B(bid).col.queue; [q[i - 1], q[i]] = [q[i], q[i - 1]]; renderSide(); };
+ACT.qup = v => { const [bid, i] = v.split(':').map(Number); const c = B(bid).col, q = c.queue; if (i === 1) c.prog = Math.floor(c.prog * 0.5); [q[i - 1], q[i]] = [q[i], q[i - 1]]; renderSide(); };
 ACT.qn = v => { const [bid, i, d] = v.split(':').map(Number); const it = B(bid).col.queue[i]; it.n = Math.max(1, (it.n || 1) + d); renderSide(); };
 ACT.buy = v => { if (buyItem(B(+v))) toast('Bought: finishes next year'); renderSide(); };
 
@@ -214,6 +216,7 @@ function fleetPanel(f) {
     const scope = has('biosignatures') && fleetHas(f, 'tel_l') && !fleetHas(f, 'lab') && !S.surveyed[s.id] && !(f.task && f.task.type === 'survey');
     if (scope) acts.push(`<button class="btn sm primary" data-a="scopeSurvey" data-v="${f.id}" title="Uses the Large Telescope with Biosignature Spectroscopy. The ship is not used up.">Telescope survey (3 yr)</button>`);
     if (!scope && canProbeSurvey(f) && !fleetHas(f, 'lab')) acts.push(`<button class="btn sm" data-a="probeSurvey" data-v="${f.id}" title="The ship is used up when the survey finishes">Probe survey (5 yr, uses up the ship)</button>`);
+    acts.push(...civActions(f));
     if (canInvestigate(f)) acts.push(`<button class="btn sm amber" data-a="investigate" data-v="${f.id}">Investigate strange readings</button>`);
     if (fleetHas(f, 'colony') || fleetHas(f, 'outpost')) acts.push(`<button class="btn sm" data-a="star" data-v="${s.id}">Choose a world to settle ▸</button>`);
     if (acts.length) h += `<div class="sec">Actions</div><div class="row wrap" style="gap:5px">${acts.join('')}</div>`;
@@ -222,7 +225,7 @@ function fleetPanel(f) {
   const groups = {}; for (const sh of f.ships) (groups[sh.d] = groups[sh.d] || []).push(sh);
   for (const did in groups) {
     const d = design(did), list = groups[did], selN = list.filter(sh => UI.fleetSel[sh.id]).length;
-    h += `<div class="card"><div class="row">${designIcon(d, 32)}<div style="flex:1;margin-left:6px"><b>${esc(d.name)}</b> <span class="dim">×${list.length}</span><div class="tiny dim">${designSummary(d)}</div></div>${f.ships.length > 1 ? `<div class="row" style="gap:3px"><button class="btn sm" data-a="fsel" data-v="${did}:-1">−</button><span class="small">${selN}</span><button class="btn sm" data-a="fsel" data-v="${did}:1">+</button></div>` : ''}</div></div>`;
+    h += `<div class="card"><div class="row">${designIcon(d, 32)}<div style="flex:1;margin-left:6px"><b>${esc(d.name)}</b> <span class="dim">×${list.length}</span><div class="tiny dim">${designSummary(d)}</div>${shipNotes(list)}</div>${f.ships.length > 1 ? `<div class="row" style="gap:3px"><button class="btn sm" data-a="fsel" data-v="${did}:-1">−</button><span class="small">${selN}</span><button class="btn sm" data-a="fsel" data-v="${did}:1">+</button></div>` : ''}</div></div>`;
   }
   const nSel = Object.values(UI.fleetSel).filter(Boolean).length;
   const others = f.star != null ? S.fleets.filter(x => x.star === f.star && x.dest == null && x !== f) : [];
@@ -281,6 +284,7 @@ function outpostPanel(b) {
   const sup = supplyTarget(b);
   let h = `<div class="hdr"><div class="row">${planetBall(b, 42)}<div><h2>${esc(b.name)} <button class="x ren" data-a="renBody" data-v="${b.id}" title="Rename this world">✎</button></h2><div class="dim small">Outpost · ${lc(PCLASS[b.cls].name)}</div></div></div><button class="x" data-a="close">✕</button></div>
     <div class="small"><a class="acc" style="cursor:pointer" data-a="star" data-v="${b.star}">◂ ${esc(ST(b.star).name)} system</a></div>
+    ${c.enslaved ? garrisonHTML(b) : ''}
     <div class="sec">Output per year</div>
     <div class="grid2 small"><div>Production <b>${o.prod}</b> <span class="dim">(${MINERALS[b.min].toLowerCase()} minerals)</span></div><div>${o.bc < 0 ? `Upkeep <b class="bad">${-o.bc} credit a year</b>` : `Credits <b class="good">+${o.bc}</b> <span class="dim">(after upkeep)</span>`}</div>${o.rp ? `<div>Research <b>${o.rp}</b></div>` : ''}</div>
     <div class="sec">Production goes to</div>

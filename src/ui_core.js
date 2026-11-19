@@ -34,7 +34,7 @@ const SETTINGS = (() => { try { return Object.assign({near: 3, music: 40, sfx: 6
 function saveSettings() { try { localStorage.setItem('starwake.settings', JSON.stringify(SETTINGS)); } catch (e) {} }
 // ---------- hotkeys (editable in Settings) ----------
 const HOTKEYS = [['endTurn', 'End the year', 'Enter'], ['skip', 'Skip ahead until something happens', 'f'], ['idle', 'Next idle colony or ship', ' '],
-  ['research', 'Research', 'r'], ['design', 'Ship design', 'd'], ['colonies', 'Colonies', 'c'], ['journal', 'Journal', 'j'], ['home', 'Center the map on the Sun', 'h']];
+  ['research', 'Research', 'r'], ['design', 'Ship design', 'd'], ['colonies', 'Colonies', 'c'], ['journal', 'Journal', 'j'], ['home', 'Center the map on the Sun', 'h'], ['near', 'Show or hide nearest-star lines', 'n'], ['diplo', 'Diplomacy', 'p']];
 const normKey = k => k.length === 1 ? k.toLowerCase() : k;
 function hotkey(act) { const s = SETTINGS.keys && SETTINGS.keys[act]; return s != null ? s : HOTKEYS.find(h => h[0] === act)[2]; }
 function keyName(k) { return k === ' ' ? 'Space' : k.length === 1 ? k.toUpperCase() : k.replace(/^Arrow/, '').replace(/^./, c => c.toUpperCase()); }
@@ -68,6 +68,7 @@ function renderTop() {
     ${short.length ? `<div class="chip click" data-a="goStar" data-v="${short[0]}"><span class="bad">Food shortage: ${short.map(s => esc(ST(s).name)).join(', ')}</span></div>` : ''}
     <div class="chip" title="Top ship speed, as a share of light speed"><span class="k">Top speed</span><b>${pct(topSpeed())}</b></div><span id="attn"></span>`;
   renderAttn();
+  const db = $('#diplobtn'); if (db) db.style.display = S.contact ? '' : 'none';
 }
 // ---------- "needs attention" button ----------
 const starOrder = () => { const o = {}; S.stars.forEach((s, i) => o[s.id] = i); return o; };

@@ -33,7 +33,9 @@ async function runEndTurn(skip) {
 ACT.endTurn = () => runEndTurn(false);
 ACT.skip = () => runEndTurn(true);
 const KEY_DO = {endTurn: () => runEndTurn(false), skip: () => runEndTurn(true), idle: () => ACT.attnGo(), research: () => ACT.openResearch(),
-  design: () => ACT.openDesign(), colonies: () => ACT.openColonies(), journal: () => ACT.openJournal(), home: () => centerOn(0)};
+  design: () => ACT.openDesign(), colonies: () => ACT.openColonies(), journal: () => ACT.openJournal(), home: () => centerOn(0),
+  near: () => { if (SETTINGS.near > 0) { SETTINGS.nearLast = SETTINGS.near; SETTINGS.near = 0; } else SETTINGS.near = SETTINGS.nearLast || 3; saveSettings(); UI.dirty = true; renderSide(); toast(SETTINGS.near ? 'Nearest-star lines: ' + SETTINGS.near : 'Nearest-star lines off'); },
+  diplo: () => ACT.openDiplo()};
 document.addEventListener('keydown', e => {
   if (UI.keyCap && !modalOpen('hotkeys')) UI.keyCap = null;
   if (UI.keyCap) { e.preventDefault(); e.stopPropagation(); hotkeyCaptured(e); return; }

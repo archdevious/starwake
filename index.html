@@ -212,6 +212,7 @@ table.list tr.click{cursor:pointer}table.list tr.click:hover td{background:#121d
       <button class="btn" data-a="openColonies" title="Colonies (C)">Colonies</button>
       <button class="btn" data-a="openResearch" title="Research (R)">Research</button>
       <button class="btn" data-a="openDesign" title="Ship Design (D)">Ships</button>
+      <button class="btn" id="diplobtn" data-a="openDiplo" title="Diplomacy (P)" style="display:none">Diplomacy</button>
       <button class="btn" data-a="openJournal" title="Journal (J)">Journal</button>
       <button class="btn" data-a="openMenu">Menu</button>
       <button class="btn" id="ffwd" data-a="skip" title="Skip years until something happens (F)">Skip ⏩</button>
@@ -236,7 +237,7 @@ const FAR_STARS=[{"n": "Achernar", "d": [0.184, -0.484, -0.855], "ly": 139}, {"n
 
 'use strict';
 // ===================== STARWAKE v2 — STATIC DATA =====================
-const GAME_VERSION = 16;
+const GAME_VERSION = 17;
 const SAVE_FORMAT = 2;
 const START_YEAR = 2326;
 const LENGTHS = {
@@ -331,6 +332,7 @@ const MODULES = {
   colony:  {name: 'Colony Pod',       mass: 4, cost: 120, desc: 'Carries 20,000 settlers to found or grow a colony (twice as many with Hibernation). Needs a medium or heavy hull.'},
   outpost: {name: 'Outpost Kit',      mass: 2, cost: 80,  desc: 'Builds a robotic outpost on almost any world, for star systems where we have no colony. Where we already have a colony, order an outpost from that colony instead: it costs far less.'},
   booster: {name: 'Booster',          mass: 1, cost: 20,  desc: '+10% of light speed (30% becomes 40%). Only one Booster counts. Light hulls only.'},
+  assault: {name: 'Assault Pod',      mass: 3, cost: 90, tech: 'ground_doctrine', desc: 'Carries 10,000 troops to land on an alien world. Troops cost a little upkeep while aboard. Needs a medium or heavy hull.'},
   cargo:   {name: 'Cargo Bay',        mass: 2, cost: 40,  desc: 'Each trip carries 10,000 settlers and 10 food from your colonies, and brings trade back on a trade route. Needs a medium or heavy hull.'},
 };
 const DEFAULT_DESIGNS = [
@@ -348,7 +350,7 @@ const DRIVE_TECH = [null, 'fusion_torch', 'antimatter_catalysis', 'laser_sails',
 
 // ---------- Research ----------
 const FIELDS = {prop: {name: 'Propulsion', color: '#5ac8ff'}, sens: {name: 'Sensors', color: '#d07aff'}, bio: {name: 'Biology', color: '#6ae07a'},
-  eng: {name: 'Engineering', color: '#e8a84a'}, phys: {name: 'Physics', color: '#ff7a7a'}, soc: {name: 'Society', color: '#ffd860'}};
+  eng: {name: 'Engineering', color: '#e8a84a'}, phys: {name: 'Physics', color: '#ff7a7a'}, soc: {name: 'Society', color: '#ffd860'}, gnd: {name: 'Ground Forces', color: '#ff9a5a', contact: true}};
 const TECHS = [
   {id: 'fusion_torch', f: 'prop', cost: 200, req: [], name: 'Fusion Torch Drive', desc: 'Top speed 40% of light speed.'},
   {id: 'antimatter_catalysis', f: 'prop', cost: 550, req: ['fusion_torch'], name: 'Antimatter-Catalysed Fusion', desc: 'Top speed 55% of light speed.'},
@@ -386,6 +388,14 @@ const TECHS = [
   {id: 'interplanetary_markets', f: 'soc', cost: 1000, req: ['interstellar_commerce'], name: 'Interplanetary Markets', desc: 'Unlocks the Trade Exchange, an upgrade of the Trade Port (+50% credits).'},
   {id: 'colonial_charter', f: 'soc', cost: 550, req: [], name: 'Colonial Charters', desc: 'Settlements grow 50% faster.'},
   {id: 'unified_science', f: 'soc', cost: 1300, req: ['quantum_computing'], name: 'Unified Science Academy', desc: '+20% research everywhere.'},
+  {id: 'ground_doctrine', f: 'gnd', cost: 400, req: [], contact: true, name: 'Ground Assault Doctrine', desc: 'Unlocks the Assault Pod ship module (10,000 troops each) for landing on alien worlds.'},
+  {id: 'laser_rifles', f: 'gnd', cost: 500, req: ['ground_doctrine'], contact: true, name: 'Laser Rifles', desc: 'Our troops fight harder: +5 strength per pod.'},
+  {id: 'powered_armor', f: 'gnd', cost: 600, req: ['ground_doctrine'], contact: true, name: 'Powered Armor', desc: '+5 strength per pod.'},
+  {id: 'field_biosuits', f: 'gnd', cost: 700, req: ['ground_doctrine'], contact: true, name: 'Field Biosuits', desc: 'Troops lose 25% less strength on worlds harsh to humans.'},
+  {id: 'occupation_logistics', f: 'gnd', cost: 1000, req: ['ground_doctrine'], contact: true, name: 'Occupation Logistics', desc: 'Uprisings are 25% less likely and garrisons cost 25% less upkeep.'},
+  {id: 'plasma_rifles', f: 'gnd', cost: 1600, req: ['laser_rifles'], contact: true, name: 'Plasma Rifles', desc: '+15 strength per pod (replaces Laser Rifles\' +5).'},
+  {id: 'combat_exo', f: 'gnd', cost: 1800, req: ['powered_armor'], contact: true, name: 'Combat Exoskeletons', desc: '+15 strength per pod (replaces Powered Armor\'s +5).'},
+  {id: 'sealed_suits', f: 'gnd', cost: 1500, req: ['field_biosuits'], contact: true, name: 'Sealed Environment Suits', desc: 'Troops lose half as much strength on harsh worlds (instead of 25% less).'},
   {id: 'xenology', f: 'soc', cost: 1800, req: ['biosignatures'], name: 'Xenology', desc: 'Anomalies give 50% more research.'},
 ];
 const TECH = {}; TECHS.forEach(t => TECH[t.id] = t);
@@ -538,6 +548,9 @@ const EVENTS = [
 ];
 // For the end screen and score
 const SCORE_W = {explored: 3, surveyed: 4, microbial: 10, ecosystem: 25, anomaly: 1, breakthrough: 30, tech: 6, settlement: 15, city: 40, core: 100, popLog: 20};
+
+// 3D scan models for each race (tubes of [x, y, z, radius, sideways-scale] in feet), drawn as rotating wireframes
+const RACE_MODELS = {"tide":{"scale":56,"cx":392,"gy":432,"h":4.9,"ox":0.0,"unit":1,"ring":[1.7,1.1],"parts":[{"p":[[-0.127,1.855,0.0,0.318,0.8],[-0.064,2.226,0.0,0.445,0.8],[0.042,2.756,0.0,0.477,0.8],[0.127,3.286,0.0,0.445,0.82],[0.212,3.71,0.0,0.371,0.85],[0.276,4.081,0.0,0.307,0.9],[0.318,4.293,0.0,0.286,0.95]],"s":16,"n":4},{"p":[[-0.127,4.537,0.0,0.042,1],[0.021,4.59,0.0,0.233,1.25],[0.318,4.611,0.0,0.318,1.3],[0.615,4.526,0.0,0.297,1.3],[0.848,4.388,0.0,0.212,1.25],[0.986,4.282,0.0,0.085,1.2],[1.028,4.24,0.0,0.021,1]],"s":16,"n":4},{"p":[[0.212,4.261,0.0,0.032,1],[0.371,4.208,0.0,0.159,1.4],[0.583,4.219,0.0,0.18,1.4],[0.763,4.261,0.0,0.127,1.3],[0.869,4.282,0.0,0.032,1]],"s":12,"n":3,"c":"#9FE1CB"},{"p":[[0.127,3.837,0.318,0.138],[0.191,3.763,0.403,0.127]],"s":10,"n":2,"m":true},{"p":[[0.191,3.763,0.424,0.122],[0.254,3.392,0.488,0.106],[0.318,3.074,0.498,0.095],[0.488,2.841,0.477,0.085],[0.7,2.65,0.445,0.074]],"s":10,"n":4,"m":true},{"p":[[0.7,2.65,0.445,0.037],[0.869,2.417,0.498,0.019]],"s":6,"n":2,"m":true},{"p":[[0.7,2.65,0.445,0.037],[0.89,2.459,0.445,0.019]],"s":6,"n":2,"m":true},{"p":[[0.7,2.65,0.445,0.037],[0.859,2.491,0.392,0.019]],"s":6,"n":2,"m":true},{"p":[[0.7,2.65,0.445,0.037],[0.784,2.353,0.53,0.019]],"s":6,"n":2,"m":true},{"p":[[-0.212,2.014,0.254,0.254],[0.0,1.696,0.318,0.233],[0.318,1.431,0.382,0.18],[0.382,1.219,0.392,0.148],[0.106,0.795,0.382,0.117],[-0.042,0.477,0.382,0.095],[-0.021,0.17,0.382,0.085]],"s":12,"n":4,"m":true},{"p":[[-0.127,0.085,0.382,0.074,1.4],[0.053,0.064,0.382,0.095,2.2],[0.318,0.053,0.382,0.106,2.6],[0.509,0.042,0.382,0.053,2.6]],"s":10,"n":3,"m":true},{"p":[[-0.265,1.961,0.0,0.212,0.9],[-0.53,1.643,0.0,0.17,0.8],[-0.869,1.219,0.0,0.117,0.7],[-1.145,0.869,0.0,0.074,0.7],[-1.325,0.721,0.0,0.032,0.7]],"s":12,"n":4},{"p":[[-0.424,1.855,0.0,0.212,0.12],[-0.742,1.505,0.0,0.254,0.1],[-1.06,1.081,0.0,0.191,0.1],[-1.293,0.784,0.0,0.085,0.1],[-1.399,0.7,0.0,0.021,0.1]],"s":10,"n":4,"c":"#5DCAA5","o":0.8},{"p":[[-0.085,4.685,0.0,0.032,0.15],[-0.191,4.505,0.0,0.095,0.15],[-0.318,4.134,0.0,0.127,0.15],[-0.445,3.498,0.0,0.127,0.15],[-0.445,2.862,0.0,0.106,0.15],[-0.382,2.332,0.0,0.042,0.15]],"s":10,"n":4,"c":"#EF9F27","o":0.9}],"spots":[],"eyes":[[[0.445,4.876,0.276],0.085],[[0.445,4.876,-0.276],0.085]],"anchors":{"l1":[0.445,4.876,0.276,"508,112 518,112"],"l2":[0.583,4.219,0,"508,180 518,180"],"l3":[0.848,2.544,0.466,"508,282 518,282"],"l4":[0.318,0.053,0.382,"508,400 518,400"],"l5":[-0.445,3.498,0,"300,240 190,240"],"l6":[-1.06,1.081,0,"280,360 190,360"]},"zr":1.1,"maxft":6,"callouts":[[522,108,"start","EYES","Clear inner lid","for underwater sight"],[522,176,"start","THROAT SAC","Resonates the voice",""],[522,278,"start","HANDS","4 webbed fingers,","fine tool use"],[522,396,"start","FEET","Webbed; walks upright","on land"],[184,236,"end","DORSAL CREST","Flushes orange","with emotion"],[184,356,"end","TAIL","Finned, for","swimming"]],"bottom":{"height":"5 FT 0 IN","mass":"~130 LB","habitat":"TIDAL SHALLOWS","v1":"VOCAL CORDS HUM AS AIR CYCLES BETWEEN LUNGS AND THROAT SAC;","v2":"LARYNX PLATES SNAP FOR CLICKS. WORKS UNDERWATER. CREST COLOR ADDS TONE."},"file":"0417","name":"Tidekin","desc":"Rotating 3D wireframe mesh of an adult Tidekin, a frog-like amphibian, with an orange crest fin, finned tail and throat sac, plus a scan ring, ruler, callouts and voice readout."},"dusk":{"scale":48,"cx":392,"gy":432,"h":6.25,"ox":-0.2,"unit":1,"ring":[2.3,1.25],"parts":[{"p":[[-2.0,3.3,0,0.03,1],[-1.85,3.3,0,0.2,0.9],[-1.55,3.33,0,0.46,0.85],[-1.1,3.36,0,0.58,0.85],[-0.5,3.34,0,0.6,0.85],[0,3.33,0,0.58,0.85],[0.4,3.37,0,0.54,0.85],[0.68,3.45,0,0.42,0.9],[0.8,3.55,0,0.2,1]],"s":16,"n":4},{"p":[[0.42,3.35,0,0.46,0.8],[0.62,3.85,0,0.47,0.8],[0.78,4.45,0,0.44,0.84],[0.86,4.95,0,0.39,0.88],[0.9,5.3,0,0.3,0.95],[0.93,5.55,0,0.23,1],[0.96,5.8,0,0.21,1]],"s":16,"n":4},{"p":[[0.18,6.07,0,0.02,1],[0.33,6.03,0,0.13,0.72],[0.58,5.98,0,0.25,0.78],[0.9,5.93,0,0.3,0.82],[1.2,5.85,0,0.28,0.86],[1.42,5.73,0,0.19,0.9],[1.56,5.64,0,0.09,0.9],[1.62,5.6,0,0.02,1]],"s":16,"n":4},{"p":[[0.8,5.8,0,0.17,0.9],[1.0,5.76,0,0.21,0.85],[1.25,5.7,0,0.18,0.85],[1.45,5.63,0,0.1,0.85],[1.55,5.6,0,0.03,1]],"s":14,"n":4},{"p":[[0.9,5.2,0.28,0.13],[0.98,5.12,0.4,0.12],[1.02,4.95,0.46,0.1]],"s":10,"n":3,"m":true},{"p":[[1.0,5.0,0.44,0.105],[1.06,4.65,0.48,0.095],[1.12,4.3,0.49,0.085],[1.32,4.02,0.46,0.075],[1.58,3.76,0.42,0.065],[1.72,3.62,0.4,0.05]],"s":10,"n":4,"m":true},{"p":[[1.7,3.63,0.4,0.035],[1.86,3.5,0.43,0.02]],"s":6,"n":2,"m":true},{"p":[[1.7,3.63,0.4,0.035],[1.88,3.52,0.38,0.02]],"s":6,"n":2,"m":true},{"p":[[1.7,3.63,0.4,0.035],[1.8,3.45,0.4,0.02]],"s":6,"n":2,"m":true},{"p":[[0.48,3.25,0.3,0.21],[0.56,2.7,0.32,0.17],[0.6,2.15,0.32,0.13],[0.58,1.65,0.32,0.105],[0.6,1.0,0.32,0.088],[0.62,0.4,0.32,0.082],[0.62,0.12,0.32,0.09]],"s":10,"n":4,"m":true},{"p":[[-1.1,3.3,0.3,0.27],[-1.02,2.85,0.32,0.23],[-0.86,2.38,0.33,0.17],[-0.98,1.95,0.34,0.12],[-1.2,1.58,0.34,0.095],[-1.18,0.95,0.34,0.08],[-1.1,0.4,0.34,0.078],[-1.08,0.12,0.34,0.09]],"s":10,"n":4,"m":true},{"p":[[0.48,0.07,0.32,0.08,0.7],[0.6,0.06,0.32,0.11,1.0],[0.76,0.05,0.32,0.1,1.0],[0.92,0.05,0.32,0.05,0.9]],"s":8,"n":3,"m":true},{"p":[[-1.22,0.07,0.34,0.08,0.7],[-1.1,0.06,0.34,0.11,1.0],[-0.94,0.05,0.34,0.1,1.0],[-0.78,0.05,0.34,0.05,0.9]],"s":8,"n":3,"m":true}],"spots":[[1.18,3.85,0.12],[1.18,3.85,-0.12],[1.18,4.09,0.12],[1.18,4.09,-0.12],[1.18,4.33,0.12],[1.18,4.33,-0.12],[1.18,4.57,0.12],[1.18,4.57,-0.12],[1.18,4.81,0.12],[1.18,4.81,-0.12],[1.18,5.05,0.12],[1.18,5.05,-0.12],[-1.3,3.67,0.5],[-1.0,3.67,0.5],[-0.7,3.67,0.5],[-0.4,3.67,0.5],[-0.1,3.67,0.5],[0.2,3.67,0.5],[0.5,3.67,0.5],[-1.2,3.36,0.58],[-0.9,3.36,0.58],[-0.6,3.36,0.58],[-0.3,3.36,0.58],[0.0,3.36,0.58],[0.3,3.36,0.58],[0.6,3.36,0.58]],"eyes":[[[1.3,5.92,0.22],0.07],[[1.3,5.92,-0.22],0.07],[[1.14,5.79,0.26],0.042],[[1.14,5.79,-0.26],0.042]],"anchors":{"l1":[1.3,5.92,0.22,"508,112 518,112"],"l2":[1.18,4.33,0.12,"508,190 518,190"],"l3":[1.72,3.62,0.4,"508,270 518,270"],"l4":[0.62,0.6,0.32,"508,380 518,380"],"l5":[-0.9,3.67,0.5,"300,260 200,260"],"l6":[-1.2,1.58,0.34,"290,380 200,380"]},"zr":1.3,"maxft":7,"callouts":[[522,108,"start","EYES","Two pairs, huge;","built for dim light"],[522,186,"start","LIGHT SPOTS","Rows of glowing skin","cells used to speak"],[522,266,"start","ARMS","Long, 3 fingers,","precise work"],[522,376,"start","FRONT LEGS","Straight, weight-","bearing"],[196,256,"end","FLANK LIGHTS","Second row; shows","mood and rank"],[196,376,"end","HIND LEGS","Reverse-jointed,","built for sprinting"]],"bottom":{"height":"6 FT 2 IN","mass":"~260 LB","habitat":"TWILIGHT BAND, TIDE-LOCKED WORLD","v1":"NONE. THEY SPEAK IN PULSING PATTERNS OF LIGHT FROM SPOTS IN THEIR SKIN.","v2":"SILENT TO HUMAN EARS; READING IT NEEDS CAMERAS AND PATTERN ANALYSIS."},"file":"0422","name":"Duskwalker","desc":"Rotating 3D wireframe mesh of an adult Duskwalker with a scan ring sweeping up and down, a feet ruler, callouts and a communication readout."},"crag":{"scale":46,"cx":400,"gy":432,"h":6.45,"ox":0.0,"unit":1,"ring":[1.7,1.3],"parts":[{"p":[[-0.05,2.95,0,0.3,0.8],[0,3.3,0,0.42,0.78],[0.06,3.85,0,0.53,0.8],[0.1,4.45,0,0.55,0.8],[0.07,5.0,0,0.45,0.85],[0.04,5.35,0,0.3,0.9],[0.06,5.55,0,0.22,1]],"s":16,"n":4},{"p":[[0.05,5.45,0,0.22,1],[0.12,5.75,0,0.19,1],[0.2,6.0,0,0.18,1],[0.24,6.15,0,0.18,1]],"s":12,"n":3},{"p":[[-0.22,6.3,0,0.03,1],[-0.08,6.33,0,0.2,0.9],[0.15,6.33,0,0.26,0.85],[0.38,6.28,0,0.22,0.8],[0.52,6.2,0,0.14,0.75],[0.58,6.15,0,0.08,0.7]],"s":16,"n":4},{"p":[[0.5,6.2,0,0.11,0.6],[0.66,6.12,0,0.08,0.55],[0.76,6.02,0,0.05,0.5],[0.78,5.92,0,0.02,0.5]],"s":10,"n":3,"c":"#EF9F27"},{"p":[[0.0,5.25,0.32,0.2,0.5],[-0.18,4.9,0.5,0.3,0.35],[-0.36,4.2,0.56,0.36,0.28],[-0.46,3.4,0.55,0.36,0.25],[-0.5,2.6,0.5,0.28,0.25],[-0.5,2.0,0.46,0.14,0.3],[-0.5,1.7,0.44,0.03,0.5]],"s":12,"n":4,"m":true,"o":0.85},{"p":[[0.05,5.05,0.42,0.1],[0.16,4.75,0.56,0.085],[0.26,4.5,0.6,0.07]],"s":8,"n":3,"m":true},{"p":[[0.26,4.5,0.6,0.03],[0.4,4.38,0.62,0.012]],"s":6,"n":2,"m":true,"c":"#EF9F27"},{"p":[[0.26,4.5,0.6,0.03],[0.42,4.46,0.58,0.012]],"s":6,"n":2,"m":true,"c":"#EF9F27"},{"p":[[0.26,4.5,0.6,0.03],[0.36,4.34,0.66,0.012]],"s":6,"n":2,"m":true,"c":"#EF9F27"},{"p":[[-0.08,3.1,0.22,0.24],[0.06,2.7,0.26,0.2],[0.2,2.35,0.27,0.15],[0.0,1.8,0.27,0.1],[-0.14,1.2,0.27,0.085],[-0.12,0.6,0.27,0.075],[-0.08,0.12,0.27,0.08]],"s":12,"n":4,"m":true},{"p":[[-0.08,0.1,0.27,0.05],[0.13,0.06,0.27,0.035],[0.34,0.03,0.27,0.015]],"s":6,"n":2,"m":true,"c":"#EF9F27"},{"p":[[-0.08,0.1,0.27,0.05],[0.1,0.06,0.33,0.035],[0.28,0.03,0.39,0.015]],"s":6,"n":2,"m":true,"c":"#EF9F27"},{"p":[[-0.08,0.1,0.27,0.05],[0.1,0.06,0.21,0.035],[0.28,0.03,0.15,0.015]],"s":6,"n":2,"m":true,"c":"#EF9F27"},{"p":[[-0.08,0.1,0.27,0.05],[-0.23,0.06,0.27,0.035],[-0.38,0.03,0.27,0.015]],"s":6,"n":2,"m":true,"c":"#EF9F27"},{"p":[[-0.25,3.0,0,0.16,1.2],[-0.6,2.55,0,0.08,4.5],[-0.95,2.22,0,0.06,6],[-1.15,2.05,0,0.02,6]],"s":12,"n":4,"o":0.85}],"spots":[],"eyes":[[[0.4,6.33,0.17],0.06],[[0.4,6.33,-0.17],0.06]],"anchors":{"l1":[0.4,6.33,0.17,"508,112 518,112"],"l2":[0.7,6.06,0,"508,170 518,170"],"l3":[0.36,4.4,0.62,"508,250 518,250"],"l4":[0.3,0.04,0.27,"508,400 518,400"],"l5":[-0.46,3.4,0.55,"300,270 190,270"],"l6":[-0.95,2.22,0,"280,372 190,372"]},"zr":1.3,"maxft":7,"callouts":[[522,108,"start","EYES","Facing forward;","sharp distance sight"],[522,166,"start","BEAK","Hooked, for tearing",""],[522,246,"start","HANDS","3 clawed fingers at","the wing joint"],[522,396,"start","TALONS","4 toes, one facing","back, for gripping"],[184,266,"end","WINGS","Folded; glide in","thick air"],[184,368,"end","TAIL","Fan of stiff plumes","for steering"]],"bottom":{"height":"6 FT 6 IN","mass":"~150 LB","habitat":"CLIFFS, THICK-AIR MOUNTAIN WORLD","v1":"SONG AND SCREECH FROM A TWO-SIDED VOICE BOX THAT CAN SING TWO NOTES AT ONCE.","v2":"WITHIN HUMAN HEARING. THE EASIEST OF THE THREE TO LEARN."},"file":"0431","name":"Cragwing","desc":"Rotating 3D wireframe mesh of an adult Cragwing, a tall eagle-like biped with folded wings, hooked beak, wing-joint hands and talons, plus a scan ring, ruler, callouts and voice readout."},"stone":{"scale":44,"cx":398,"gy":432,"h":7.249,"ox":0.227,"unit":1,"ring":[2.152,1.812],"parts":[{"p":[[-0.283,3.058,0.0,0.476,0.85],[-0.17,3.625,0.0,0.702,0.9],[0.0,4.417,0.0,0.883,0.92],[0.17,5.21,0.0,0.929,0.95],[0.34,5.89,0.0,0.816,1],[0.476,6.343,0.0,0.566,1],[0.566,6.57,0.0,0.362,1]],"s":18,"n":4},{"p":[[0.43,6.479,0.0,0.045,1],[0.566,6.547,0.0,0.34,1],[0.85,6.57,0.0,0.408,0.95],[1.11,6.479,0.0,0.351,0.9],[1.291,6.343,0.0,0.238,0.85],[1.472,6.252,0.0,0.181,0.8],[1.608,6.196,0.0,0.125,0.8],[1.665,6.173,0.0,0.034,1]],"s":16,"n":4},{"p":[[0.702,6.773,0.249,0.034],[0.702,6.887,0.272,0.091],[0.725,6.943,0.283,0.034]],"s":8,"n":2,"m":true},{"p":[[-0.589,4.304,-0.748,0.102,2.6],[-0.883,4.361,-0.43,0.113,3],[-0.951,4.383,0.0,0.113,3.2],[-0.883,4.361,0.43,0.113,3],[-0.589,4.304,0.748,0.102,2.6]],"s":10,"n":3,"c":"#B4B2A9","o":0.95},{"p":[[-0.544,4.905,-0.748,0.102,2.6],[-0.838,4.961,-0.43,0.113,3],[-0.906,4.984,0.0,0.113,3.2],[-0.838,4.961,0.43,0.113,3],[-0.544,4.905,0.748,0.102,2.6]],"s":10,"n":3,"c":"#B4B2A9","o":0.95},{"p":[[-0.385,5.471,-0.748,0.102,2.6],[-0.68,5.528,-0.43,0.113,3],[-0.748,5.55,0.0,0.113,3.2],[-0.68,5.528,0.43,0.113,3],[-0.385,5.471,0.748,0.102,2.6]],"s":10,"n":3,"c":"#B4B2A9","o":0.95},{"p":[[-0.068,5.969,-0.748,0.102,2.6],[-0.362,6.026,-0.43,0.113,3],[-0.43,6.049,0.0,0.113,3.2],[-0.362,6.026,0.43,0.113,3],[-0.068,5.969,0.748,0.102,2.6]],"s":10,"n":3,"c":"#B4B2A9","o":0.95},{"p":[[0.283,5.777,0.68,0.34],[0.396,5.607,0.883,0.306]],"s":12,"n":2,"m":true},{"p":[[0.43,5.55,0.929,0.306],[0.51,4.871,1.042,0.283],[0.566,4.248,1.053,0.249],[0.883,3.681,0.997,0.227],[1.189,3.285,0.929,0.204],[1.303,3.115,0.906,0.181]],"s":12,"n":4,"m":true},{"p":[[1.303,3.115,0.906,0.079],[1.506,2.832,0.793,0.034]],"s":6,"n":2,"m":true,"c":"#EF9F27"},{"p":[[1.303,3.115,0.906,0.079],[1.552,2.832,0.906,0.034]],"s":6,"n":2,"m":true,"c":"#EF9F27"},{"p":[[1.303,3.115,0.906,0.079],[1.506,2.832,1.019,0.034]],"s":6,"n":2,"m":true,"c":"#EF9F27"},{"p":[[-0.227,3.228,0.476,0.43],[-0.057,2.605,0.544,0.408],[0.113,1.926,0.566,0.34],[0.057,1.246,0.566,0.294],[0.0,0.566,0.566,0.272],[0.023,0.17,0.566,0.283]],"s":14,"n":4,"m":true},{"p":[[-0.17,0.113,0.566,0.227,1.3],[0.17,0.091,0.566,0.272,1.4],[0.51,0.079,0.566,0.204,1.3],[0.623,0.068,0.566,0.057,1.2]],"s":12,"n":3,"m":true}],"spots":[],"eyes":[[[1.201,6.547,0.193],0.04],[[1.201,6.547,-0.193],0.04]],"anchors":{"l1":[1.201,6.547,0.193,"508,112 518,112"],"l2":[-0.748,5.528,0.0,"508,176 518,176"],"l3":[1.416,2.888,0.906,"508,300 518,300"],"l4":[0.34,0.091,0.566,"508,400 518,400"],"l5":[0.113,4.757,0.929,"300,250 186,250"],"l6":[0.113,1.812,0.566,"280,350 186,350"]},"zr":1.812,"maxft":8,"callouts":[[522,108,"start","EYES","Small, deep-set;","poor in bright light"],[522,172,"start","BACK PLATES","Overlapping horn","armor; stops blades"],[522,296,"start","HANDS","Blunt claws; can","crush stone"],[522,396,"start","FEET","Broad pads for","1.6x gravity"],[182,246,"end","ARMS","Long and heavy;","charge on all fours"],[182,346,"end","LEGS","Short, thick,","built to carry weight"]],"bottom":{"height":"7 FT 0 IN","mass":"~850 LB","habitat":"COLD HIGH-GRAVITY WORLD","v1":"DEEP RUMBLES, MOSTLY BELOW HUMAN HEARING, FELT THROUGH THE GROUND.","v2":"NEEDS LOW-FREQUENCY MICROPHONES TO STUDY; SLOWER TO LEARN."},"file":"0436","name":"Stoneback","desc":"Rotating 3D wireframe mesh of an adult Stoneback, a massive bear-like biped with armor plates along its shoulders and back, long heavy arms with blunt claws and thick legs, plus scan ring, ruler, callouts and voice readout."},"shell":{"scale":58,"cx":380,"gy":432,"h":4.8,"ox":-0.3,"unit":1,"ring":[1.9,1.4],"parts":[{"p":[[-1.5,1.75,0,0.04,1],[-1.35,1.8,0,0.4,1.15],[-0.95,1.9,0,0.62,1.2],[-0.45,2.0,0,0.66,1.2],[0,2.1,0,0.55,1.15],[0.25,2.2,0,0.38,1.1]],"s":16,"n":4,"c":"#97C459"},{"p":[[0.15,2.1,0,0.34,1.05],[0.32,2.6,0,0.36,1.0],[0.45,3.15,0,0.33,1.0],[0.55,3.6,0,0.26,1.0],[0.6,3.85,0,0.2,1]],"s":14,"n":4},{"p":[[0.5,3.8,0,0.05,1],[0.62,3.95,0,0.24,1.25],[0.85,4.0,0,0.25,1.2],[1.05,3.92,0,0.18,1.1],[1.15,3.85,0,0.04,1]],"s":14,"n":4,"c":"#97C459"},{"p":[[1.1,3.86,0.1,0.03],[1.32,3.78,0.16,0.035],[1.4,3.7,0.08,0.01]],"s":6,"n":2,"c":"#EF9F27"},{"p":[[1.1,3.86,-0.1,0.03],[1.32,3.78,-0.16,0.035],[1.4,3.7,-0.08,0.01]],"s":6,"n":2,"c":"#EF9F27"},{"p":[[0.85,4.15,0.12,0.025],[0.95,4.5,0.25,0.02],[1.15,4.75,0.38,0.015],[1.35,4.82,0.45,0.008]],"s":6,"n":3},{"p":[[0.85,4.15,-0.12,0.025],[0.95,4.5,-0.25,0.02],[1.15,4.75,-0.38,0.015],[1.35,4.82,-0.45,0.008]],"s":6,"n":3},{"p":[[0.45,3.45,0.3,0.09],[0.62,3.1,0.42,0.08],[0.72,2.7,0.44,0.07],[0.95,2.45,0.42,0.06],[1.12,2.32,0.4,0.04]],"s":8,"n":4,"m":true},{"p":[[-0.2,1.8,0.55,0.1],[-0.06,1.5,0.85,0.08],[0.15,0.8,1.0,0.055],[0.22,0.08,1.05,0.04]],"s":8,"n":3,"m":true},{"p":[[-0.75,1.8,0.55,0.1],[-0.75,1.5,0.85,0.08],[-0.75,0.8,1.0,0.055],[-0.75,0.08,1.05,0.04]],"s":8,"n":3,"m":true},{"p":[[-1.15,1.8,0.55,0.1],[-1.27,1.5,0.85,0.08],[-1.45,0.8,1.0,0.055],[-1.51,0.08,1.05,0.04]],"s":8,"n":3,"m":true}],"spots":[],"eyes":[[[0.95,4.02,0.2],0.06],[[0.95,4.02,-0.2],0.06]],"anchors":{"l1":[1.3,4.8,0.42,"508,112 518,112"],"l2":[1.3,3.76,0.15,"508,190 518,190"],"l3":[1.12,2.32,0.4,"508,280 518,280"],"l4":[-0.75,0.6,1.0,"508,400 518,400"],"l5":[-0.8,2.45,0,"300,250 190,250"],"l6":[-1.2,1.2,1.0,"280,370 190,370"]},"zr":1.3,"maxft":5,"callouts":[[522,108,"start","ANTENNAE","Smell and touch;","read scent-marks"],[522,186,"start","MANDIBLES","Shape wood, clay","and stone"],[522,276,"start","HANDS","Two, very precise;","fine crafting"],[522,396,"start","SIX LEGS","Steady on any","ground"],[184,246,"end","SHELL","Hard back plates;","tough but heavy"],[184,366,"end","LEG RIDGES","Rubbed together to","make sound"]],"bottom":{"height":"4 FT 10 IN","mass":"~220 LB","habitat":"HUMID FOREST WORLD","v1":"CHIRPS AND TRILLS MADE BY RUBBING LEG RIDGES, LIKE CRICKETS, PLUS SCENT-MARKS.","v2":"THE SOUND PART IS EASY TO RECORD; THE SCENT PART NEEDS CHEMICAL ANALYSIS."},"file":"0440","name":"Shellwright","desc":"Rotating 3D wireframe mesh of an adult Shellwright, a beetle-like being with a long shelled body on six legs, an upright upper body with two arms, mandibles and long antennae."},"wire":{"scale":50,"cx":392,"gy":432,"h":6.05,"ox":0,"unit":1,"ring":[1.5,1.2],"parts":[{"p":[[0,3.2,0,0.36,0.7],[0.02,3.7,0,0.42,0.7],[0.04,4.3,0,0.48,0.72],[0.04,4.8,0,0.46,0.75],[0.03,5.15,0,0.32,0.8],[0.03,5.35,0,0.18,1]],"s":16,"n":4},{"p":[[0.03,5.3,0,0.14],[0.05,5.55,0,0.13]],"s":10,"n":2,"c":"#B4B2A9"},{"p":[[-0.15,5.75,0,0.05,1],[-0.05,5.82,0,0.25,0.85],[0.15,5.86,0,0.28,0.85],[0.3,5.8,0,0.24,0.85],[0.38,5.7,0,0.12,0.8]],"s":14,"n":4},{"p":[[0.22,5.8,0,0.12,1.9],[0.36,5.8,0,0.1,1.9]],"s":12,"n":2,"c":"#EF9F27"},{"p":[[0.04,4.82,0.55,0.01],[0.04,4.859,0.55,0.091],[0.04,4.95,0.55,0.13],[0.04,5.041,0.55,0.091],[0.04,5.08,0.55,0.01]],"s":10,"n":2,"c":"#B4B2A9"},{"p":[[0.04,4.95,0.55,0.11],[0.08,4.1,0.62,0.11]],"s":8,"n":2,"c":"#B4B2A9","o":1},{"p":[[0.08,4.0,0.62,0.01],[0.08,4.03,0.62,0.07],[0.08,4.1,0.62,0.1],[0.08,4.17,0.62,0.07],[0.08,4.2,0.62,0.01]],"s":10,"n":2,"c":"#B4B2A9"},{"p":[[0.08,4.1,0.62,0.09],[0.4,3.5,0.58,0.09]],"s":8,"n":2,"c":"#B4B2A9","o":1},{"p":[[0.42,3.38,0.58,0.01],[0.42,3.401,0.58,0.049],[0.42,3.45,0.58,0.07],[0.42,3.499,0.58,0.049],[0.42,3.52,0.58,0.01]],"s":10,"n":2,"c":"#B4B2A9"},{"p":[[0,5.0,-0.5,0.13],[0.03,4.6,-0.6,0.12],[0.08,4.15,-0.62,0.11],[0.25,3.75,-0.6,0.1],[0.45,3.5,-0.56,0.08]],"s":10,"n":4},{"p":[[0.0,2.91,0.25,0.01],[0.0,2.952,0.25,0.098],[0.0,3.05,0.25,0.14],[0.0,3.148,0.25,0.098],[0.0,3.19,0.25,0.01]],"s":10,"n":2,"c":"#B4B2A9"},{"p":[[0.0,3.05,0.25,0.14],[0.1,1.7,0.27,0.14]],"s":8,"n":2,"c":"#B4B2A9","o":1},{"p":[[0.1,1.59,0.27,0.01],[0.1,1.623,0.27,0.077],[0.1,1.7,0.27,0.11],[0.1,1.777,0.27,0.077],[0.1,1.81,0.27,0.01]],"s":10,"n":2,"c":"#B4B2A9"},{"p":[[0.1,1.7,0.27,0.11],[0.02,0.25,0.27,0.11]],"s":8,"n":2,"c":"#B4B2A9","o":1},{"p":[[-0.12,0.1,0.27,0.09,1.3],[0.3,0.07,0.27,0.08,1.3]],"s":8,"n":2,"c":"#B4B2A9"},{"p":[[0,3.05,-0.25,0.2],[0.05,2.4,-0.27,0.17],[0.1,1.7,-0.27,0.14],[0.05,1.0,-0.27,0.12],[0.02,0.3,-0.27,0.11],[0.1,0.1,-0.27,0.1]],"s":12,"n":4},{"p":[[-0.38,4.9,0.0,0.04],[-0.5,5.0,0.0,0.08,2.5],[-0.42,5.3,0.0,0.06,2.5]],"s":8,"n":2,"c":"#EF9F27","o":0.8}],"spots":[],"eyes":[],"anchors":{"l1":[0.36,5.8,0,"508,112 518,112"],"l2":[0.08,4.1,0.62,"508,210 518,210"],"l3":[0.45,3.5,-0.56,"508,300 518,300"],"l4":[0.1,1.7,0.27,"508,390 518,390"],"l5":[-0.5,5.0,0,"300,240 190,240"],"l6":[0,4.3,-0.45,"280,350 190,350"]},"zr":1.2,"maxft":7,"callouts":[[522,108,"start","VISOR","Machine eyes; see","radio and heat"],[522,206,"start","MACHINE ARM","Strong, tireless,","needs repair"],[522,296,"start","LIVING ARM","Kept by choice;","a mark of pride"],[522,386,"start","MACHINE LEG","Replaced after","poison air years"],[184,236,"end","HEAT VENT","Cools the implants",""],[184,346,"end","BODY","Half flesh, half","machine"]],"bottom":{"height":"6 FT 1 IN","mass":"~310 LB","habitat":"INDUSTRIAL WORLD, POISONED AIR","v1":"SPEAK BY RADIO BETWEEN IMPLANTS; A THROAT SPEAKER MAKES A FLAT VOICE FOR OTHERS.","v2":"RADIO IS EASY FOR US TO RECORD. FAST TO LEARN. ALWAYS MODERN STAGE."},"file":"0447","name":"Wirebound","desc":"Rotating 3D wireframe mesh of an adult Wirebound, a humanoid whose right arm and left leg are replaced by jointed machine limbs, with a glowing visor and a backpack heat vent."},"cat":{"scale":56,"cx":400,"gy":432,"h":5.95,"ox":-0.2,"unit":1,"ring":[1.6,1.1],"parts":[{"p":[[-0.05,3.0,0,0.32,0.75],[0,3.4,0,0.36,0.72],[0.06,3.95,0,0.4,0.72],[0.08,4.45,0,0.4,0.75],[0.06,4.8,0,0.3,0.85],[0.06,5.0,0,0.16,1]],"s":16,"n":4},{"p":[[0.06,4.95,0,0.15],[0.12,5.2,0,0.14]],"s":10,"n":2},{"p":[[-0.12,5.42,0,0.04],[-0.02,5.48,0,0.24,0.95],[0.18,5.5,0,0.26,0.95],[0.35,5.42,0,0.2,0.9],[0.48,5.33,0,0.12,0.85],[0.55,5.28,0,0.04,1]],"s":14,"n":4},{"p":[[0.08,5.6,0.14,0.08,0.4],[0.04,5.82,0.18,0.06,0.35],[0,5.98,0.2,0.015,0.4]],"s":8,"n":3},{"p":[[0.08,5.6,-0.14,0.08,0.4],[0.04,5.82,-0.18,0.06,0.35],[0,5.98,-0.2,0.015,0.4]],"s":8,"n":3},{"p":[[0.06,4.6,0.32,0.11],[0.1,4.1,0.38,0.095],[0.14,3.6,0.38,0.08],[0.3,3.2,0.36,0.07],[0.42,3.0,0.33,0.06]],"s":10,"n":4,"m":true},{"p":[[0.42,3.0,0.33,0.03],[0.52,2.85,0.29,0.01]],"s":6,"n":2,"m":true,"c":"#EF9F27"},{"p":[[0.42,3.0,0.33,0.03],[0.54,2.85,0.35,0.01]],"s":6,"n":2,"m":true,"c":"#EF9F27"},{"p":[[0.42,3.0,0.33,0.03],[0.5,2.85,0.39,0.01]],"s":6,"n":2,"m":true,"c":"#EF9F27"},{"p":[[-0.05,3.05,0.2,0.2],[0.2,2.5,0.24,0.17],[0.3,2.0,0.25,0.13],[0,1.35,0.25,0.09],[-0.15,0.75,0.25,0.07],[-0.05,0.2,0.25,0.065],[0.05,0.08,0.25,0.07]],"s":12,"n":4,"m":true},{"p":[[0.0,0.08,0.25,0.06,1.3],[0.25,0.06,0.25,0.07,1.4],[0.4,0.05,0.25,0.04,1.3]],"s":8,"n":2,"m":true},{"p":[[-0.3,3.0,0,0.08],[-0.7,2.7,0,0.07],[-1.05,2.6,0,0.065],[-1.35,2.8,0,0.055],[-1.55,3.15,0,0.045],[-1.6,3.4,0,0.02]],"s":10,"n":4}],"spots":[],"eyes":[[[0.32,5.5,0.15],0.05],[[0.32,5.5,-0.15],0.05]],"anchors":{"l1":[0.04,5.82,0.18,"508,112 518,112"],"l2":[0.32,5.5,0.15,"508,190 518,190"],"l3":[0.48,2.95,0.33,"508,290 518,290"],"l4":[-0.15,0.75,0.25,"508,390 518,390"],"l5":[-1.35,2.8,0,"300,250 190,250"],"l6":[0.08,4.0,0.4,"280,350 190,350"]},"zr":1.2,"maxft":6,"callouts":[[522,108,"start","EARS","Turn to track","faint sounds"],[522,186,"start","EYES","See well at night;","slit pupils"],[522,286,"start","HANDS","Retractable claws",""],[522,386,"start","LEGS","Built for leaps","and sprints"],[184,246,"end","TAIL","Balance; also","shows mood"],[184,346,"end","BODY","Lean and fast;","short sandy fur"]],"bottom":{"height":"6 FT 0 IN","mass":"~180 LB","habitat":"DESERT WORLD, COLD NIGHTS","v1":"GROWLS, PURRS AND CALLS IN A RANGE CLOSE TO OURS; EAR AND TAIL POSTURE ADD MEANING.","v2":"WITHIN HUMAN HEARING. QUICK TO LEARN."},"file":"0452","name":"Sandprowler","desc":"Rotating 3D wireframe mesh of an adult Sandprowler, a lean cat-like biped with tall pointed ears, a short muzzle, reverse-jointed legs and a long tail."},"veil":{"scale":40,"cx":400,"gy":432,"h":7.2,"ox":0,"unit":1,"ring":[1.5,1.5],"parts":[{"p":[[0,7.2,0,0.02],[0,7.1,0,0.55],[0,6.8,0,0.95],[0,6.35,0,1.15],[0,5.9,0,1.18],[0,5.6,0,1.05],[0,5.45,0,0.8]],"s":20,"n":4,"c":"#AFA9EC","o":0.85},{"p":[[0,6.7,0,0.02],[0,6.6,0,0.35],[0,6.3,0,0.5],[0,6.0,0,0.45],[0,5.8,0,0.2]],"s":12,"n":3,"c":"#E6F7FF","o":0.7},{"p":[[0.85,5.5,0.0,0.06],[0.892,4.3,0.0,0.045],[0.807,3.0,0.0,0.035],[0.935,1.6,0.0,0.025],[0.85,0.5,0.0,0.012]],"s":6,"n":4,"c":"#7F77DD","o":0.75},{"p":[[0.601,5.5,0.601,0.06],[0.879,4.3,0.631,0.045],[0.323,3.0,0.571,0.035],[0.785,1.6,0.661,0.025],[0.601,0.5,0.601,0.012]],"s":6,"n":4,"c":"#7F77DD","o":0.75},{"p":[[0.0,5.5,0.85,0.06],[-0.064,4.3,0.892,0.045],[0.064,3.0,0.807,0.035],[-0.032,1.6,0.935,0.025],[0.0,0.5,0.85,0.012]],"s":6,"n":4,"c":"#7F77DD","o":0.75},{"p":[[-0.601,5.5,0.601,0.06],[-0.863,4.3,0.631,0.045],[-0.34,3.0,0.571,0.035],[-0.777,1.6,0.661,0.025],[-0.601,0.5,0.601,0.012]],"s":6,"n":4,"c":"#7F77DD","o":0.75},{"p":[[-0.85,5.5,0.0,0.06],[-0.769,4.3,0.0,0.045],[-0.931,3.0,0.0,0.035],[-0.873,1.6,0.0,0.025],[-0.85,0.5,0.0,0.012]],"s":6,"n":4,"c":"#7F77DD","o":0.75},{"p":[[-0.601,5.5,-0.601,0.06],[-0.431,4.3,-0.631,0.045],[-0.771,3.0,-0.571,0.035],[-0.561,1.6,-0.661,0.025],[-0.601,0.5,-0.601,0.012]],"s":6,"n":4,"c":"#7F77DD","o":0.75},{"p":[[-0.0,5.5,-0.85,0.06],[-0.175,4.3,-0.892,0.045],[0.175,3.0,-0.807,0.035],[-0.087,1.6,-0.935,0.025],[-0.0,0.5,-0.85,0.012]],"s":6,"n":4,"c":"#7F77DD","o":0.75},{"p":[[0.601,5.5,-0.601,0.06],[0.477,4.3,-0.631,0.045],[0.726,3.0,-0.571,0.035],[0.584,1.6,-0.661,0.025],[0.601,0.5,-0.601,0.012]],"s":6,"n":4,"c":"#7F77DD","o":0.75},{"p":[[0.212,5.5,0.212,0.09],[0.297,4.6,0.297,0.08],[0.255,3.8,0.255,0.06],[0.212,3.3,0.212,0.02]],"s":8,"n":3,"c":"#AFA9EC","o":0.8},{"p":[[-0.212,5.5,0.212,0.09],[-0.297,4.6,0.297,0.08],[-0.255,3.8,0.255,0.06],[-0.212,3.3,0.212,0.02]],"s":8,"n":3,"c":"#AFA9EC","o":0.8},{"p":[[-0.212,5.5,-0.212,0.09],[-0.297,4.6,-0.297,0.08],[-0.255,3.8,-0.255,0.06],[-0.212,3.3,-0.212,0.02]],"s":8,"n":3,"c":"#AFA9EC","o":0.8},{"p":[[0.212,5.5,-0.212,0.09],[0.297,4.6,-0.297,0.08],[0.255,3.8,-0.255,0.06],[0.212,3.3,-0.212,0.02]],"s":8,"n":3,"c":"#AFA9EC","o":0.8}],"spots":[[0,6.3,0]],"eyes":[],"anchors":{"l1":[0,7.0,0.5,"508,112 518,112"],"l2":[0,6.3,0,"508,190 518,190"],"l3":[0.35,4.4,0.35,"508,290 518,290"],"l4":[0.85,1.6,0,"508,390 518,390"],"l5":[-1.15,6.0,0,"300,240 190,240"],"l6":[-0.6,3.0,-0.6,"280,350 190,350"]},"zr":1.3,"maxft":8,"callouts":[[522,108,"start","BELL","Gas-filled; floats","in dense air"],[522,186,"start","CORE","Glows when they","\"speak\""],[522,286,"start","FEEDING ARMS","Gather drifting","spores"],[522,386,"start","TENDRILS","Feel electric fields;","drag along the ground"],[184,236,"end","SKIN","See-through, thin;","tears easily"],[184,346,"end","NO BRAIN","Thought spread","through the body"]],"bottom":{"height":"7 FT + TENDRILS","mass":"~40 LB","habitat":"DENSE-AIR WORLD","v1":"RIPPLES OF LIGHT AND FAINT ELECTRIC FIELDS SENSED THROUGH THE TENDRILS.","v2":"NEEDS FIELD SENSORS AND A LONG STUDY. THE SLOWEST OF ALL TO LEARN."},"file":"0459","name":"Driftveil","desc":"Rotating 3D wireframe mesh of an adult Driftveil, a translucent floating bell-shaped being with a glowing core, four short feeding arms and eight long trailing tendrils."}};
 
 'use strict';
 // ===================== STARWAKE — STAR DESCRIPTIONS =====================
@@ -777,6 +790,7 @@ function newGame(o) {
   const gc = shuffle(S.stars.filter(s => s.ly >= 10 && s.ly <= L.radius - 2 && s.name !== 'Alpha Centauri' && s.bodies.length));
   gc.slice(0, o.len === 'long' ? 3 : 2).forEach(s => s.guard = true);
   assignLife();
+  S.civs = []; S.contact = false; placeCivs();
   // anomalies
   const ev = shuffle(EVENTS.map(e => e.id));
   let k = 0;
@@ -858,7 +872,8 @@ function newFleetAt(starId, did) {
 }
 function fleetSpeed(f) { let v = 1; for (const sh of f.ships) v = Math.min(v, designSpeed(design(sh.d))); return v; }
 function fleetTel(f) { let v = 0; for (const sh of f.ships) v = Math.max(v, designTel(design(sh.d))); return v; }
-function fleetHas(f, m) { return f.ships.some(sh => designHas(design(sh.d), m)); }
+function shipHas(sh, m) { return designHas(design(sh.d), m) && !(sh.lost && sh.lost.includes(m)); }
+function fleetHas(f, m) { return f.ships.some(sh => shipHas(sh, m)); }
 function fleetCargo(f) { let n = 0; for (const sh of f.ships) n += design(sh.d).mods.filter(m => m === 'cargo').length; return n; }
 function cargoCap(f) { const n = fleetCargo(f) * (has('interstellar_commerce') ? 1.25 : 1); return {pop: n * 0.01, food: n * 10}; }
 function etaTo(f, starId) { const s = ST(starId); return Math.max(1, Math.ceil((d3(f, s) - 1e-6) / fleetSpeed(f))); }
@@ -928,6 +943,7 @@ function colOut(b) {
   const lvl = Math.max(0, STAGE_ORDER.indexOf(stg) - 1);
   let food = st.food * fert * fm.food + (p.agridomes ? (3 + 3 * Math.max(0, lvl - 0)) * (has('bt_seeds') ? 2 : 1) : 0) + (c.home ? S.mods.earthFood : 0);
   if (stg === 'outpost') { food = 0; }
+  if (c.enslaved) prod += slaveProd(b);
   return {stage: stg, prod: r1(prod * bf), rp: r1(rp * bf), bc: r1(bc * bf), food: r1(food), eat: st.eat, cap: popCap(b), hab: h};
 }
 function systemFood(starId) {
@@ -953,8 +969,10 @@ const OUTPOST_PROJ_COST = 60, SETTLE_PROJ_COST = 120;
 function itemCost(b, it) { return it.kind === 'proj' ? projCost(it.id) : it.kind === 'outpost' || it.kind === 'settle' ? Math.round((it.kind === 'outpost' ? OUTPOST_PROJ_COST : SETTLE_PROJ_COST) * (has('megastructures') ? 0.75 : 1)) : shipCost(design(it.id), b); }
 function itemName(it) { return it.kind === 'proj' ? PROJECTS[it.id].name : it.kind === 'outpost' ? 'Outpost on ' + B(it.id).name : it.kind === 'settle' ? 'Settle ' + B(it.id).name : design(it.id).name; }
 function peopleCanLive(t) { const h = hab(t); return h !== 'none' && h !== 'outpost'; }
-function settleTargets(b) { if (b.col.outpost) return []; return ST(b.star).bodies.map(B).filter(x => x !== b && peopleCanLive(x) && (x.owner == null || (x.owner === 0 && x.col && x.col.outpost))); }
-function outpostTargets(b) { return ST(b.star).bodies.map(B).filter(x => x.owner == null && hab(x) !== 'none'); }
+function settleTargets(b) { if (b.col.outpost) return []; return ST(b.star).bodies.map(B).filter(x => x !== b && peopleCanLive(x) && !civBlocks(x) && (x.owner == null || (x.owner === 0 && x.col && x.col.outpost))); }
+function outpostTargets(b) { return ST(b.star).bodies.map(B).filter(x => x.owner == null && hab(x) !== 'none' && !civBlocks(x)); }
+// a world already ordered (outpost or settle) by any of our colonies in its system
+function claimedAt(t) { for (const b of colonies(true)) if (b.star === t.star && b.col.queue.some(x => (x.kind === 'outpost' || x.kind === 'settle') && x.id === t.id)) return b; return null; }
 function upgradedFrom(c, id) { return Object.keys(c.proj).some(k => PROJECTS[k] && PROJECTS[k].replaces === id); }
 function projReason(b, id) {
   const P = PROJECTS[id], c = b.col;
@@ -976,6 +994,8 @@ function designReason(d) {
   if (d.hull === 'heavy' && !has('heavy_hulls')) return 'Heavy hulls need Heavy Hull Construction';
   if (d.hull === 'light' && d.mods.some(m => m === 'colony' || m === 'cargo')) return 'Colony Pods and Cargo Bays need a medium or heavy hull';
   if (d.hull !== 'light' && d.mods.includes('booster')) return 'Boosters only fit light hulls';
+  if (d.hull === 'light' && d.mods.includes('assault')) return 'Assault Pods need a medium or heavy hull';
+  if (d.mods.includes('assault') && !has('ground_doctrine')) return 'Assault Pods need Ground Assault Doctrine';
   return null;
 }
 function shipReason(b, d) {
@@ -1008,6 +1028,7 @@ function completeItem(b, it) {
 function settlerCount() { return (has('hibernation') ? 0.04 : 0.02) * (S.mods.settlers || 1); }
 function colonizeCheck(f, b, kind) {
   if (f.star !== b.star || f.dest != null) return 'The ship must be in orbit';
+  if (civBlocks(b)) return 'The ' + civRace(civOfBody(b)).name + ' live there';
   if (kind === 'colony') {
     if (!fleetHas(f, 'colony')) return 'No Colony Pod in this fleet';
     const h = hab(b);
@@ -1044,7 +1065,7 @@ function colonize(f, b, kind) {
 
 // ---------- research ----------
 function techCost(id) { const t = TECH[id]; return Math.round(t.cost * (id === 'exotic_matter' && has('bt_exotic') ? 0.5 : 1)); }
-function availableTechs() { return TECHS.filter(t => !has(t.id) && t.req.every(has)); }
+function availableTechs() { return TECHS.filter(t => !has(t.id) && t.req.every(has) && (!t.contact || S.contact)); }
 function setResearch(id) { if (!TECH[id] || has(id) || !TECH[id].req.every(has)) return false; if (S.res && S.res.tech !== id) S.rpBank += S.res.prog; if (!S.res || S.res.tech !== id) S.res = {tech: id, prog: 0}; return true; }
 function learn(id, how) { if (has(id)) return; S.techs[id] = 1; msg((how || 'Research complete') + ': ' + TECH[id].name + '. ' + TECH[id].desc, null, 'tech'); }
 
@@ -1086,6 +1107,7 @@ function visit(s, how, quiet) {
 }
 function surveyStar(s, who, quiet) {
   if (S.surveyed[s.id]) return; S.surveyed[s.id] = 1;
+  civDiscover(s, quiet);
   if (quiet) return;
   const life = s.bodies.map(B).filter(b => b.life !== 'none');
   msg((who ? who + ' completed a survey of ' + s.name : 'Survey of ' + s.name + ' complete') + (life.length ? ': ' + life.map(b => LIFE[b.life].toLowerCase() + ' on ' + b.name).join(', ') + '!' : '. No life found.'), s.id, 'survey');
@@ -1110,7 +1132,7 @@ function resolveChoice(f, ci) {
   if (o.bt) { if (!has(o.bt)) { S.techs[o.bt] = 1; res.gains.push('Breakthrough: ' + TECH[o.bt].name + ' (' + TECH[o.bt].desc + ')'); } else { S.rpBank += 150; res.gains.push('+150 research'); } }
   if (o.reveal) { const unk = S.stars.filter(x => !S.visited[x.id]).sort((a, b) => d3(a, s) - d3(b, s)).slice(0, o.reveal); unk.forEach(x => { S.visited[x.id] = 1; S.known[x.id] = 1; }); if (unk.length) res.gains.push('Charted: ' + unk.map(x => x.name).join(', ')); }
   if (o.score) S.stats.anomScore += o.score;
-  if (o.lose) { const i = f.ships.findIndex(sh => designHas(design(sh.d), 'lab')); f.ships.splice(i >= 0 ? i : 0, 1); S.stats.lost++; res.gains.push('The ship was lost'); res.lost = true; cleanupFleets(); }
+  if (o.lose) { const i = f.ships.findIndex(sh => shipHas(sh, 'lab')); f.ships.splice(i >= 0 ? i : 0, 1); S.stats.lost++; res.gains.push('The ship was lost'); res.lost = true; cleanupFleets(); }
   journal(ev.title + ' at ' + s.name + ': ' + o.t, s.id);
   return res;
 }
@@ -1216,13 +1238,13 @@ function processEconomy() {
     rp += o.rp; bc += o.bc;
     if (supplyTarget(b)) continue;
     let prod = (o.prod + (supplied[b.id] || 0)) * (broke ? 0.5 : 1);
-    while (c.queue.length && !itemValid(b, c.queue[0])) c.queue.shift();
-    if (!c.queue.length) { bc += prod * 0.5; c.prog = 0; continue; }
+    dropInvalid(b);
+    if (!c.queue.length) { bc += prod * 0.5; continue; }
     c.prog += prod;
     const it = c.queue[0], cost = itemCost(b, it);
     if (c.prog >= cost) {
       completeItem(b, it); c.prog = Math.min(c.prog - cost, cost); if (it.n > 1) it.n--; else c.queue.shift();
-      while (c.queue.length && !itemValid(b, c.queue[0])) c.queue.shift();
+      dropInvalid(b, true);
       if (!c.queue.length && !c.outpost) msg(b.name + ' has nothing to build.', b.star, 'idle');
     }
   }
@@ -1252,9 +1274,17 @@ function processEconomy() {
     if (S.res.prog >= cost) { S.rpBank = Math.min(S.res.prog - cost, cost); learn(S.res.tech); S.res = null; }
   }
   // upkeep
-  let up = 0; for (const f of S.fleets) for (const sh of f.ships) up += designCost(design(sh.d)) * 0.01;
+  let up = civUpkeep(); for (const f of S.fleets) for (const sh of f.ships) up += designCost(design(sh.d)) * 0.01;
   S.bc = r1(S.bc + bc - up);
   if (S.bc < 0) msg('The treasury is empty. Production is halved until credits recover: scrap idle ships or set a colony to Trade.', null, 'warn');
+}
+// drop queued items that can no longer be built; if the item being built goes, half its progress carries over
+function dropInvalid(b, fresh) {
+  const c = b.col;
+  while (c.queue.length && !itemValid(b, c.queue[0])) {
+    const it = c.queue.shift();
+    if (!fresh && c.prog > 0) { c.prog = Math.floor(c.prog * 0.5); if (it.kind === 'outpost' || it.kind === 'settle') msg(b.name + ': the order for ' + B(it.id).name + ' was cancelled because the world was claimed first. Half its progress carries over.', b.star, 'warn'); }
+  }
 }
 function supplyRate() { return has('orbital_logistics') ? 1 : 0.8; }
 function supplyTarget(b) {
@@ -1263,8 +1293,8 @@ function supplyTarget(b) {
 }
 function itemValid(b, it) {
   if (it.kind === 'ship') return !!design(it.id) && !shipReason(b, design(it.id));
-  if (it.kind === 'outpost') { const t = B(it.id); return !!t && t.star === b.star && t.owner == null && hab(t) !== 'none' && !b.col.outpost; }
-  if (it.kind === 'settle') { const t = B(it.id); return !!t && t !== b && t.star === b.star && !b.col.outpost && peopleCanLive(t) && (t.owner == null || (t.owner === 0 && !!t.col && !!t.col.outpost)); }
+  if (it.kind === 'outpost') { const t = B(it.id); return !!t && !civBlocks(t) && t.star === b.star && t.owner == null && hab(t) !== 'none' && !b.col.outpost; }
+  if (it.kind === 'settle') { const t = B(it.id); return !!t && !civBlocks(t) && t !== b && t.star === b.star && !b.col.outpost && peopleCanLive(t) && (t.owner == null || (t.owner === 0 && !!t.col && !!t.col.outpost)); }
   const P = PROJECTS[it.id], c = b.col;
   if ((c.outpost && !P.outpost) || (!c.outpost && P.outpostOnly) || (P.tech && !has(P.tech)) || (c.home && !P.space)) return false;
   if (P.giantOnly && b.cls !== 'gasgiant' && b.cls !== 'icegiant') return false;
@@ -1276,7 +1306,7 @@ function itemValid(b, it) {
 function totals() {
   let prod = 0, rp = 0, bc = 0, pop = 0, food = 0;
   for (const b of colonies(true)) { const o = colOut(b); prod += o.prod; rp += o.rp; bc += o.bc; pop += b.col.pop; }
-  let up = 0; for (const f of S.fleets) for (const sh of f.ships) up += designCost(design(sh.d)) * 0.01;
+  let up = civUpkeep(); for (const f of S.fleets) for (const sh of f.ships) up += designCost(design(sh.d)) * 0.01;
   const short = colonyStars().filter(s => ST(s).short || systemFood(s).net < 0 && ST(s).stock < 5);
   return {prod: r1(prod), rp: r1(rp), bc: r1(bc), up: r1(up), net: r1(bc - up), pop, short};
 }
@@ -1286,6 +1316,7 @@ function endTurn() {
   updateKnowledge();
   processSurveys();
   processEconomy();
+  processCivs();
   autoExplore();
   budgetYearly();
   S.turn++; S.year++; S._inTurn = false;
@@ -1354,9 +1385,224 @@ function score() {
     life: micro * SCORE_W.microbial + eco * SCORE_W.ecosystem, anomalies: S.stats.anomScore, breakthroughs: bts * SCORE_W.breakthrough, techs: techs * SCORE_W.tech,
     colonies: settle * SCORE_W.settlement + city * SCORE_W.city + core * SCORE_W.core, population: Math.round(Math.log10(1 + pop) * SCORE_W.popLog),
   };
+  const cv = S.civs || []; p.aliens = cv.filter(c => c.known).length * 10 + cv.filter(c => c.lang >= 100).length * 5 - (S.stats.extinct || 0) * 15;
   p.total = Object.values(p).reduce((a, b) => a + b, 0);
   return p;
 }
+
+// ---------- Prespacers: alien civilizations that have not reached space ----------
+// Every race in this version appears as a Prespacer (stone age to modern). Found by surveying their system.
+const CIV_STAGES = ['Stone age', 'Medieval', 'Industrial', 'Modern'];
+const STAGE_STR = [0.6, 0.9, 1.8, 3.2];        // multiplies a race's base ground strength
+const SPOT_BASE = [0.005, 0.01, 0.04, 0.12];   // yearly chance to spot a ship or colony in their system
+const TRADE_BC = [1, 2, 4, 6];                 // credits a year from trade, by their stage
+const SLAVE_PROD = [3, 5, 8, 12];              // production a year from an enslaved world, by their stage
+const HARSH_PEN = {mild: 0.1, moderate: 0.2, high: 0.3}; // ground strength lost on a world harsh to humans
+const TROOPS_PER_POD = 10000, HUMAN_STR = 20;
+const CIV_COUNT = {standard: 8, long: 12};
+const RACES = {
+  tide: {name: 'Tidekin', one: 'Tidekin', base: 14, stages: [0, 3], spot: 1.3, lang: 0.8, hostile: 0.1, instinct: false, revolt: 1.2, revoltGrow: 0.01, prod: 1, harsh: 'moderate', trust0: 50, give: 0.75, trustMul: 1.4, awe: false,
+    home: 'Shallow-sea world with two large moons', body: 'Amphibious, 5 ft. Breathes air and water.',
+    culture: ['Patient', 'Clan-loyal', 'Long memory', 'Hates captivity'], comm: 'Hums and clicks from a throat sac; works underwater.',
+    feel: 'Value fair trade. Aid changes them slowly, but they never forget a kindness, or a wrong.'},
+  dusk: {name: 'Duskwalkers', one: 'Duskwalker', base: 18, stages: [0, 3], spot: 2.5, lang: 0.5, hostile: 0.25, instinct: false, revolt: 1, prod: 1, harsh: 'high', trust0: 40, give: 1, trustMul: 0.8, awe: false,
+    home: 'Tide-locked world of a red dwarf', body: 'Four legs, upright torso, 6 ft 2 in. Huge eyes for dim light.',
+    culture: ['Proud', 'Strict about rank', 'Territorial', 'Sky-watchers'], comm: 'Pulsing patterns of light from spots in their skin.',
+    feel: 'Respect strength and despise weakness. Gifts look like a trap to them until they reach industry.'},
+  crag: {name: 'Cragwings', one: 'Cragwing', base: 20, stages: [0, 3], spot: 2.5, lang: 1.2, hostile: 0.35, instinct: true, revolt: 1.1, prod: 1, harsh: 'mild', trust0: 50, give: 1, trustMul: 1, awe: true,
+    home: 'Thick-air mountain world', body: 'Eagle-like biped, 6 ft 6 in. Folded wings, talons, hands at the wing joint.',
+    culture: ['Curious', 'Fiercely independent', 'Quick to anger', 'Sharp-eyed'], comm: 'Song and screech from a two-sided voice box; within human hearing.',
+    feel: 'Love their freedom above all. Treat them as equals and they warm quickly.'},
+  stone: {name: 'Stonebacks', one: 'Stoneback', base: 32, stages: [0, 3], spot: 0.5, lang: 0.6, hostile: 0.35, instinct: true, revolt: 1.3, prod: 1.1, harsh: 'high', trust0: 45, give: 1, trustMul: 1, awe: true,
+    home: 'Cold high-gravity world', body: 'Bear-like biped, 7 ft, about 850 lb. Horn armor plates on the back.',
+    culture: ['Clan-proud', 'Honor-bound', 'Respect strength', 'Fearsome fighters'], comm: 'Deep rumbles, mostly below human hearing.',
+    feel: 'Judge you by courage. Keep your word and they will stand by you.'},
+  shell: {name: 'Shellwrights', one: 'Shellwright', base: 22, stages: [0, 3], spot: 0.7, lang: 0.6, hostile: 0.2, instinct: false, revolt: 0.7, prod: 1.2, harsh: 'moderate', trust0: 50, give: 1, trustMul: 1, awe: false,
+    home: 'Humid forest world', body: 'Beetle-like, six legs and two hands, 4 ft 10 in.',
+    culture: ['Industrious', 'Cautious', 'Clan nests (not a hive)', 'Master crafters'], comm: 'Chirps from rubbing leg ridges, plus scent-marks.',
+    feel: 'Trust is built slowly, through work done together.'},
+  wire: {name: 'Wirebound', one: 'Wirebound', base: 26, stages: [3, 3], spot: 3, lang: 1.2, hostile: 0.1, instinct: false, revolt: 1.4, prod: 1.3, harsh: 'high', trust0: 45, give: 1, trustMul: 0.9, awe: false,
+    home: 'Industrial world with poisoned air', body: 'Humanoid, 6 ft 1 in, half machine: machine limbs and a visor.',
+    culture: ['Logical', 'Wary', 'Hate waste', 'Proud of what flesh remains'], comm: 'Radio between implants; a throat speaker for outsiders.',
+    feel: 'Value useful exchange. Wasteful gifts make them suspicious.'},
+  cat: {name: 'Sandprowlers', one: 'Sandprowler', base: 22, stages: [0, 3], spot: 2, lang: 1, hostile: 0.25, instinct: false, revolt: 1.3, prod: 1, harsh: 'mild', trust0: 50, give: 1, trustMul: 1, awe: true,
+    home: 'Desert world with cold nights', body: 'Cat-like biped, 6 ft. Long tail, tall ears, retractable claws.',
+    culture: ['Curious', 'Individualistic', 'Settle disputes by duel', 'Night hunters'], comm: 'Growls, purrs and calls close to our range; ear and tail posture.',
+    feel: 'Admire boldness. Easily bored by caution.'},
+  veil: {name: 'Driftveils', one: 'Driftveil', base: 6, stages: [0, 3], spot: 0.5, lang: 0.4, hostile: 0.05, instinct: false, revolt: 0.3, prod: 1, harsh: 'moderate', trust0: 55, give: 1, trustMul: 1.1, awe: true,
+    home: 'Dense-air world', body: 'Floating see-through bell, 7 ft, with long tendrils. Domesticated grazers do their heavy work.',
+    culture: ['Serene', 'Unreadable', 'Highly intelligent', 'Keep herds of grazers'], comm: 'Ripples of light and faint electric fields.',
+    feel: 'Calm toward everyone. Hard to tell what they think of you.'},
+};
+function civAt(sid) { return (S.civs || []).find(c => c.star === sid && c.status !== 'dead'); }
+function civOfBody(b) { return b && b.civ != null ? (S.civs || []).find(c => c.id === b.civ) : null; }
+function civBlocks(b) { const c = civOfBody(b); return !!(c && c.status === 'free'); } // their homeworld or outposts: not ours to settle
+function civRace(c) { return RACES[c.race]; }
+function civKnown(c) { return !!c.known; }
+// ----- placement -----
+function placeCivs(existing) {
+  S.civs = S.civs || [];
+  const want = CIV_COUNT[S.len] || 8;
+  const ours = new Set(colonyStars());
+  let cand = shuffle(S.stars.filter(s => s.id !== 0 && !s.guard && d3(s, S.stars[0]) > 10 && !ours.has(s.id) && !S.surveyed[s.id] && !civAt(s.id) &&
+    s.bodies.some(id => civHomeOK(B(id)))));
+  const races = shuffle(Object.keys(RACES)); let ri0 = 0;
+  for (const s of cand) {
+    if (S.civs.length >= want) break;
+    const race = races[ri0 % races.length]; ri0++;
+    const R = RACES[race];
+    const homes = s.bodies.map(B).filter(civHomeOK).sort((a, b) => civHomeScore(b) - civHomeScore(a));
+    const hb = homes[0];
+    hb.temp = 'temperate'; if (hb.cls === 'ice') hb.cls = 'ocean'; hb.atm = race === 'wire' ? 'toxic' : race === 'veil' ? 'thick' : 'breathable'; hb.life = 'ecosystem'; hb.clouds = false;
+    if (race === 'tide') hb.cls = 'ocean';
+    const stage = ri(R.stages[0], R.stages[1]);
+    const c = {id: S.civs.length + 1, race, star: s.id, body: hb.id, stage, tech: ri(5, 60), lang: 0, met: false, aware: false, known: false, trust: R.trust0,
+      mode: 'none', give: 20, status: 'free', garrison: 0, unrest: false, boost: 1, enslavedYear: 0, outs: []};
+    hb.civ = c.id;
+    if (stage === 3) civModernOutposts(c);
+    S.civs.push(c);
+  }
+}
+function civHomeOK(b) { const P = PCLASS[b.cls]; return b && P.solid && !P.belt && b.cls !== 'molten' && b.owner == null && b.civ == null && b.temp !== 'scorching'; }
+function civHomeScore(b) { return (b.temp === 'temperate' ? 10 : 0) + (b.life === 'ecosystem' ? 5 : 0) + (['rocky', 'superearth', 'ocean'].includes(b.cls) ? 3 : 0) + b.size; }
+function civModernOutposts(c) {
+  const s = ST(c.star); const n = ri(2, 3);
+  for (const b of shuffle(s.bodies.map(B).filter(x => x.id !== c.body && x.owner == null && x.civ == null && PCLASS[x.cls].solid))) { if (c.outs.length >= n) break; b.civ = c.id; c.outs.push(b.id); }
+}
+function ensureCivs() { if (!S.civs) { S.civs = []; placeCivs(true); } if (S.contact == null) S.contact = false; }
+// ----- discovery -----
+function civDiscover(s, quiet) {
+  const c = civAt(s.id); if (!c || c.known) return;
+  c.known = true; const R = civRace(c);
+  if (quiet) { S.contact = true; return; }
+  msg('First contact! Our survey of ' + s.name + ' found a civilization on ' + B(c.body).name + ': the ' + R.name + ', at ' + CIV_STAGES[c.stage].toLowerCase() + ' level. They have no way to reach space yet. See Diplomacy.', s.id, 'contact');
+  journal('Discovered the ' + R.name + ' (' + CIV_STAGES[c.stage].toLowerCase() + ') on ' + B(c.body).name + '.', s.id);
+  if (!S.contact) {
+    S.contact = true;
+    budgetEvent('contact', 5, 'We are not alone. The discovery of the ' + R.name + ' changes how Earth sees the stars, and calls to prepare for other minds out there grow loud.', s.id);
+    msg('Ground Forces research is now possible: assault doctrine, rifles, armor and environment suits.', null, 'info');
+  }
+}
+// ----- yearly -----
+function civStudyRate(c, f) { const R = civRace(c); return 10 * R.lang * (c.met ? 2 : 1) * Math.min(2, f.ships.filter(sh => shipHas(sh, 'lab')).length); }
+function processCivs() {
+  if (!S.civs) return;
+  // empty Assault Pods refill at any star where we have a colony with people
+  const home = new Set(colonies().map(b => b.star));
+  for (const f of S.fleets) if (f.dest == null && home.has(f.star)) for (const sh of f.ships) if (shipPods(sh)) sh.troops = shipPods(sh) * TROOPS_PER_POD;
+  for (const c of S.civs) {
+    if (c.status === 'dead') continue;
+    const R = civRace(c), s = ST(c.star);
+    // language study by Science Lab ships in orbit
+    for (const f of S.fleets) if (f.task && f.task.type === 'study' && f.star === c.star && f.dest == null) {
+      if (c.lang >= 100 || !fleetHas(f, 'lab')) { f.task = null; continue; }
+      c.lang = Math.min(100, c.lang + civStudyRate(c, f));
+      if (c.lang >= 100) { f.task = null; msg('We have learned the language of the ' + R.name + '. Their culture is now in our files. ' + (c.met ? 'We can talk with them in Diplomacy.' : 'A landing party can now speak with them.'), c.star, 'contact'); journal('Learned the language of the ' + R.name + '.', c.star); }
+    }
+    if (c.status === 'free') {
+      // being spotted
+      if (!c.aware && !c.met) {
+        const present = S.fleets.some(f => f.star === c.star && f.dest == null) || s.bodies.some(id => B(id).owner === 0);
+        if (present && rnd() < SPOT_BASE[c.stage] * R.spot) {
+          c.aware = true; c.trust = clamp(c.trust + (R.awe ? 5 : -5), 0, 100);
+          msg('The ' + R.name + ' have spotted our presence at ' + s.name + '. Our cover is blown; they now know they are not alone.', c.star, 'contact');
+          journal('The ' + R.name + ' spotted us.', c.star);
+        }
+      }
+      // relations
+      if (c.met && c.lang >= 100) {
+        if (c.mode === 'trade') { S.bc = r1(S.bc + TRADE_BC[c.stage]); civTech(c, 1.2); c.trust = Math.min(90, c.trust + 1); }
+        if (c.mode === 'give') {
+          const g = Math.min(c.give, Math.max(0, S.bc));
+          if (g > 0) { const r = giveRate(c, g); S.bc = r1(S.bc - g); civTech(c, r.tech); c.trust = Math.min(100, c.trust + r.trust); }
+        }
+      }
+    }
+    if (c.status === 'enslaved') civGarrisonYear(c);
+  }
+}
+function giveRate(c, g) { const R = civRace(c), slow = c.race === 'dusk' && c.stage < 2; return {tech: g / 10 * (R.give || 1) * (slow ? 0.5 : 1), trust: g / 10 * (R.trustMul || 1) * (slow ? 0.3 : 1)}; }
+function civTech(c, v) {
+  if (c.stage >= 3) { c.tech = 100; return; }
+  c.tech += v;
+  if (c.tech >= 100) {
+    c.stage++; c.tech = c.stage >= 3 ? 100 : 0;
+    msg('The ' + civRace(c).name + ' have entered the ' + CIV_STAGES[c.stage].toLowerCase() + ' age.', c.star, 'contact');
+    journal('The ' + civRace(c).name + ' advanced to ' + CIV_STAGES[c.stage].toLowerCase() + '.', c.star);
+    if (c.stage === 3 && c.status === 'free') civModernOutposts(c);
+  }
+}
+// ----- landing parties -----
+function landRisk(c) { const R = civRace(c); let r = R.hostile; if (c.lang >= 100) r *= R.instinct ? 0.9 : 0.5; return clamp(r, 0, 0.95); }
+function landParty(f) {
+  const c = civAt(f.star); if (!c || c.status !== 'free' || c.met) return null;
+  const R = civRace(c);
+  if (rnd() < landRisk(c)) {
+    const sh = f.ships.find(x => shipHas(x, 'lab')); if (sh) (sh.lost = sh.lost || []).push('lab');
+    c.aware = true;
+    f.task = f.task && f.task.type === 'study' && !fleetHas(f, 'lab') ? null : f.task;
+    msg('Our landing party on ' + B(c.body).name + ' was attacked by the ' + R.name + '. The science team was lost; the ship survived but its Science Lab is gone.', c.star, 'lost');
+    journal('A landing party was lost among the ' + R.name + '.', c.star);
+    return false;
+  }
+  c.met = true; c.aware = true; c.trust = clamp(c.trust + (c.lang >= 100 ? 10 : 0), 0, 100);
+  msg('Our landing party has met the ' + R.name + ' face to face. ' + (c.lang >= 100 ? 'Knowing their language, we can now talk in Diplomacy.' : 'Learning their language goes twice as fast now.'), c.star, 'contact');
+  journal('Met the ' + R.name + ' in person.', c.star);
+  return true;
+}
+// ----- ground combat -----
+function shipPods(sh) { return design(sh.d).mods.filter(m => m === 'assault').length; }
+function shipTroops(sh) { const cap = shipPods(sh) * TROOPS_PER_POD; return sh.troops == null ? cap : Math.min(cap, sh.troops); }
+function fleetTroops(f) { return f.ships.reduce((a, sh) => a + shipTroops(sh), 0); }
+function perPod() { return HUMAN_STR + (has('plasma_rifles') ? 15 : has('laser_rifles') ? 5 : 0) + (has('combat_exo') ? 15 : has('powered_armor') ? 5 : 0); }
+function harshFactor(c) { let p = HARSH_PEN[civRace(c).harsh] || 0; if (has('sealed_suits')) p *= 0.5; else if (has('field_biosuits')) p *= 0.75; return 1 - p; }
+function ourStrength(c, troops) { return troops / TROOPS_PER_POD * perPod() * harshFactor(c); }
+function theirStrength(c, ext) { return civRace(c).base * STAGE_STR[c.stage] * (c.boost || 1) * (ext ? 1.1 : 1); }
+function winChance(r) { return clamp((r - 0.5) / 0.7, 0.02, 0.98); }
+function assaultPreview(f, ext) { const c = civAt(f.star), t = fleetTroops(f), us = ourStrength(c, t), them = theirStrength(c, ext); return {c, troops: t, us, them, ratio: us / them, chance: winChance(us / them), loss: clamp(0.35 * them / Math.max(1, us), 0.05, 0.6)}; }
+function assault(f, ext) {
+  const p = assaultPreview(f, ext), c = p.c, R = civRace(c), wb = B(c.body);
+  const won = rnd() < p.chance;
+  const lost = won ? Math.round(p.troops * p.loss / 1000) * 1000 : p.troops, left = p.troops - lost;
+  for (const sh of f.ships) if (shipPods(sh)) sh.troops = 0;
+  c.aware = true; c.trust = won ? 5 : 0;
+  if (!won) {
+    msg('Our assault on ' + wb.name + ' failed. All ' + people(p.troops / 1e6) + ' troops were lost against the ' + R.name + '.', c.star, 'lost');
+    journal('An assault on the ' + R.name + ' failed.', c.star);
+    return {won: false, lost};
+  }
+  for (const id of c.outs) { const ob = B(id); if (ob.civ === c.id) ob.civ = null; } c.outs = [];
+  if (ext) {
+    c.status = 'dead'; wb.civ = null; wb.ruins = c.race; S.stats.extinct = (S.stats.extinct || 0) + 1;
+    // survivors go back to their pods
+    let back = left; for (const sh of f.ships) { const cap = shipPods(sh) * TROOPS_PER_POD; const n = Math.min(cap, back); sh.troops = n; back -= n; }
+    msg('The ' + R.name + ' are gone. ' + wb.name + ' is empty and can be settled. We lost ' + people(lost / 1e6) + ' troops.', c.star, 'lost');
+    journal('Exterminated the ' + R.name + ' on ' + wb.name + '.', c.star);
+  } else {
+    c.status = 'enslaved'; c.garrison = left; c.unrest = false; c.enslavedYear = S.year; c.mode = 'none';
+    wb.owner = 0; wb.col = {pop: 0, outpost: true, enslaved: c.id, mode: 'build', focus: 'balanced', proj: {}, queue: [], prog: 0, founded: S.year};
+    msg('The ' + R.name + ' on ' + wb.name + ' are under our control. ' + people(left / 1e6) + ' troops hold the world; ' + people(lost / 1e6) + ' were lost.', c.star, 'colony');
+    journal('Enslaved the ' + R.name + ' on ' + wb.name + '.', c.star);
+  }
+  return {won: true, lost};
+}
+function garrisonRatio(c) { return ourStrength(c, c.garrison) / Math.max(1, theirStrength(c) * (civRace(c).revolt || 1)); }
+function civGarrisonYear(c) {
+  const R = civRace(c), wb = B(c.body), r = garrisonRatio(c), occ = has('occupation_logistics') ? 0.75 : 1;
+  const grow = (R.revoltGrow || 0) * (S.year - c.enslavedYear);
+  if (S.year - c.enslavedYear >= 5) c.seenRevolt = true;
+  if (!c.unrest) {
+    if (rnd() < (clamp(0.25 * (1.2 - r), 0, 0.5) + grow) * R.revolt * occ) { c.unrest = true; c.seenRevolt = true; msg('Uprising on ' + wb.name + '! The ' + R.name + ' have stopped working. Send more troops to restore order, or it may become a full revolt.', c.star, 'warn'); }
+  } else if (r >= 1.2) { c.unrest = false; msg('Order is restored on ' + wb.name + '.', c.star, 'colony'); }
+  else if (rnd() < clamp(0.3 * (1.2 - r), 0.05, 0.6) * occ) {
+    c.status = 'free'; c.unrest = false; const lost = c.garrison; c.garrison = 0; c.boost = (c.boost || 1) * 1.25; c.trust = 0; civTech(c, 50);
+    wb.owner = null; wb.col = null;
+    msg('Full revolt on ' + wb.name + '! Our garrison of ' + people(lost / 1e6) + ' was wiped out. The ' + R.name + ' are free again and armed with our captured weapons.', c.star, 'lost');
+    journal('The ' + R.name + ' threw off our rule on ' + wb.name + '.', c.star);
+  }
+}
+function civUpkeep() { let u = 0; for (const c of S.civs || []) if (c.status === 'enslaved') u += c.garrison / TROOPS_PER_POD * 2; for (const f of S.fleets) u += fleetTroops(f) / TROOPS_PER_POD * 0.5; return u * (has('occupation_logistics') ? 0.75 : 1); }
+function slaveProd(b) { const c = (S.civs || []).find(x => x.id === b.col.enslaved); if (!c || c.unrest) return 0; return SLAVE_PROD[c.stage] * (civRace(c).prod || 1); }
 
 'use strict';
 // ===================== STARWAKE v2 — UI CORE & 3D STAR MAP =====================
@@ -1394,7 +1640,7 @@ const SETTINGS = (() => { try { return Object.assign({near: 3, music: 40, sfx: 6
 function saveSettings() { try { localStorage.setItem('starwake.settings', JSON.stringify(SETTINGS)); } catch (e) {} }
 // ---------- hotkeys (editable in Settings) ----------
 const HOTKEYS = [['endTurn', 'End the year', 'Enter'], ['skip', 'Skip ahead until something happens', 'f'], ['idle', 'Next idle colony or ship', ' '],
-  ['research', 'Research', 'r'], ['design', 'Ship design', 'd'], ['colonies', 'Colonies', 'c'], ['journal', 'Journal', 'j'], ['home', 'Center the map on the Sun', 'h']];
+  ['research', 'Research', 'r'], ['design', 'Ship design', 'd'], ['colonies', 'Colonies', 'c'], ['journal', 'Journal', 'j'], ['home', 'Center the map on the Sun', 'h'], ['near', 'Show or hide nearest-star lines', 'n'], ['diplo', 'Diplomacy', 'p']];
 const normKey = k => k.length === 1 ? k.toLowerCase() : k;
 function hotkey(act) { const s = SETTINGS.keys && SETTINGS.keys[act]; return s != null ? s : HOTKEYS.find(h => h[0] === act)[2]; }
 function keyName(k) { return k === ' ' ? 'Space' : k.length === 1 ? k.toUpperCase() : k.replace(/^Arrow/, '').replace(/^./, c => c.toUpperCase()); }
@@ -1428,6 +1674,7 @@ function renderTop() {
     ${short.length ? `<div class="chip click" data-a="goStar" data-v="${short[0]}"><span class="bad">Food shortage: ${short.map(s => esc(ST(s).name)).join(', ')}</span></div>` : ''}
     <div class="chip" title="Top ship speed, as a share of light speed"><span class="k">Top speed</span><b>${pct(topSpeed())}</b></div><span id="attn"></span>`;
   renderAttn();
+  const db = $('#diplobtn'); if (db) db.style.display = S.contact ? '' : 'none';
 }
 // ---------- "needs attention" button ----------
 const starOrder = () => { const o = {}; S.stars.forEach((s, i) => o[s.id] = i); return o; };
@@ -1925,6 +2172,7 @@ function starPanel(sid) {
   let h = `<div class="hdr"><div><h2>${esc(s.name)}${canRenameStar(s) ? ` <button class="x ren" data-a="renStar" data-v="${s.id}" title="Rename this star">✎</button>` : ''}</h2>${s.orig ? `<div class="tiny faint">Charted as ${esc(s.orig)}</div>` : ''}<div class="dim small">${starTitle(s)}</div></div><button class="x" data-a="close">✕</button></div>`;
   h += `<div class="sdesc">${esc(starDesc(s))}</div>`;
   if (s.guardKnown) h += `<div class="card" style="border-color:#7a2a2a"><b class="bad">Guardian machines.</b> Ancient automated defenses destroy any ship that enters this system.</div>`;
+  h += civStarHTML(s);
   if (!worldsKnown(s)) {
     h += `<div class="card dim"><b>Unexplored.</b> Its worlds are unknown. Send any ship into orbit here, or get a ship's telescope within range (2.5 or 4 light-years, by module), to chart it.</div>`;
   } else {
@@ -1939,7 +2187,7 @@ function starPanel(sid) {
       const b = B(bid), ours = b.owner === 0 && b.col;
       const st = ours ? stageOf(b) : null;
       const idle = ours && !b.col.queue.length && !supplyTarget(b);
-      h += `<div class="card ${ours ? 'click' : ''} ${idle ? 'idlecard' : ''}" ${ours ? `data-a="colony" data-v="${b.id}"` : ''} ${idle ? 'title="Nothing is being built here"' : ''}><div class="body">${planetBall(b, 32)}<div style="flex:1;min-width:0"><b>${bodyName(b)}</b><div class="dim small">${sizeWord(b)}${lc(PCLASS[b.cls].name)}</div>${bodyFacts(b)}
+      h += `<div class="card ${ours ? 'click' : ''} ${idle ? 'idlecard' : ''}" ${ours ? `data-a="colony" data-v="${b.id}"` : ''} ${idle ? 'title="Nothing is being built here"' : ''}><div class="body">${planetBall(b, 32)}<div style="flex:1;min-width:0"><b>${bodyName(b)}</b><div class="dim small">${sizeWord(b)}${lc(PCLASS[b.cls].name)}</div>${civBodyLine(b)}${bodyFacts(b)}
         ${ours ? `<div class="row sb small" style="margin-top:5px"><span class="good">Ours · ${STAGES[st].name}${b.col.outpost ? '' : ' · ' + people(b.col.pop)}</span><span class="acc" style="white-space:nowrap">Manage ▸</span></div><div class="small" style="margin-top:2px">${buildLine(b)}</div>` : ''}
         ${bodyActions(b) ? `<div class="row wrap" style="margin-top:6px;gap:5px">${bodyActions(b)}</div>` : ''}</div></div></div>`;
     }
@@ -1965,8 +2213,9 @@ function buildLine(b) {
   const it = c.queue[0], o = colOut(b), cost = itemCost(b, it), yrs = o.prod > 0 ? Math.max(1, Math.ceil((cost - c.prog) / o.prod)) : '∞';
   return `<span class="dim">Building:</span> ${esc(itemName(it))}${it.n > 1 ? ' ×' + it.n : ''} <span class="dim">(${yrs} yr)${c.queue.length > 1 ? ' +' + (c.queue.length - 1) + ' more' : ''}</span>`;
 }
+function shipNotes(list) { const lost = list.filter(sh => sh.lost && sh.lost.length).length, pods = list.reduce((a, sh) => a + shipPods(sh), 0), tr = list.reduce((a, sh) => a + shipTroops(sh), 0); return (lost ? `<div class="tiny bad">Science Lab lost on ${lost === list.length ? (list.length > 1 ? 'all' : 'this ship') : lost}</div>` : '') + (pods ? `<div class="tiny ${tr ? 'good' : 'dim'}">Troops ${people(tr / 1e6)} of ${people(pods * TROOPS_PER_POD / 1e6)}${tr < pods * TROOPS_PER_POD ? ' (refill at a star with one of our colonies)' : ''}</div>` : ''); }
 function fleetName(f) { const cnt = {}; for (const sh of f.ships) { const n = design(sh.d).name; cnt[n] = (cnt[n] || 0) + 1; } return Object.entries(cnt).map(([n, c]) => (c > 1 ? c + '× ' : '') + esc(n)).join(', '); }
-function taskText(f) { const t = f.task; if (!t) return ''; if (t.type === 'survey') return (t.probe ? 'probe survey' : 'surveying') + ' (' + t.left + ' yr left)'; if (t.type === 'route') return 'trade route ' + esc(routeName(t)); return ''; }
+function taskText(f) { const t = f.task; if (!t) return ''; if (t.type === 'survey') return (t.probe ? 'probe survey' : 'surveying') + ' (' + t.left + ' yr left)'; if (t.type === 'route') return 'trade route ' + esc(routeName(t)); if (t.type === 'study') { const c = civAt(f.star); return 'studying their language' + (c ? ' (' + Math.floor(c.lang) + '%)' : ''); } return ''; }
 
 // ---------- colony ----------
 function outputHTML(b, o) {
@@ -2009,11 +2258,11 @@ function colonyPanel(b) {
     h += `<div class="tiny dim" style="padding:2px 6px 6px">Interplanetary expansion within this star system: no ship needed. The outpost or settlement appears as soon as the project is done.</div>`;
     if (!nWorlds) h += `<div class="small dim" style="padding:6px">Every world in this system is already claimed.</div>`;
     const robo = ots.filter(t => HAB[habSeen(t)].cap <= 0), live = ots.filter(t => HAB[habSeen(t)].cap > 0);
-    const anyQ = t => c.queue.some(x => (x.kind === 'outpost' || x.kind === 'settle') && x.id === t.id);
+    const claim = t => claimedAt(t), anyQ = t => !!claim(t);
     const row = (t, kind) => { const cost = itemCost(b, {kind, id: t.id}), hs = habSeen(t), q = anyQ(t), own = t.owner === 0;
       const label = kind === 'settle' ? (own ? 'Turn the outpost on ' + esc(t.name) + ' into a colony' : 'Settle ' + esc(t.name)) : 'Outpost on ' + esc(t.name);
       const info = kind === 'settle' ? `${people(settlerCount())} settlers · grows to ${people(popCap(t))}` : `${lc(PCLASS[t.cls].name)}${S.surveyed[b.star] ? ' · ' + MINERALS[t.min].toLowerCase() + ' minerals' : ''}${HAB[hs].cap > 0 ? ` · <span style="color:${HAB[hs].color}">${HAB[hs].name}</span> · ${people(popCap(t, hs))}` : ''}`;
-      return `<div class="opt" ${q ? 'style="opacity:.45;cursor:default"' : `data-a="qadd" data-v="${b.id}:${kind}:${t.id}"`}><span class="nm">${label}<div class="tiny dim">${info}${q ? ' · queued' : ''}</div></span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`; };
+      const qb = q ? claim(t) : null; return `<div class="opt" ${q ? 'style="opacity:.45;cursor:default"' : `data-a="qadd" data-v="${b.id}:${kind}:${t.id}"`}><span class="nm">${label}<div class="tiny dim">${info}${q ? (qb === b ? ' · queued' : ' · queued at ' + esc(qb.name)) : ''}</div></span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`; };
     if (robo.length) h += `<div class="sec" style="margin-top:4px">Robotic only</div>` + robo.map(t => row(t, 'outpost')).join('');
     if (live.length || ownOut.length) {
       h += `<div class="sec">Could hold people</div><div class="tiny dim" style="padding:0 6px 4px">Settle a world to found a colony, or claim it as an outpost first and settle it later.</div>`;
@@ -2051,9 +2300,9 @@ function designSummary(d) {
 }
 ACT.focus = v => { const [bid, k] = v.split(':'); B(+bid).col.focus = k; renderSide(); };
 ACT.btab = v => { UI.buildTab = v; renderSide(); };
-ACT.qadd = v => { const [bid, kind, id] = v.split(':'); const c = B(+bid).col; if (kind === 'outpost' || kind === 'settle') { c.queue.push({kind, id: +id}); renderSide(); return; } if (kind === 'ship') { const last = c.queue[c.queue.length - 1]; if (last && last.kind === 'ship' && last.id === id) last.n = (last.n || 1) + 1; else c.queue.push({kind, id, n: 1}); } else c.queue.push({kind, id}); renderSide(); };
+ACT.qadd = v => { const [bid, kind, id] = v.split(':'); const c = B(+bid).col; if (kind === 'outpost' || kind === 'settle') { if (claimedAt(B(+id))) { toast('Already queued at ' + claimedAt(B(+id)).name); return; } c.queue.push({kind, id: +id}); renderSide(); return; } if (kind === 'ship') { const last = c.queue[c.queue.length - 1]; if (last && last.kind === 'ship' && last.id === id) last.n = (last.n || 1) + 1; else c.queue.push({kind, id, n: 1}); } else c.queue.push({kind, id}); renderSide(); };
 ACT.qdel = v => { const [bid, i] = v.split(':').map(Number); const c = B(bid).col; if (i === 0) c.prog = Math.floor(c.prog * 0.5); c.queue.splice(i, 1); renderSide(); };
-ACT.qup = v => { const [bid, i] = v.split(':').map(Number); const q = B(bid).col.queue; [q[i - 1], q[i]] = [q[i], q[i - 1]]; renderSide(); };
+ACT.qup = v => { const [bid, i] = v.split(':').map(Number); const c = B(bid).col, q = c.queue; if (i === 1) c.prog = Math.floor(c.prog * 0.5); [q[i - 1], q[i]] = [q[i], q[i - 1]]; renderSide(); };
 ACT.qn = v => { const [bid, i, d] = v.split(':').map(Number); const it = B(bid).col.queue[i]; it.n = Math.max(1, (it.n || 1) + d); renderSide(); };
 ACT.buy = v => { if (buyItem(B(+v))) toast('Bought: finishes next year'); renderSide(); };
 
@@ -2083,6 +2332,7 @@ function fleetPanel(f) {
     const scope = has('biosignatures') && fleetHas(f, 'tel_l') && !fleetHas(f, 'lab') && !S.surveyed[s.id] && !(f.task && f.task.type === 'survey');
     if (scope) acts.push(`<button class="btn sm primary" data-a="scopeSurvey" data-v="${f.id}" title="Uses the Large Telescope with Biosignature Spectroscopy. The ship is not used up.">Telescope survey (3 yr)</button>`);
     if (!scope && canProbeSurvey(f) && !fleetHas(f, 'lab')) acts.push(`<button class="btn sm" data-a="probeSurvey" data-v="${f.id}" title="The ship is used up when the survey finishes">Probe survey (5 yr, uses up the ship)</button>`);
+    acts.push(...civActions(f));
     if (canInvestigate(f)) acts.push(`<button class="btn sm amber" data-a="investigate" data-v="${f.id}">Investigate strange readings</button>`);
     if (fleetHas(f, 'colony') || fleetHas(f, 'outpost')) acts.push(`<button class="btn sm" data-a="star" data-v="${s.id}">Choose a world to settle ▸</button>`);
     if (acts.length) h += `<div class="sec">Actions</div><div class="row wrap" style="gap:5px">${acts.join('')}</div>`;
@@ -2091,7 +2341,7 @@ function fleetPanel(f) {
   const groups = {}; for (const sh of f.ships) (groups[sh.d] = groups[sh.d] || []).push(sh);
   for (const did in groups) {
     const d = design(did), list = groups[did], selN = list.filter(sh => UI.fleetSel[sh.id]).length;
-    h += `<div class="card"><div class="row">${designIcon(d, 32)}<div style="flex:1;margin-left:6px"><b>${esc(d.name)}</b> <span class="dim">×${list.length}</span><div class="tiny dim">${designSummary(d)}</div></div>${f.ships.length > 1 ? `<div class="row" style="gap:3px"><button class="btn sm" data-a="fsel" data-v="${did}:-1">−</button><span class="small">${selN}</span><button class="btn sm" data-a="fsel" data-v="${did}:1">+</button></div>` : ''}</div></div>`;
+    h += `<div class="card"><div class="row">${designIcon(d, 32)}<div style="flex:1;margin-left:6px"><b>${esc(d.name)}</b> <span class="dim">×${list.length}</span><div class="tiny dim">${designSummary(d)}</div>${shipNotes(list)}</div>${f.ships.length > 1 ? `<div class="row" style="gap:3px"><button class="btn sm" data-a="fsel" data-v="${did}:-1">−</button><span class="small">${selN}</span><button class="btn sm" data-a="fsel" data-v="${did}:1">+</button></div>` : ''}</div></div>`;
   }
   const nSel = Object.values(UI.fleetSel).filter(Boolean).length;
   const others = f.star != null ? S.fleets.filter(x => x.star === f.star && x.dest == null && x !== f) : [];
@@ -2150,6 +2400,7 @@ function outpostPanel(b) {
   const sup = supplyTarget(b);
   let h = `<div class="hdr"><div class="row">${planetBall(b, 42)}<div><h2>${esc(b.name)} <button class="x ren" data-a="renBody" data-v="${b.id}" title="Rename this world">✎</button></h2><div class="dim small">Outpost · ${lc(PCLASS[b.cls].name)}</div></div></div><button class="x" data-a="close">✕</button></div>
     <div class="small"><a class="acc" style="cursor:pointer" data-a="star" data-v="${b.star}">◂ ${esc(ST(b.star).name)} system</a></div>
+    ${c.enslaved ? garrisonHTML(b) : ''}
     <div class="sec">Output per year</div>
     <div class="grid2 small"><div>Production <b>${o.prod}</b> <span class="dim">(${MINERALS[b.min].toLowerCase()} minerals)</span></div><div>${o.bc < 0 ? `Upkeep <b class="bad">${-o.bc} credit a year</b>` : `Credits <b class="good">+${o.bc}</b> <span class="dim">(after upkeep)</span>`}</div>${o.rp ? `<div>Research <b>${o.rp}</b></div>` : ''}</div>
     <div class="sec">Production goes to</div>
@@ -2243,6 +2494,7 @@ function researchHTML() {
   if (S.res) { const c = techCost(S.res.tech); h += `<div class="card"><div class="row sb"><span>Researching <b class="amber">${TECH[S.res.tech].name}</b></span><span class="dim small">${Math.floor(S.res.prog + S.rpBank)} / ${c} · ${t.rp > 0 ? Math.max(1, Math.ceil((c - S.res.prog - S.rpBank) / t.rp)) : '∞'} years</span></div><div class="bar a" style="margin-top:5px"><i style="width:${Math.min(100, (S.res.prog + S.rpBank) / c * 100)}%"></i></div></div>`; }
   h += `<div class="tgrid">`;
   for (const fk in FIELDS) {
+    if (FIELDS[fk].contact && !S.contact) continue;
     h += `<div class="tcol"><div class="rname" style="border-color:${FIELDS[fk].color};width:auto"><b>${FIELDS[fk].name}</b></div>`;
     for (const tk of TECHS.filter(x => x.f === fk).sort((a, b) => a.cost - b.cost)) {
       const known = has(tk.id), cur = S.res && S.res.tech === tk.id, ok = tk.req.every(has);
@@ -2270,7 +2522,7 @@ function designHTML() {
   h += `<div class="tiny dim" style="margin-top:8px">Pick a design to change its look, or change its parts and save it as a new design.</div></div>`;
   h += `<div><input type="text" id="dname" value="${esc(d.name)}" maxlength="28" style="width:100%"><div class="sec">Hull</div><div class="hullbtns">${Object.keys(HULLS).map(k => { const lock = k === 'heavy' && !has('heavy_hulls'); return `<button class="btn sm ${d.hull === k ? 'on' : ''}" ${lock ? 'disabled title="Needs Heavy Hull Construction"' : ''} data-a="setHull" data-v="${k}">${HULLS[k].name} (${HULLS[k].slots} slots)${lock ? ' 🔒' : ''}</button>`; }).join('')}</div>
     <div class="sec">Modules</div>`;
-  for (let i = 0; i < H.slots; i++) h += `<div class="slotrow"><span class="small dim" style="width:52px">Slot ${i + 1}</span><select data-c="setSlot" data-i="${i}"><option value="">— empty —</option>${Object.keys(MODULES).map(k => { const bad = modFits(d.hull, k); return `<option value="${k}" ${d.mods[i] === k ? 'selected' : ''} ${bad ? 'disabled' : ''}>${MODULES[k].name} · mass ${MODULES[k].mass} · ${MODULES[k].cost} cost${bad ? ' (' + bad + ')' : ''}</option>`; }).join('')}</select></div>`;
+  for (let i = 0; i < H.slots; i++) h += `<div class="slotrow"><span class="small dim" style="width:52px">Slot ${i + 1}</span><select data-c="setSlot" data-i="${i}"><option value="">— empty —</option>${Object.keys(MODULES).filter(k => !MODULES[k].tech || S.contact).map(k => { const bad = modFits(d.hull, k); return `<option value="${k}" ${d.mods[i] === k ? 'selected' : ''} ${bad ? 'disabled' : ''}>${MODULES[k].name} · mass ${MODULES[k].mass} · ${MODULES[k].cost} cost${bad ? ' (' + bad + ')' : ''}</option>`; }).join('')}</select></div>`;
   h += `<div class="small dim" style="margin-top:8px">${d.mods.filter(Boolean).map(m => `<div>• <b>${MODULES[m].name}</b>: ${MODULES[m].desc}</div>`).join('')}</div>
     <div class="sec">Secondary colour <span class="tiny dim" style="text-transform:none;letter-spacing:0">(the main colour is always your civilisation's)</span></div>
     <div class="sw">${SHIP_COLORS.map(([nm, c]) => `<i class="${d.acc === c ? 'sel' : ''}" style="background:${c}" title="${nm}" data-a="setAcc" data-v="${c}"></i>`).join('')}</div></div>`;
@@ -2283,7 +2535,7 @@ function designHTML() {
     ${d.src ? `<button class="btn" style="width:100%;margin-top:8px" data-a="saveLook" ${iconOk ? '' : 'disabled'}>Save look only (icon and colour)</button><div class="tiny dim" style="margin-top:4px">Restyles ${esc(design(d.src).name)} and its ${shipsOfDesign(d.src)} ship${shipsOfDesign(d.src) === 1 ? '' : 's'} in service. Nothing else changes.${design(d.src).std ? ' Starting designs keep this look in new games.' : ''}</div>` : ''}</div></div>`;
   return h;
 }
-function modFits(hull, m) { return hull === 'light' && (m === 'colony' || m === 'cargo') ? 'medium or heavy hull' : hull !== 'light' && m === 'booster' ? 'light hulls only' : null; }
+function modFits(hull, m) { if (MODULES[m].tech && !has(MODULES[m].tech)) return 'needs ' + TECH[MODULES[m].tech].name; if (hull === 'light' && m === 'assault') return 'medium or heavy hull'; return hull === 'light' && (m === 'colony' || m === 'cargo') ? 'medium or heavy hull' : hull !== 'light' && m === 'booster' ? 'light hulls only' : null; }
 function newDesignEdit() { const f = freeIcons(null); return {name: 'New Design', hull: 'light', mods: ['tel_m', ''], icon: f[0] || 'dart', acc: '#eef2f8', src: null}; }
 ACT.openDesign = () => { UI.designEdit = newDesignEdit(); return modal({title: 'Ship Design', w: 1100, kind: 'design', body: designHTML(), foot: `<button class="btn" data-a="newDesignEd">New design</button><button class="btn" data-a="mclose">Close</button>`}).then(() => { renderSide(); UI.dirty = true; }); };
 ACT.newDesignEd = () => { UI.designEdit = newDesignEdit(); modalBody(designHTML()); };
@@ -2333,7 +2585,7 @@ function saveTo(slot) {
 function autosave() { if (S && !S.over) saveTo('auto'); }
 function migrateSave(d) { d.version = GAME_VERSION; d.known = d.known || {}; for (const st of d.stars || []) d.known[st.id] = 1; if (!d.budget) d.budget = {perm: 0, temp: [], seen: {}}; { const ck = Object.keys(d.budget.seen || {}).filter(k => /^core\d+$/.test(k)); if (ck.length) { d.budget.perm -= ck.length - 1; ck.forEach(k => delete d.budget.seen[k]); d.budget.seen.core = 1; } } d.newsLog = d.newsLog || []; for (const x of d.designs || []) if (x.id === 'scout' && x.mods.length === 1 && x.mods[0] === 'tel_m') x.mods.push('booster'); for (const b of d.bodies || []) if (b.col && b.col.outpost && !b.col.mode) b.col.mode = 'build'; if ((d.designs || []).some(x => x.id === 'probe')) { for (const f of d.fleets || []) for (const sh of f.ships) if (sh.d === 'probe') sh.d = 'scout'; d.designs = d.designs.filter(x => x.id !== 'probe'); }
   for (const x of d.designs || []) delete x.obsolete; fixDesignIcons(d.designs || []); d.msgs = d.msgs || []; d.journal = d.journal || []; d.hist = d.hist || []; return d; }
-function loadFrom(slot) { const r = readSlot(slot); if (!r) return false; try { S = migrateSave(JSON.parse(r.data)); updateKnowledge(true); } catch (e) { toast('That save could not be read.'); return false; } startPlaying(false); return true; }
+function loadFrom(slot) { const r = readSlot(slot); if (!r) return false; try { S = migrateSave(JSON.parse(r.data)); ensureCivs(); updateKnowledge(true); } catch (e) { toast('That save could not be read.'); return false; } startPlaying(false); return true; }
 function savesHTML(canSave) {
   let h = `<table class="list"><tr><th>Slot</th><th>Civilisation</th><th>Year</th><th>Saved</th><th></th></tr>`;
   for (const s of ['auto', 1, 2, 3, 4, 5]) { const r = readSlot(s);
@@ -2364,9 +2616,13 @@ const HELP = `<div class="small" style="line-height:1.65">
 <h3>What's shared</h3><p>Production stays with each colony. Research and credits go into one empire-wide total. Food is shared by everything at the same star. Outposts can send their production to a colony in their system.</p>
 <h3>Freighters</h3><p>A trade route between two of your systems carries settlers and food out and brings trade back. Short routes pay best.</p>
 <h3>Staying on top</h3><p>The Idle button in the top bar counts colonies with nothing to build and ships waiting for orders. Each click (or its hotkey, Space unless changed) goes to the next one: colonies first, then ships, and round again. The research bar turns red when nothing is being researched.</p>
-<h3>Map controls</h3><p>Drag to rotate, right-drag or Shift-drag to pan, scroll to zoom. Stars sit on pins above or below a flat reference plane through the Sun. Click a star or ship; with a ship selected, click a star to send it.</p>
+%ALIENS%<h3>Map controls</h3><p>Drag to rotate, right-drag or Shift-drag to pan, scroll to zoom. Stars sit on pins above or below a flat reference plane through the Sun. Click a star or ship; with a ship selected, click a star to send it.</p>
 <h3>Keys</h3><p>%KEYS% · Esc: close. You can change these in Settings → Hotkeys.</p></div>`;
-ACT.openHelp = () => modal({title: 'How to play', w: 760, body: HELP.replace('%KEYS%', HOTKEYS.map(([a, l]) => keyName(hotkey(a)) + ': ' + l[0].toLowerCase() + l.slice(1)).join(' · ')), foot: `<button class="btn primary" data-a="mclose">Got it</button>`});
+const ALIEN_HELP = `<h3>Other civilizations</h3><p>Some worlds hold <b>Prespacers</b>: civilizations from the stone age to the modern age that cannot reach space. A survey of their system finds them. Their homeworld and outposts cannot be settled while they are free.</p>
+<p><b>Study</b>: a Science Lab ship in orbit learns their language from afar; it reveals their culture. <b>Landing party</b>: a Science Lab ship sends a team to meet them; they may attack it (safer once you know their language), which loses the ship's Science Lab. Ships and colonies in their system may be spotted.</p>
+<p><b>Diplomacy</b> (once met and their language is learned): <b>Trade</b> brings a few credits a year and slowly raises their tech; <b>Give</b> spends credits each year to raise them much faster and win their trust. Nobody advances past the modern age in this version.</p>
+<p><b>Ground Forces</b> research unlocks Assault Pods (10,000 troops each; empty pods refill at your colonies). Rifles and armor make each pod stronger; worlds harsh to humans weaken your troops until you have environment suits. An assault shows your chance first. <b>Enslave</b>: the world becomes your outpost, worked under guard; garrisons cost upkeep, and too few troops lead to uprisings that can become full revolts. <b>Exterminate</b>: the world is free to settle, at a cost to your score.</p>`;
+ACT.openHelp = () => modal({title: 'How to play', w: 760, body: HELP.replace('%ALIENS%', S && S.contact ? ALIEN_HELP : '').replace('%KEYS%', HOTKEYS.map(([a, l]) => keyName(hotkey(a)) + ': ' + l[0].toLowerCase() + l.slice(1)).join(' · ')), foot: `<button class="btn primary" data-a="mclose">Got it</button>`});
 
 // ---------- end screen ----------
 function drawHistChart(cvs) {
@@ -2386,7 +2642,7 @@ async function showEnd() {
   if (!S.recorded) { S.recorded = true; try { const hof = JSON.parse(localStorage.getItem('starwake.hof') || '[]');
     hof.push({date: Date.now(), name: S.empire.name, race: 'Humans', color: S.empire.color, result: o.result, turn: S.turn, year: S.year, score: sc.total, size: LENGTHS[S.len].label, shape: '', rivals: 0, version: GAME_VERSION});
     localStorage.setItem('starwake.hof', JSON.stringify(hof)); localStorage.removeItem(SKEY('auto')); } catch (e) {} }
-  const rows = [['Systems visited', sc.explored], ['Systems surveyed', sc.surveyed], ['Life discovered', sc.life], ['Anomalies', sc.anomalies], ['Breakthroughs', sc.breakthroughs], ['Technologies', sc.techs], ['Colonies', sc.colonies], ['Population', sc.population]];
+  const rows = [['Systems visited', sc.explored], ['Systems surveyed', sc.surveyed], ['Life discovered', sc.life], ['Anomalies', sc.anomalies], ['Breakthroughs', sc.breakthroughs], ['Technologies', sc.techs], ['Colonies', sc.colonies], ['Population', sc.population], ['Alien civilizations', sc.aliens]];
   await modal({title: o.result === 'retired' ? 'Retired' : 'The Age of Exploration Ends', w: 980, noClose: true, kind: 'end',
     body: `<p>${esc(o.why)}</p><div class="row" style="gap:16px;align-items:stretch;flex-wrap:wrap">
       <div class="card" style="flex:1;min-width:240px"><div class="sec" style="margin-top:0">Final score</div><div style="font-size:38px;font-weight:700" class="amber">${sc.total}</div><table class="statt small"><tr><td class="dim tiny">Points from</td><td></td></tr>${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table></div>
@@ -2490,6 +2746,193 @@ function introHTML() {
 ACT.openIntro = () => modal({title: START_YEAR + ' · ' + esc(S.empire.name), w: 620, noClose: true, body: introHTML(), foot: `<button class="btn primary" data-a="mclose">Begin</button>`});
 
 'use strict';
+// ===================== STARWAKE — ALIENS: scans, diplomacy, ground actions =====================
+// ----- rotating 3D wireframe scan (one animates at a time) -----
+let WIRE_TOK = 0;
+function WIRE(root, o) {
+  const tok = ++WIRE_TOK;
+  const SC = o.scale, CX = o.cx, GY = o.gy, PIT = 0.12, REV = 24000, SCAN = 5000, ZR = o.zr || 1.3, H = o.h;
+  const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], mul = (a, s) => [a[0] * s, a[1] * s, a[2] * s], dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], nz = a => { const l = Math.hypot(...a) || 1; return mul(a, 1 / l); };
+  function cat(p, n) { const P = [p[0], ...p, p[p.length - 1]], q = []; for (let i = 1; i < P.length - 2; i++) { const [a, b, c, d] = [P[i - 1], P[i], P[i + 1], P[i + 2]]; for (let k = 0; k < n; k++) { const t = k / n, t2 = t * t, t3 = t2 * t; q.push(b.map((_, j) => .5 * (2 * b[j] + (-a[j] + c[j]) * t + (2 * a[j] - 5 * b[j] + 4 * c[j] - d[j]) * t2 + (-a[j] + 3 * b[j] - 3 * c[j] + d[j]) * t3))); } } q.push(p[p.length - 1]); return q; }
+  function tube(ctrl, seg, n) { const pts = cat(ctrl.map(p => [p[0], p[1], p[2], p[3], p[4] == null ? 1 : p[4]]), n), R = []; pts.forEach((p, i) => { const t = nz(sub(pts[Math.min(i + 1, pts.length - 1)], pts[Math.max(i - 1, 0)])); const rf = Math.abs(dot(t, [0, 0, 1])) > .9 ? [0, 1, 0] : [0, 0, 1]; const u = nz(cr(t, rf)), w = nz(cr(t, u)), r = []; for (let k = 0; k < seg; k++) { const g = 2 * Math.PI * k / seg; r.push(add(p, add(mul(u, Math.cos(g) * p[3]), mul(w, Math.sin(g) * p[3] * p[4])))); } R.push(r); }); return R; }
+  const SEG = [];
+  for (const pt of o.parts) for (const sd of pt.m ? [1, -1] : [1]) {
+    const R = tube(pt.p.map(q => [q[0] - o.ox, q[1], q[2] * sd, q[3], q[4]]), pt.s || 12, pt.n || 4), col = pt.c || '#5EC8E8', op = pt.o || 1;
+    R.forEach(r => r.forEach((a, k) => SEG.push([a, r[(k + 1) % r.length], col, op])));
+    for (let k = 0; k < R[0].length; k++) for (let i = 0; i < R.length - 1; i++) SEG.push([R[i][k], R[i + 1][k], col, op * .85]);
+  }
+  const SP = (o.spots || []).map(p => [p[0] - o.ox, p[1], p[2]]), EY = (o.eyes || []).map(([p, r]) => [[p[0] - o.ox, p[1], p[2]], r]);
+  const mesh = root.querySelector('.mesh'), scan = root.querySelector('.scan'), AN = o.anchors || {}, lines = {};
+  for (const k in AN) lines[k] = root.querySelector('.' + k);
+  function frame(t) {
+    const yaw = (o.yaw0 || 0.55) + 2 * Math.PI * ((t % REV) / REV), c = Math.cos(yaw), s = Math.sin(yaw), cp = Math.cos(PIT), sp = Math.sin(PIT);
+    const pr = p => { const x = p[0] * c + p[2] * s, z = -p[0] * s + p[2] * c; return [CX + x * SC, GY - (p[1] * cp - z * sp) * SC, p[1] * sp + z * cp]; };
+    const sy = H * (0.5 - 0.5 * Math.cos(2 * Math.PI * ((t % SCAN) / SCAN))), Bk = {}, HI = [];
+    for (const [a, b, col, op] of SEG) {
+      const A = pr(a), Q = pr(b), f = Math.max(0, Math.min(.999, ((A[2] + Q[2]) / 2 + ZR) / (2 * ZR)));
+      const d = `M${A[0].toFixed(1)} ${A[1].toFixed(1)}L${Q[0].toFixed(1)} ${Q[1].toFixed(1)}`;
+      if (Math.abs((a[1] + b[1]) / 2 - sy) < .12 * (o.unit || 1)) HI.push(d); else { const key = col + '|' + op + '|' + (f * 5 | 0); (Bk[key] = Bk[key] || []).push(d); }
+    }
+    let h = '';
+    for (const key in Bk) { const [col, op, q] = key.split('|'); const f = (+q + .5) / 5; h += `<path d="${Bk[key].join('')}" stroke="${col}" stroke-opacity="${((.1 + .8 * f ** 1.6) * op).toFixed(2)}" stroke-width="${(.5 + .6 * f).toFixed(2)}" fill="none"/>`; }
+    h += `<path d="${HI.join('')}" stroke="#E6F7FF" stroke-opacity="0.9" stroke-width="1.2" fill="none"/>`;
+    for (const p0 of SP) { const p = pr(p0), f = Math.max(0, Math.min(1, (p[2] + ZR) / (2 * ZR))); h += `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="${(1.1 + f).toFixed(1)}" fill="#FAC775" fill-opacity="${(.15 + .85 * f).toFixed(2)}"/>`; }
+    for (const [e, r] of EY) { const p = pr(e), f = Math.max(0, Math.min(1, (p[2] + ZR) / (2 * ZR))); h += `<ellipse cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" rx="${(r * SC * .85).toFixed(1)}" ry="${(r * SC).toFixed(1)}" fill="#06121C" fill-opacity="${(.2 + .8 * f).toFixed(2)}" stroke="#5EC8E8" stroke-opacity="${(.2 + .8 * f).toFixed(2)}" stroke-width="1.1"/>`; }
+    mesh.innerHTML = h;
+    if (scan) { let d = ''; for (let i = 0; i <= 48; i++) { const g = 2 * Math.PI * i / 48, x = Math.cos(g) * o.ring[0], z = Math.sin(g) * o.ring[1]; d += (i ? 'L' : 'M') + (CX + x * SC).toFixed(1) + ' ' + (GY - (sy * cp - z * sp) * SC).toFixed(1); } scan.setAttribute('d', d); scan.setAttribute('stroke-opacity', (.55 + .25 * Math.sin(t / 180)).toFixed(2)); }
+    for (const k in AN) { const a = AN[k], p = pr([a[0] - o.ox, a[1], a[2]]), f = Math.max(0, Math.min(1, (p[2] + ZR) / (2 * ZR))); if (lines[k]) { lines[k].setAttribute('points', `${p[0].toFixed(0)},${p[1].toFixed(0)} ${a[3]}`); lines[k].setAttribute('stroke-opacity', (.25 + .75 * f).toFixed(2)); } }
+  }
+  let last = 0;
+  function loop(t) { if (!root.isConnected || tok !== WIRE_TOK) return; if (t - last > 33) { last = t; frame(t); } requestAnimationFrame(loop); }
+  frame(0); requestAnimationFrame(loop);
+}
+const THUMB_SCALE = {tide: 32, dusk: 26, crag: 25, stone: 24, shell: 36, wire: 27, cat: 28, veil: 22};
+function thumbSVG() { return `<svg viewBox="0 0 200 230" width="200" height="230" class="civthumb" style="background:#06121C;border-radius:6px;flex:none"><line x1="10" y1="214" x2="190" y2="214" stroke="#1E4A5E"/><g class="mesh"></g><path class="scan" fill="none" stroke="#5EC8E8" stroke-width="1.2"/></svg>`; }
+function startThumb(race) { const el = $('#modal .civthumb'); if (!el) return; const m = RACE_MODELS[race]; WIRE(el, Object.assign({}, m, {anchors: {}, gy: 214, cx: 100, scale: THUMB_SCALE[race] || 26})); }
+function fullScanSVG(race) {
+  const sp = RACE_MODELS[race], S0 = sp.scale, maxft = sp.maxft, bt = sp.bottom;
+  let ticks = '', labels = '';
+  for (let i = 0; i <= maxft; i++) ticks += `<line x1="${i % 2 === 0 ? 226 : 228}" y1="${(432 - S0 * i).toFixed(0)}" x2="${i % 2 === 0 ? 238 : 236}" y2="${(432 - S0 * i).toFixed(0)}"/>`;
+  for (let i = 0; i <= maxft; i += 2) labels += `<text x="222" y="${(436 - S0 * i).toFixed(0)}">${i} ft</text>`;
+  const lines = Object.keys(sp.anchors).map(k => `<polyline class="${k}" points="0,0 ${sp.anchors[k][3]}"/>`).join('');
+  const calls = sp.callouts.map(([x, y, anch, t, l1, l2]) => { const ta = anch === 'end' ? ' text-anchor="end"' : ''; return `<text x="${x}" y="${y}"${ta}>${t}</text><text x="${x}" y="${y + 14}"${ta} fill="#3E7A90">${l1}</text>` + (l2 ? `<text x="${x}" y="${y + 27}"${ta} fill="#3E7A90">${l2}</text>` : ''); }).join('');
+  return `<svg viewBox="0 0 680 530" width="100%" class="civscan" style="display:block"><defs><pattern id="scangrid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0 L0 0 0 20" fill="none" stroke="#0F2A3A" stroke-width="1"/></pattern></defs>
+<rect width="680" height="530" rx="10" fill="#06121C"/><rect width="680" height="530" rx="10" fill="url(#scangrid)"/><rect x="6" y="6" width="668" height="518" rx="7" fill="none" stroke="#1E4A5E"/>
+<path d="M14 28 L14 14 L28 14 M652 14 L666 14 L666 28 M14 502 L14 516 L28 516 M652 516 L666 516 L666 502" stroke="#5EC8E8" stroke-width="2" fill="none"/>
+<g font-family="ui-monospace, Menlo, Consolas, monospace"><text x="32" y="36" fill="#5EC8E8" font-size="14" letter-spacing="2">XENOBIOLOGY DATABASE</text>
+<text x="32" y="54" fill="#3E7A90" font-size="11" letter-spacing="1">SURVEY FILE ${sp.file} · ${sp.name.toUpperCase()} · ADULT · SOURCE: ORBITAL IMAGING</text>
+<text x="648" y="36" fill="#5DCAA5" font-size="11" text-anchor="end">● 3D SCAN COMPLETE</text><line x1="32" y1="66" x2="648" y2="66" stroke="#1E4A5E"/>
+<g stroke="#3E7A90"><line x1="232" y1="432" x2="232" y2="${(432 - S0 * maxft).toFixed(0)}"/>${ticks}</g><g fill="#3E7A90" font-size="11" text-anchor="end">${labels}</g>
+<line x1="232" y1="432" x2="620" y2="432" stroke="#1E4A5E"/><g class="mesh"></g><path class="scan" fill="none" stroke="#5EC8E8" stroke-width="1.5"/>
+<g stroke="#3E7A90" stroke-width="0.8" fill="none">${lines}</g><g font-size="11" fill="#9ED8EA">${calls}</g><line x1="32" y1="462" x2="648" y2="462" stroke="#1E4A5E"/>
+<g font-size="11"><text x="32" y="482" fill="#3E7A90">HEIGHT</text><text x="84" y="482" fill="#9ED8EA">${bt.height}</text><text x="170" y="482" fill="#3E7A90">MASS</text><text x="208" y="482" fill="#9ED8EA">${bt.mass}</text>
+<text x="290" y="482" fill="#3E7A90">HABITAT</text><text x="346" y="482" fill="#9ED8EA">${bt.habitat}</text><text x="32" y="502" fill="#3E7A90">VOICE</text><text x="84" y="502" fill="#9ED8EA">${bt.v1}</text><text x="84" y="517" fill="#9ED8EA">${bt.v2}</text></g></g></svg>`;
+}
+ACT.openScan = race => {
+  UI.scanBack = UI.diploSel;
+  modal({title: RACE_MODELS[race].name + ' · scan file', kind: 'scan', w: 760, body: fullScanSVG(race), foot: `<button class="btn" data-a="openDiplo">◂ Diplomacy</button><button class="btn primary" data-a="mclose">Close</button>`});
+  WIRE($('#modal .civscan'), RACE_MODELS[race]);
+};
+// ----- diplomacy screen -----
+function trustWord(t) { return t >= 90 ? 'Worshipful' : t >= 70 ? 'Devoted' : t >= 55 ? 'Friendly' : t >= 40 ? 'Wary' : t >= 20 ? 'Hostile' : 'Hateful'; }
+function civStatusText(c) {
+  if (c.status === 'dead') return 'Exterminated';
+  if (c.status === 'enslaved') return 'Under our rule' + (c.unrest ? ' · UPRISING' : '');
+  const f = S.fleets.find(x => x.task && x.task.type === 'study' && x.star === c.star);
+  return (c.met ? 'Met in person' : c.aware ? 'They know we exist' : 'Unaware of us') + ' · ' + (c.lang >= 100 ? 'language learned' : f ? 'studying language' : c.lang > 0 ? 'language ' + Math.floor(c.lang) + '%' : 'language unknown');
+}
+function knownCivs() { return (S.civs || []).filter(c => c.known); }
+ACT.openDiplo = v => {
+  const list = knownCivs();
+  if (!list.length) { toast('We have not found any other civilization.'); return; }
+  if (v != null && v !== '') UI.diploSel = +v;
+  else if (UI.scanBack != null) UI.diploSel = UI.scanBack;
+  UI.scanBack = null;
+  if (!list.some(c => c.id === UI.diploSel)) UI.diploSel = list[0].id;
+  UI.diploTab = 'pre';
+  modal({title: 'Diplomacy', kind: 'diplo', w: 980, body: diploHTML(), foot: `<button class="btn primary" data-a="mclose">Close</button>`});
+  startThumb(diploCiv().race);
+};
+function diploCiv() { return (S.civs || []).find(c => c.id === UI.diploSel); }
+ACT.diploSel = v => { UI.diploSel = +v; modalBody(diploHTML()); startThumb(diploCiv().race); };
+ACT.diploTab = v => { UI.diploTab = v; modalBody(diploHTML()); if (v === 'pre') startThumb(diploCiv().race); };
+const unk = t => `<span class="dim" style="font-style:italic">${t}</span>`;
+function diploHTML() {
+  const list = knownCivs();
+  let h = `<div class="row" style="gap:6px;margin-bottom:10px"><button class="btn sm ${UI.diploTab === 'pre' ? 'on' : ''}" data-a="diploTab" data-v="pre">Prespacers (${list.length})</button><button class="btn sm ${UI.diploTab === 'space' ? 'on' : ''}" data-a="diploTab" data-v="space">Spacefarers (0)</button></div>`;
+  if (UI.diploTab === 'space') return h + `<div class="card dim">No spacefaring civilizations have been found.</div>`;
+  const c = diploCiv(), R = civRace(c), wb = B(c.body);
+  h += `<div style="display:grid;grid-template-columns:200px minmax(0,1fr);gap:12px"><div>`;
+  for (const x of list) h += `<div class="card click ${x.id === c.id ? 'on' : ''}" style="${x.id === c.id ? 'border-color:#5EC8E8' : ''}" data-a="diploSel" data-v="${x.id}"><b>${RACES[x.race].name}</b><div class="tiny dim">${x.status === 'dead' ? 'Exterminated' : CIV_STAGES[x.stage] + ' · ' + (x.met ? 'trust ' + Math.round(x.trust) : 'not met')}</div></div>`;
+  h += `</div><div>`;
+  const nextStage = c.stage >= 3 ? 'Spacefaring (not in this version)' : CIV_STAGES[c.stage + 1];
+  h += `<div class="card" style="display:flex;gap:12px;align-items:flex-start">${thumbSVG()}<div style="flex:1;min-width:0">
+    <h2 style="margin:0">${R.name}</h2><div class="small dim">${esc(R.home)} · <a class="acc" style="cursor:pointer" data-a="jGo" data-v="${c.star}">${esc(wb.name)}, ${esc(ST(c.star).name)}</a></div>
+    <div class="small" style="margin:6px 0"><span class="otag">${CIV_STAGES[c.stage]}</span> <span class="otag">${civStatusText(c)}</span></div>
+    <div class="sec" style="margin-top:6px">Tech · ${CIV_STAGES[c.stage]} → ${nextStage}</div><div class="bar"><i style="width:${Math.min(100, c.tech)}%;background:#4aa8ff"></i></div>
+    <div class="sec">Trust</div>${c.met ? `<div class="row sb small"><span>${Math.round(c.trust)} / 100</span><span>${trustWord(c.trust)}</span></div><div class="bar"><i style="width:${c.trust}%;background:#5DCAA5"></i></div>` : unk('Unknown: shown once we meet them in person')}
+    <div class="sec">Language</div><div class="bar"><i style="width:${c.lang}%;background:#9FE1CB"></i></div><div class="tiny dim">${c.lang >= 100 ? 'Learned' : Math.floor(c.lang) + '% learned'}</div>
+    <div style="margin-top:8px"><button class="btn sm" data-a="openScan" data-v="${c.race}">Open scan file ▸</button></div></div></div>`;
+  h += `<div class="sec">Body (from survey)</div><div class="small">${esc(R.body)} ${esc(R.comm)}</div>`;
+  h += `<div class="sec">Culture (from language)</div><div class="small">${c.lang >= 100 ? R.culture.map(x => `<span class="otag">${x}</span>`).join(' ') : unk('Unknown: learn their language')}</div>`;
+  h += `<div class="sec">How they see us (from meeting)</div><div class="small">${c.met ? esc(R.feel) : unk('Unknown: needs a meeting in person')}</div>`;
+  h += `<div class="sec">Revolt tendency</div><div class="small">${c.seenRevolt ? (R.revolt >= 1.25 ? 'Rebellious: they rise up often.' : R.revolt <= 0.7 ? 'Submissive: they rarely rise up.' : 'They rise up when guards are few.') + (R.revoltGrow ? ' Their anger grows the longer they are held.' : '') : unk('Unknown: learned only by ruling them')}</div>`;
+  h += `<div class="sec">View on interference</div><div class="small">${c.aware ? (R.awe ? 'They see visitors from the sky with awe.' : 'They distrust outsiders who watch or meddle.') : unk('Unknown: revealed once they notice us')}</div>`;
+  h += `<div class="sec">Relations</div><div class="card small">${relHTML(c)}</div>`;
+  return h + `</div></div>`;
+}
+function relHTML(c) {
+  if (c.status === 'dead') return unk('They are gone.');
+  if (c.status === 'enslaved') return `They are under our rule. Garrison: ${people(c.garrison / 1e6)} troops${c.unrest ? ' · <span class="bad">uprising</span>' : ''}. <a class="acc" style="cursor:pointer" data-a="colonyGo" data-v="${c.body}">Manage ${esc(B(c.body).name)} ▸</a>`;
+  if (!(c.met && c.lang >= 100)) return unk(c.lang >= 100 ? 'Land a party from a Science Lab ship (ship panel) to meet them and open talks.' : 'Learn their language with a Science Lab ship in orbit, and meet them with a landing party, to open talks.');
+  const m = c.mode || 'none', left = 100 - c.tech;
+  let h = `<div class="row" style="gap:6px;margin-bottom:6px">${['none', 'trade', 'give'].map(k => `<button class="btn sm ${m === k ? 'on' : ''}" data-a="civMode" data-v="${k}">${{none: 'None', trade: 'Trade', give: 'Give'}[k]}</button>`).join('')}</div>`;
+  const yrs = r => c.stage >= 3 ? 'they are as advanced as they can get here' : 'next age in about ' + Math.max(1, Math.ceil(left / r)) + ' years';
+  if (m === 'none') h += `<div class="dim">No exchange. Their development stays where it is.</div>`;
+  if (m === 'trade') h += `<div>+${TRADE_BC[c.stage]} credits a year · their tech rises slowly (${yrs(1.2)}) · trust +1 a year (up to 90)</div>`;
+  if (m === 'give') { const r = giveRate(c, c.give); h += `<div class="row sb"><span>Give <b>${c.give}</b> credits a year</span><span class="dim">${yrs(r.tech)} · trust +${r.trust.toFixed(1)} a year</span></div><input type="range" min="5" max="100" step="5" value="${c.give}" data-c="civGive" style="width:100%"><div class="tiny dim">Costs credits every year, but raises them much faster than trade and wins their loyalty.</div>`; }
+  return h;
+}
+ACT.civMode = v => { const c = diploCiv(); c.mode = v; modalBody(diploHTML()); startThumb(c.race); renderTop(); };
+ACT.civGive = v => { const c = diploCiv(); c.give = +v; modalBody(diploHTML()); startThumb(c.race); };
+ACT.colonyGo = v => { ACT.mclose(); selectColony(+v); };
+// ----- star panel pieces -----
+function civStarHTML(s) {
+  const c = (S.civs || []).find(x => x.star === s.id && x.known); if (!c) return '';
+  const R = civRace(c);
+  if (c.status === 'dead') return `<div class="card small" style="border-color:#5a3030"><b>Ruins of the ${R.name}</b><div class="dim">${esc(B(c.body).name)} is empty now.</div></div>`;
+  return `<div class="card" style="border-color:#2a6a8a"><div class="row sb"><b class="acc">◉ The ${R.name}</b><span class="small dim">${CIV_STAGES[c.stage]}</span></div><div class="small dim" style="margin-top:3px">${civStatusText(c)}</div>
+    <button class="btn sm" style="margin-top:6px" data-a="openDiplo" data-v="${c.id}">Diplomacy ▸</button></div>`;
+}
+function civBodyLine(b) {
+  const c = civOfBody(b); if (!c || !c.known) return b.ruins ? `<div class="tiny dim">Ruins of the ${RACES[b.ruins].name}</div>` : '';
+  const R = civRace(c);
+  return c.body === b.id ? `<div class="tiny acc">Homeworld of the ${R.name}${c.status === 'enslaved' ? ' · under our rule' : ''}</div>` : `<div class="tiny acc">${R.one} outpost</div>`;
+}
+// ----- ship actions -----
+function civActions(f) {
+  const c = civAt(f.star); if (!c || !c.known) return [];
+  const R = civRace(c), out = [], tr = fleetTroops(f);
+  if (fleetHas(f, 'lab') && c.lang < 100 && !(f.task && f.task.type === 'study') && c.status !== 'dead') out.push(`<button class="btn sm primary" data-a="civStudy" data-v="${f.id}" title="Science Lab ships in orbit learn their language from afar (twice as fast after meeting them)">Study their language</button>`);
+  if (fleetHas(f, 'lab') && !c.met && c.status === 'free') out.push(`<button class="btn sm" data-a="civLand" data-v="${f.id}">Send a landing party (risk ${Math.round(landRisk(c) * 100)}%)</button>`);
+  if (tr > 0 && c.status === 'free') out.push(`<button class="btn sm danger" data-a="civAssault" data-v="${f.id}">Assault ${esc(B(c.body).name)} ▸</button>`);
+  if (c.status === 'enslaved' && tr > 0) out.push(`<button class="btn sm" data-a="civTroopsDown" data-v="${f.id}">Land ${people(tr / 1e6)} troops</button>`);
+  if (c.status === 'enslaved' && c.garrison > 0 && fleetPodRoom(f) > 0) out.push(`<button class="btn sm" data-a="civTroopsUp" data-v="${f.id}">Load ${people(Math.min(c.garrison, fleetPodRoom(f)) / 1e6)} troops</button>`);
+  return out;
+}
+function fleetPodRoom(f) { return f.ships.reduce((a, sh) => a + shipPods(sh) * TROOPS_PER_POD - shipTroops(sh), 0); }
+const FL = v => S.fleets.find(x => x.id === +v);
+ACT.civStudy = v => { const f = FL(v); f.task = {type: 'study'}; f.auto = false; renderSide(); toast('Studying their language'); };
+ACT.civLand = v => {
+  const f = FL(v), c = civAt(f.star), R = civRace(c);
+  modal({title: 'Landing party', w: 460, body: `<div>Send a science team down to meet the ${R.name} face to face?</div><div class="small dim" style="margin-top:6px">Risk they attack the party: <b>${Math.round(landRisk(c) * 100)}%</b>${c.lang < 100 ? '. Learning their language first makes it safer.' : '.'} If they attack, the team and the ship's Science Lab are lost; the ship itself survives.</div>`,
+    foot: `<button class="btn" data-a="mclose">Cancel</button><button class="btn primary" data-a="mclose" data-v="go">Land</button>`}).then(r => { if (r !== 'go') return; landParty(f); showNews(); renderSide(); renderTop(); UI.dirty = true; autosave(); });
+};
+ACT.civAssault = v => {
+  const f = FL(v), c = civAt(f.star), R = civRace(c), p = assaultPreview(f, false), px = assaultPreview(f, true);
+  const hp = Math.round((1 - harshFactor(c)) * 100);
+  const line = (q, ext) => `<div class="card small"><b>${ext ? 'Exterminate' : 'Enslave'}</b> · their strength ${Math.round(q.them)}${ext ? ' (they fight 10% harder for their lives)' : ''}<div>Chance to win: <b class="${q.chance >= 0.6 ? 'good' : q.chance >= 0.35 ? 'amber' : 'bad'}">${Math.round(q.chance * 100)}%</b> · expected losses if we win: about ${people(Math.round(q.troops * q.loss / 1000) * 1000 / 1e6)} troops. If we lose, every troop dies.</div></div>`;
+  modal({title: 'Assault on ' + esc(B(c.body).name), w: 560, body: `<div class="small">Our ${people(p.troops / 1e6)} troops: strength <b>${Math.round(p.us)}</b> (${perPod()} per pod${hp ? `, −${hp}% on a world harsh to us` : ''}). The ${R.name} (${CIV_STAGES[c.stage].toLowerCase()}): ground troops only.</div>
+    ${line(p, false)}${line(px, true)}
+    <div class="tiny dim" style="margin-top:6px">Enslaved: the world becomes our outpost, worked by them under guard. Garrisons cost upkeep, and too few guards invite uprisings. Exterminated: the world is free to settle, but the loss costs us 15 score.</div>`,
+    foot: `<button class="btn" data-a="mclose">Cancel</button><button class="btn danger" data-a="mclose" data-v="ext">Exterminate</button><button class="btn primary" data-a="mclose" data-v="ens">Enslave</button>`}).then(r => {
+    if (r !== 'ens' && r !== 'ext') return;
+    assault(f, r === 'ext'); showNews(); renderSide(); renderTop(); UI.dirty = true; autosave();
+  });
+};
+ACT.civTroopsDown = v => { const f = FL(v), c = civAt(f.star); c.garrison += fleetTroops(f); for (const sh of f.ships) if (shipPods(sh)) sh.troops = 0; if (c.unrest && garrisonRatio(c) >= 1.2) { c.unrest = false; toast('Order restored'); } renderSide(); renderTop(); };
+ACT.civTroopsUp = v => { const f = FL(v), c = civAt(f.star); let n = Math.min(c.garrison, fleetPodRoom(f)); c.garrison -= n; for (const sh of f.ships) { const room = shipPods(sh) * TROOPS_PER_POD - shipTroops(sh); const k = Math.min(room, n); if (k > 0) { sh.troops = shipTroops(sh) + k; n -= k; } } renderSide(); renderTop(); };
+// ----- enslaved world panel section -----
+function garrisonHTML(b) {
+  const c = (S.civs || []).find(x => x.id === b.col.enslaved); if (!c) return '';
+  const R = civRace(c), r = garrisonRatio(c), need = Math.ceil(theirStrength(c) * (R.revolt || 1) * 1.2 / (perPod() * harshFactor(c))) * TROOPS_PER_POD;
+  return `<div class="sec">The ${R.name}</div><div class="card small">${c.unrest ? '<b class="bad">Uprising!</b> They have stopped working. Land more troops to restore order, or it may become a full revolt.' : `Working under guard: +${r1(slaveProd(b))} production a year.`}
+    <div style="margin-top:4px">Garrison <b>${people(c.garrison / 1e6)}</b> troops · <span class="${r >= 1.2 ? 'good' : r >= 0.8 ? 'amber' : 'bad'}">${r >= 1.2 ? 'secure' : r >= 0.8 ? 'stretched' : 'too few'}</span> · about ${people(need / 1e6)} keeps order · upkeep ${r1(c.garrison / TROOPS_PER_POD * 2 * (has('occupation_logistics') ? 0.75 : 1))} credits a year</div>
+    <div class="tiny dim" style="margin-top:3px">Ships with Assault Pods in orbit can land or load troops.</div></div>`;
+}
+
+'use strict';
 // ===================== STARWAKE v2 — GAME FLOW =====================
 function refresh() { renderTop(); renderSide(); UI.dirty = true; }
 function startPlaying(isNew) {
@@ -2524,7 +2967,9 @@ async function runEndTurn(skip) {
 ACT.endTurn = () => runEndTurn(false);
 ACT.skip = () => runEndTurn(true);
 const KEY_DO = {endTurn: () => runEndTurn(false), skip: () => runEndTurn(true), idle: () => ACT.attnGo(), research: () => ACT.openResearch(),
-  design: () => ACT.openDesign(), colonies: () => ACT.openColonies(), journal: () => ACT.openJournal(), home: () => centerOn(0)};
+  design: () => ACT.openDesign(), colonies: () => ACT.openColonies(), journal: () => ACT.openJournal(), home: () => centerOn(0),
+  near: () => { if (SETTINGS.near > 0) { SETTINGS.nearLast = SETTINGS.near; SETTINGS.near = 0; } else SETTINGS.near = SETTINGS.nearLast || 3; saveSettings(); UI.dirty = true; renderSide(); toast(SETTINGS.near ? 'Nearest-star lines: ' + SETTINGS.near : 'Nearest-star lines off'); },
+  diplo: () => ACT.openDiplo()};
 document.addEventListener('keydown', e => {
   if (UI.keyCap && !modalOpen('hotkeys')) UI.keyCap = null;
   if (UI.keyCap) { e.preventDefault(); e.stopPropagation(); hotkeyCaptured(e); return; }

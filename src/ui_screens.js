@@ -50,6 +50,7 @@ function researchHTML() {
   if (S.res) { const c = techCost(S.res.tech); h += `<div class="card"><div class="row sb"><span>Researching <b class="amber">${TECH[S.res.tech].name}</b></span><span class="dim small">${Math.floor(S.res.prog + S.rpBank)} / ${c} · ${t.rp > 0 ? Math.max(1, Math.ceil((c - S.res.prog - S.rpBank) / t.rp)) : '∞'} years</span></div><div class="bar a" style="margin-top:5px"><i style="width:${Math.min(100, (S.res.prog + S.rpBank) / c * 100)}%"></i></div></div>`; }
   h += `<div class="tgrid">`;
   for (const fk in FIELDS) {
+    if (FIELDS[fk].contact && !S.contact) continue;
     h += `<div class="tcol"><div class="rname" style="border-color:${FIELDS[fk].color};width:auto"><b>${FIELDS[fk].name}</b></div>`;
     for (const tk of TECHS.filter(x => x.f === fk).sort((a, b) => a.cost - b.cost)) {
       const known = has(tk.id), cur = S.res && S.res.tech === tk.id, ok = tk.req.every(has);
@@ -77,7 +78,7 @@ function designHTML() {
   h += `<div class="tiny dim" style="margin-top:8px">Pick a design to change its look, or change its parts and save it as a new design.</div></div>`;
   h += `<div><input type="text" id="dname" value="${esc(d.name)}" maxlength="28" style="width:100%"><div class="sec">Hull</div><div class="hullbtns">${Object.keys(HULLS).map(k => { const lock = k === 'heavy' && !has('heavy_hulls'); return `<button class="btn sm ${d.hull === k ? 'on' : ''}" ${lock ? 'disabled title="Needs Heavy Hull Construction"' : ''} data-a="setHull" data-v="${k}">${HULLS[k].name} (${HULLS[k].slots} slots)${lock ? ' 🔒' : ''}</button>`; }).join('')}</div>
     <div class="sec">Modules</div>`;
-  for (let i = 0; i < H.slots; i++) h += `<div class="slotrow"><span class="small dim" style="width:52px">Slot ${i + 1}</span><select data-c="setSlot" data-i="${i}"><option value="">— empty —</option>${Object.keys(MODULES).map(k => { const bad = modFits(d.hull, k); return `<option value="${k}" ${d.mods[i] === k ? 'selected' : ''} ${bad ? 'disabled' : ''}>${MODULES[k].name} · mass ${MODULES[k].mass} · ${MODULES[k].cost} cost${bad ? ' (' + bad + ')' : ''}</option>`; }).join('')}</select></div>`;
+  for (let i = 0; i < H.slots; i++) h += `<div class="slotrow"><span class="small dim" style="width:52px">Slot ${i + 1}</span><select data-c="setSlot" data-i="${i}"><option value="">— empty —</option>${Object.keys(MODULES).filter(k => !MODULES[k].tech || S.contact).map(k => { const bad = modFits(d.hull, k); return `<option value="${k}" ${d.mods[i] === k ? 'selected' : ''} ${bad ? 'disabled' : ''}>${MODULES[k].name} · mass ${MODULES[k].mass} · ${MODULES[k].cost} cost${bad ? ' (' + bad + ')' : ''}</option>`; }).join('')}</select></div>`;
   h += `<div class="small dim" style="margin-top:8px">${d.mods.filter(Boolean).map(m => `<div>• <b>${MODULES[m].name}</b>: ${MODULES[m].desc}</div>`).join('')}</div>
     <div class="sec">Secondary colour <span class="tiny dim" style="text-transform:none;letter-spacing:0">(the main colour is always your civilisation's)</span></div>
     <div class="sw">${SHIP_COLORS.map(([nm, c]) => `<i class="${d.acc === c ? 'sel' : ''}" style="background:${c}" title="${nm}" data-a="setAcc" data-v="${c}"></i>`).join('')}</div></div>`;
@@ -90,7 +91,7 @@ function designHTML() {
     ${d.src ? `<button class="btn" style="width:100%;margin-top:8px" data-a="saveLook" ${iconOk ? '' : 'disabled'}>Save look only (icon and colour)</button><div class="tiny dim" style="margin-top:4px">Restyles ${esc(design(d.src).name)} and its ${shipsOfDesign(d.src)} ship${shipsOfDesign(d.src) === 1 ? '' : 's'} in service. Nothing else changes.${design(d.src).std ? ' Starting designs keep this look in new games.' : ''}</div>` : ''}</div></div>`;
   return h;
 }
-function modFits(hull, m) { return hull === 'light' && (m === 'colony' || m === 'cargo') ? 'medium or heavy hull' : hull !== 'light' && m === 'booster' ? 'light hulls only' : null; }
+function modFits(hull, m) { if (MODULES[m].tech && !has(MODULES[m].tech)) return 'needs ' + TECH[MODULES[m].tech].name; if (hull === 'light' && m === 'assault') return 'medium or heavy hull'; return hull === 'light' && (m === 'colony' || m === 'cargo') ? 'medium or heavy hull' : hull !== 'light' && m === 'booster' ? 'light hulls only' : null; }
 function newDesignEdit() { const f = freeIcons(null); return {name: 'New Design', hull: 'light', mods: ['tel_m', ''], icon: f[0] || 'dart', acc: '#eef2f8', src: null}; }
 ACT.openDesign = () => { UI.designEdit = newDesignEdit(); return modal({title: 'Ship Design', w: 1100, kind: 'design', body: designHTML(), foot: `<button class="btn" data-a="newDesignEd">New design</button><button class="btn" data-a="mclose">Close</button>`}).then(() => { renderSide(); UI.dirty = true; }); };
 ACT.newDesignEd = () => { UI.designEdit = newDesignEdit(); modalBody(designHTML()); };
@@ -140,7 +141,7 @@ function saveTo(slot) {
 function autosave() { if (S && !S.over) saveTo('auto'); }
 function migrateSave(d) { d.version = GAME_VERSION; d.known = d.known || {}; for (const st of d.stars || []) d.known[st.id] = 1; if (!d.budget) d.budget = {perm: 0, temp: [], seen: {}}; { const ck = Object.keys(d.budget.seen || {}).filter(k => /^core\d+$/.test(k)); if (ck.length) { d.budget.perm -= ck.length - 1; ck.forEach(k => delete d.budget.seen[k]); d.budget.seen.core = 1; } } d.newsLog = d.newsLog || []; for (const x of d.designs || []) if (x.id === 'scout' && x.mods.length === 1 && x.mods[0] === 'tel_m') x.mods.push('booster'); for (const b of d.bodies || []) if (b.col && b.col.outpost && !b.col.mode) b.col.mode = 'build'; if ((d.designs || []).some(x => x.id === 'probe')) { for (const f of d.fleets || []) for (const sh of f.ships) if (sh.d === 'probe') sh.d = 'scout'; d.designs = d.designs.filter(x => x.id !== 'probe'); }
   for (const x of d.designs || []) delete x.obsolete; fixDesignIcons(d.designs || []); d.msgs = d.msgs || []; d.journal = d.journal || []; d.hist = d.hist || []; return d; }
-function loadFrom(slot) { const r = readSlot(slot); if (!r) return false; try { S = migrateSave(JSON.parse(r.data)); updateKnowledge(true); } catch (e) { toast('That save could not be read.'); return false; } startPlaying(false); return true; }
+function loadFrom(slot) { const r = readSlot(slot); if (!r) return false; try { S = migrateSave(JSON.parse(r.data)); ensureCivs(); updateKnowledge(true); } catch (e) { toast('That save could not be read.'); return false; } startPlaying(false); return true; }
 function savesHTML(canSave) {
   let h = `<table class="list"><tr><th>Slot</th><th>Civilisation</th><th>Year</th><th>Saved</th><th></th></tr>`;
   for (const s of ['auto', 1, 2, 3, 4, 5]) { const r = readSlot(s);
@@ -171,9 +172,13 @@ const HELP = `<div class="small" style="line-height:1.65">
 <h3>What's shared</h3><p>Production stays with each colony. Research and credits go into one empire-wide total. Food is shared by everything at the same star. Outposts can send their production to a colony in their system.</p>
 <h3>Freighters</h3><p>A trade route between two of your systems carries settlers and food out and brings trade back. Short routes pay best.</p>
 <h3>Staying on top</h3><p>The Idle button in the top bar counts colonies with nothing to build and ships waiting for orders. Each click (or its hotkey, Space unless changed) goes to the next one: colonies first, then ships, and round again. The research bar turns red when nothing is being researched.</p>
-<h3>Map controls</h3><p>Drag to rotate, right-drag or Shift-drag to pan, scroll to zoom. Stars sit on pins above or below a flat reference plane through the Sun. Click a star or ship; with a ship selected, click a star to send it.</p>
+%ALIENS%<h3>Map controls</h3><p>Drag to rotate, right-drag or Shift-drag to pan, scroll to zoom. Stars sit on pins above or below a flat reference plane through the Sun. Click a star or ship; with a ship selected, click a star to send it.</p>
 <h3>Keys</h3><p>%KEYS% · Esc: close. You can change these in Settings → Hotkeys.</p></div>`;
-ACT.openHelp = () => modal({title: 'How to play', w: 760, body: HELP.replace('%KEYS%', HOTKEYS.map(([a, l]) => keyName(hotkey(a)) + ': ' + l[0].toLowerCase() + l.slice(1)).join(' · ')), foot: `<button class="btn primary" data-a="mclose">Got it</button>`});
+const ALIEN_HELP = `<h3>Other civilizations</h3><p>Some worlds hold <b>Prespacers</b>: civilizations from the stone age to the modern age that cannot reach space. A survey of their system finds them. Their homeworld and outposts cannot be settled while they are free.</p>
+<p><b>Study</b>: a Science Lab ship in orbit learns their language from afar; it reveals their culture. <b>Landing party</b>: a Science Lab ship sends a team to meet them; they may attack it (safer once you know their language), which loses the ship's Science Lab. Ships and colonies in their system may be spotted.</p>
+<p><b>Diplomacy</b> (once met and their language is learned): <b>Trade</b> brings a few credits a year and slowly raises their tech; <b>Give</b> spends credits each year to raise them much faster and win their trust. Nobody advances past the modern age in this version.</p>
+<p><b>Ground Forces</b> research unlocks Assault Pods (10,000 troops each; empty pods refill at your colonies). Rifles and armor make each pod stronger; worlds harsh to humans weaken your troops until you have environment suits. An assault shows your chance first. <b>Enslave</b>: the world becomes your outpost, worked under guard; garrisons cost upkeep, and too few troops lead to uprisings that can become full revolts. <b>Exterminate</b>: the world is free to settle, at a cost to your score.</p>`;
+ACT.openHelp = () => modal({title: 'How to play', w: 760, body: HELP.replace('%ALIENS%', S && S.contact ? ALIEN_HELP : '').replace('%KEYS%', HOTKEYS.map(([a, l]) => keyName(hotkey(a)) + ': ' + l[0].toLowerCase() + l.slice(1)).join(' · ')), foot: `<button class="btn primary" data-a="mclose">Got it</button>`});
 
 // ---------- end screen ----------
 function drawHistChart(cvs) {
@@ -193,7 +198,7 @@ async function showEnd() {
   if (!S.recorded) { S.recorded = true; try { const hof = JSON.parse(localStorage.getItem('starwake.hof') || '[]');
     hof.push({date: Date.now(), name: S.empire.name, race: 'Humans', color: S.empire.color, result: o.result, turn: S.turn, year: S.year, score: sc.total, size: LENGTHS[S.len].label, shape: '', rivals: 0, version: GAME_VERSION});
     localStorage.setItem('starwake.hof', JSON.stringify(hof)); localStorage.removeItem(SKEY('auto')); } catch (e) {} }
-  const rows = [['Systems visited', sc.explored], ['Systems surveyed', sc.surveyed], ['Life discovered', sc.life], ['Anomalies', sc.anomalies], ['Breakthroughs', sc.breakthroughs], ['Technologies', sc.techs], ['Colonies', sc.colonies], ['Population', sc.population]];
+  const rows = [['Systems visited', sc.explored], ['Systems surveyed', sc.surveyed], ['Life discovered', sc.life], ['Anomalies', sc.anomalies], ['Breakthroughs', sc.breakthroughs], ['Technologies', sc.techs], ['Colonies', sc.colonies], ['Population', sc.population], ['Alien civilizations', sc.aliens]];
   await modal({title: o.result === 'retired' ? 'Retired' : 'The Age of Exploration Ends', w: 980, noClose: true, kind: 'end',
     body: `<p>${esc(o.why)}</p><div class="row" style="gap:16px;align-items:stretch;flex-wrap:wrap">
       <div class="card" style="flex:1;min-width:240px"><div class="sec" style="margin-top:0">Final score</div><div style="font-size:38px;font-weight:700" class="amber">${sc.total}</div><table class="statt small"><tr><td class="dim tiny">Points from</td><td></td></tr>${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table></div>

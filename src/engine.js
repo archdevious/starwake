@@ -134,6 +134,7 @@ function newGame(o) {
   const gc = shuffle(S.stars.filter(s => s.ly >= 10 && s.ly <= L.radius - 2 && s.name !== 'Alpha Centauri' && s.bodies.length));
   gc.slice(0, o.len === 'long' ? 3 : 2).forEach(s => s.guard = true);
   assignLife();
+  S.civs = []; S.contact = false; placeCivs();
   // anomalies
   const ev = shuffle(EVENTS.map(e => e.id));
   let k = 0;
@@ -215,7 +216,8 @@ function newFleetAt(starId, did) {
 }
 function fleetSpeed(f) { let v = 1; for (const sh of f.ships) v = Math.min(v, designSpeed(design(sh.d))); return v; }
 function fleetTel(f) { let v = 0; for (const sh of f.ships) v = Math.max(v, designTel(design(sh.d))); return v; }
-function fleetHas(f, m) { return f.ships.some(sh => designHas(design(sh.d), m)); }
+function shipHas(sh, m) { return designHas(design(sh.d), m) && !(sh.lost && sh.lost.includes(m)); }
+function fleetHas(f, m) { return f.ships.some(sh => shipHas(sh, m)); }
 function fleetCargo(f) { let n = 0; for (const sh of f.ships) n += design(sh.d).mods.filter(m => m === 'cargo').length; return n; }
 function cargoCap(f) { const n = fleetCargo(f) * (has('interstellar_commerce') ? 1.25 : 1); return {pop: n * 0.01, food: n * 10}; }
 function etaTo(f, starId) { const s = ST(starId); return Math.max(1, Math.ceil((d3(f, s) - 1e-6) / fleetSpeed(f))); }
@@ -285,6 +287,7 @@ function colOut(b) {
   const lvl = Math.max(0, STAGE_ORDER.indexOf(stg) - 1);
   let food = st.food * fert * fm.food + (p.agridomes ? (3 + 3 * Math.max(0, lvl - 0)) * (has('bt_seeds') ? 2 : 1) : 0) + (c.home ? S.mods.earthFood : 0);
   if (stg === 'outpost') { food = 0; }
+  if (c.enslaved) prod += slaveProd(b);
   return {stage: stg, prod: r1(prod * bf), rp: r1(rp * bf), bc: r1(bc * bf), food: r1(food), eat: st.eat, cap: popCap(b), hab: h};
 }
 function systemFood(starId) {
@@ -310,8 +313,10 @@ const OUTPOST_PROJ_COST = 60, SETTLE_PROJ_COST = 120;
 function itemCost(b, it) { return it.kind === 'proj' ? projCost(it.id) : it.kind === 'outpost' || it.kind === 'settle' ? Math.round((it.kind === 'outpost' ? OUTPOST_PROJ_COST : SETTLE_PROJ_COST) * (has('megastructures') ? 0.75 : 1)) : shipCost(design(it.id), b); }
 function itemName(it) { return it.kind === 'proj' ? PROJECTS[it.id].name : it.kind === 'outpost' ? 'Outpost on ' + B(it.id).name : it.kind === 'settle' ? 'Settle ' + B(it.id).name : design(it.id).name; }
 function peopleCanLive(t) { const h = hab(t); return h !== 'none' && h !== 'outpost'; }
-function settleTargets(b) { if (b.col.outpost) return []; return ST(b.star).bodies.map(B).filter(x => x !== b && peopleCanLive(x) && (x.owner == null || (x.owner === 0 && x.col && x.col.outpost))); }
-function outpostTargets(b) { return ST(b.star).bodies.map(B).filter(x => x.owner == null && hab(x) !== 'none'); }
+function settleTargets(b) { if (b.col.outpost) return []; return ST(b.star).bodies.map(B).filter(x => x !== b && peopleCanLive(x) && !civBlocks(x) && (x.owner == null || (x.owner === 0 && x.col && x.col.outpost))); }
+function outpostTargets(b) { return ST(b.star).bodies.map(B).filter(x => x.owner == null && hab(x) !== 'none' && !civBlocks(x)); }
+// a world already ordered (outpost or settle) by any of our colonies in its system
+function claimedAt(t) { for (const b of colonies(true)) if (b.star === t.star && b.col.queue.some(x => (x.kind === 'outpost' || x.kind === 'settle') && x.id === t.id)) return b; return null; }
 function upgradedFrom(c, id) { return Object.keys(c.proj).some(k => PROJECTS[k] && PROJECTS[k].replaces === id); }
 function projReason(b, id) {
   const P = PROJECTS[id], c = b.col;
@@ -333,6 +338,8 @@ function designReason(d) {
   if (d.hull === 'heavy' && !has('heavy_hulls')) return 'Heavy hulls need Heavy Hull Construction';
   if (d.hull === 'light' && d.mods.some(m => m === 'colony' || m === 'cargo')) return 'Colony Pods and Cargo Bays need a medium or heavy hull';
   if (d.hull !== 'light' && d.mods.includes('booster')) return 'Boosters only fit light hulls';
+  if (d.hull === 'light' && d.mods.includes('assault')) return 'Assault Pods need a medium or heavy hull';
+  if (d.mods.includes('assault') && !has('ground_doctrine')) return 'Assault Pods need Ground Assault Doctrine';
   return null;
 }
 function shipReason(b, d) {
@@ -365,6 +372,7 @@ function completeItem(b, it) {
 function settlerCount() { return (has('hibernation') ? 0.04 : 0.02) * (S.mods.settlers || 1); }
 function colonizeCheck(f, b, kind) {
   if (f.star !== b.star || f.dest != null) return 'The ship must be in orbit';
+  if (civBlocks(b)) return 'The ' + civRace(civOfBody(b)).name + ' live there';
   if (kind === 'colony') {
     if (!fleetHas(f, 'colony')) return 'No Colony Pod in this fleet';
     const h = hab(b);
@@ -401,7 +409,7 @@ function colonize(f, b, kind) {
 
 // ---------- research ----------
 function techCost(id) { const t = TECH[id]; return Math.round(t.cost * (id === 'exotic_matter' && has('bt_exotic') ? 0.5 : 1)); }
-function availableTechs() { return TECHS.filter(t => !has(t.id) && t.req.every(has)); }
+function availableTechs() { return TECHS.filter(t => !has(t.id) && t.req.every(has) && (!t.contact || S.contact)); }
 function setResearch(id) { if (!TECH[id] || has(id) || !TECH[id].req.every(has)) return false; if (S.res && S.res.tech !== id) S.rpBank += S.res.prog; if (!S.res || S.res.tech !== id) S.res = {tech: id, prog: 0}; return true; }
 function learn(id, how) { if (has(id)) return; S.techs[id] = 1; msg((how || 'Research complete') + ': ' + TECH[id].name + '. ' + TECH[id].desc, null, 'tech'); }
 
@@ -443,6 +451,7 @@ function visit(s, how, quiet) {
 }
 function surveyStar(s, who, quiet) {
   if (S.surveyed[s.id]) return; S.surveyed[s.id] = 1;
+  civDiscover(s, quiet);
   if (quiet) return;
   const life = s.bodies.map(B).filter(b => b.life !== 'none');
   msg((who ? who + ' completed a survey of ' + s.name : 'Survey of ' + s.name + ' complete') + (life.length ? ': ' + life.map(b => LIFE[b.life].toLowerCase() + ' on ' + b.name).join(', ') + '!' : '. No life found.'), s.id, 'survey');
@@ -467,7 +476,7 @@ function resolveChoice(f, ci) {
   if (o.bt) { if (!has(o.bt)) { S.techs[o.bt] = 1; res.gains.push('Breakthrough: ' + TECH[o.bt].name + ' (' + TECH[o.bt].desc + ')'); } else { S.rpBank += 150; res.gains.push('+150 research'); } }
   if (o.reveal) { const unk = S.stars.filter(x => !S.visited[x.id]).sort((a, b) => d3(a, s) - d3(b, s)).slice(0, o.reveal); unk.forEach(x => { S.visited[x.id] = 1; S.known[x.id] = 1; }); if (unk.length) res.gains.push('Charted: ' + unk.map(x => x.name).join(', ')); }
   if (o.score) S.stats.anomScore += o.score;
-  if (o.lose) { const i = f.ships.findIndex(sh => designHas(design(sh.d), 'lab')); f.ships.splice(i >= 0 ? i : 0, 1); S.stats.lost++; res.gains.push('The ship was lost'); res.lost = true; cleanupFleets(); }
+  if (o.lose) { const i = f.ships.findIndex(sh => shipHas(sh, 'lab')); f.ships.splice(i >= 0 ? i : 0, 1); S.stats.lost++; res.gains.push('The ship was lost'); res.lost = true; cleanupFleets(); }
   journal(ev.title + ' at ' + s.name + ': ' + o.t, s.id);
   return res;
 }
@@ -573,13 +582,13 @@ function processEconomy() {
     rp += o.rp; bc += o.bc;
     if (supplyTarget(b)) continue;
     let prod = (o.prod + (supplied[b.id] || 0)) * (broke ? 0.5 : 1);
-    while (c.queue.length && !itemValid(b, c.queue[0])) c.queue.shift();
-    if (!c.queue.length) { bc += prod * 0.5; c.prog = 0; continue; }
+    dropInvalid(b);
+    if (!c.queue.length) { bc += prod * 0.5; continue; }
     c.prog += prod;
     const it = c.queue[0], cost = itemCost(b, it);
     if (c.prog >= cost) {
       completeItem(b, it); c.prog = Math.min(c.prog - cost, cost); if (it.n > 1) it.n--; else c.queue.shift();
-      while (c.queue.length && !itemValid(b, c.queue[0])) c.queue.shift();
+      dropInvalid(b, true);
       if (!c.queue.length && !c.outpost) msg(b.name + ' has nothing to build.', b.star, 'idle');
     }
   }
@@ -609,9 +618,17 @@ function processEconomy() {
     if (S.res.prog >= cost) { S.rpBank = Math.min(S.res.prog - cost, cost); learn(S.res.tech); S.res = null; }
   }
   // upkeep
-  let up = 0; for (const f of S.fleets) for (const sh of f.ships) up += designCost(design(sh.d)) * 0.01;
+  let up = civUpkeep(); for (const f of S.fleets) for (const sh of f.ships) up += designCost(design(sh.d)) * 0.01;
   S.bc = r1(S.bc + bc - up);
   if (S.bc < 0) msg('The treasury is empty. Production is halved until credits recover: scrap idle ships or set a colony to Trade.', null, 'warn');
+}
+// drop queued items that can no longer be built; if the item being built goes, half its progress carries over
+function dropInvalid(b, fresh) {
+  const c = b.col;
+  while (c.queue.length && !itemValid(b, c.queue[0])) {
+    const it = c.queue.shift();
+    if (!fresh && c.prog > 0) { c.prog = Math.floor(c.prog * 0.5); if (it.kind === 'outpost' || it.kind === 'settle') msg(b.name + ': the order for ' + B(it.id).name + ' was cancelled because the world was claimed first. Half its progress carries over.', b.star, 'warn'); }
+  }
 }
 function supplyRate() { return has('orbital_logistics') ? 1 : 0.8; }
 function supplyTarget(b) {
@@ -620,8 +637,8 @@ function supplyTarget(b) {
 }
 function itemValid(b, it) {
   if (it.kind === 'ship') return !!design(it.id) && !shipReason(b, design(it.id));
-  if (it.kind === 'outpost') { const t = B(it.id); return !!t && t.star === b.star && t.owner == null && hab(t) !== 'none' && !b.col.outpost; }
-  if (it.kind === 'settle') { const t = B(it.id); return !!t && t !== b && t.star === b.star && !b.col.outpost && peopleCanLive(t) && (t.owner == null || (t.owner === 0 && !!t.col && !!t.col.outpost)); }
+  if (it.kind === 'outpost') { const t = B(it.id); return !!t && !civBlocks(t) && t.star === b.star && t.owner == null && hab(t) !== 'none' && !b.col.outpost; }
+  if (it.kind === 'settle') { const t = B(it.id); return !!t && !civBlocks(t) && t !== b && t.star === b.star && !b.col.outpost && peopleCanLive(t) && (t.owner == null || (t.owner === 0 && !!t.col && !!t.col.outpost)); }
   const P = PROJECTS[it.id], c = b.col;
   if ((c.outpost && !P.outpost) || (!c.outpost && P.outpostOnly) || (P.tech && !has(P.tech)) || (c.home && !P.space)) return false;
   if (P.giantOnly && b.cls !== 'gasgiant' && b.cls !== 'icegiant') return false;
@@ -633,7 +650,7 @@ function itemValid(b, it) {
 function totals() {
   let prod = 0, rp = 0, bc = 0, pop = 0, food = 0;
   for (const b of colonies(true)) { const o = colOut(b); prod += o.prod; rp += o.rp; bc += o.bc; pop += b.col.pop; }
-  let up = 0; for (const f of S.fleets) for (const sh of f.ships) up += designCost(design(sh.d)) * 0.01;
+  let up = civUpkeep(); for (const f of S.fleets) for (const sh of f.ships) up += designCost(design(sh.d)) * 0.01;
   const short = colonyStars().filter(s => ST(s).short || systemFood(s).net < 0 && ST(s).stock < 5);
   return {prod: r1(prod), rp: r1(rp), bc: r1(bc), up: r1(up), net: r1(bc - up), pop, short};
 }
@@ -643,6 +660,7 @@ function endTurn() {
   updateKnowledge();
   processSurveys();
   processEconomy();
+  processCivs();
   autoExplore();
   budgetYearly();
   S.turn++; S.year++; S._inTurn = false;
@@ -711,6 +729,7 @@ function score() {
     life: micro * SCORE_W.microbial + eco * SCORE_W.ecosystem, anomalies: S.stats.anomScore, breakthroughs: bts * SCORE_W.breakthrough, techs: techs * SCORE_W.tech,
     colonies: settle * SCORE_W.settlement + city * SCORE_W.city + core * SCORE_W.core, population: Math.round(Math.log10(1 + pop) * SCORE_W.popLog),
   };
+  const cv = S.civs || []; p.aliens = cv.filter(c => c.known).length * 10 + cv.filter(c => c.lang >= 100).length * 5 - (S.stats.extinct || 0) * 15;
   p.total = Object.values(p).reduce((a, b) => a + b, 0);
   return p;
 }

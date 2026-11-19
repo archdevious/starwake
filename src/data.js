@@ -1,6 +1,6 @@
 'use strict';
 // ===================== STARWAKE v2 — STATIC DATA =====================
-const GAME_VERSION = 16;
+const GAME_VERSION = 17;
 const SAVE_FORMAT = 2;
 const START_YEAR = 2326;
 const LENGTHS = {
@@ -95,6 +95,7 @@ const MODULES = {
   colony:  {name: 'Colony Pod',       mass: 4, cost: 120, desc: 'Carries 20,000 settlers to found or grow a colony (twice as many with Hibernation). Needs a medium or heavy hull.'},
   outpost: {name: 'Outpost Kit',      mass: 2, cost: 80,  desc: 'Builds a robotic outpost on almost any world, for star systems where we have no colony. Where we already have a colony, order an outpost from that colony instead: it costs far less.'},
   booster: {name: 'Booster',          mass: 1, cost: 20,  desc: '+10% of light speed (30% becomes 40%). Only one Booster counts. Light hulls only.'},
+  assault: {name: 'Assault Pod',      mass: 3, cost: 90, tech: 'ground_doctrine', desc: 'Carries 10,000 troops to land on an alien world. Troops cost a little upkeep while aboard. Needs a medium or heavy hull.'},
   cargo:   {name: 'Cargo Bay',        mass: 2, cost: 40,  desc: 'Each trip carries 10,000 settlers and 10 food from your colonies, and brings trade back on a trade route. Needs a medium or heavy hull.'},
 };
 const DEFAULT_DESIGNS = [
@@ -112,7 +113,7 @@ const DRIVE_TECH = [null, 'fusion_torch', 'antimatter_catalysis', 'laser_sails',
 
 // ---------- Research ----------
 const FIELDS = {prop: {name: 'Propulsion', color: '#5ac8ff'}, sens: {name: 'Sensors', color: '#d07aff'}, bio: {name: 'Biology', color: '#6ae07a'},
-  eng: {name: 'Engineering', color: '#e8a84a'}, phys: {name: 'Physics', color: '#ff7a7a'}, soc: {name: 'Society', color: '#ffd860'}};
+  eng: {name: 'Engineering', color: '#e8a84a'}, phys: {name: 'Physics', color: '#ff7a7a'}, soc: {name: 'Society', color: '#ffd860'}, gnd: {name: 'Ground Forces', color: '#ff9a5a', contact: true}};
 const TECHS = [
   {id: 'fusion_torch', f: 'prop', cost: 200, req: [], name: 'Fusion Torch Drive', desc: 'Top speed 40% of light speed.'},
   {id: 'antimatter_catalysis', f: 'prop', cost: 550, req: ['fusion_torch'], name: 'Antimatter-Catalysed Fusion', desc: 'Top speed 55% of light speed.'},
@@ -150,6 +151,14 @@ const TECHS = [
   {id: 'interplanetary_markets', f: 'soc', cost: 1000, req: ['interstellar_commerce'], name: 'Interplanetary Markets', desc: 'Unlocks the Trade Exchange, an upgrade of the Trade Port (+50% credits).'},
   {id: 'colonial_charter', f: 'soc', cost: 550, req: [], name: 'Colonial Charters', desc: 'Settlements grow 50% faster.'},
   {id: 'unified_science', f: 'soc', cost: 1300, req: ['quantum_computing'], name: 'Unified Science Academy', desc: '+20% research everywhere.'},
+  {id: 'ground_doctrine', f: 'gnd', cost: 400, req: [], contact: true, name: 'Ground Assault Doctrine', desc: 'Unlocks the Assault Pod ship module (10,000 troops each) for landing on alien worlds.'},
+  {id: 'laser_rifles', f: 'gnd', cost: 500, req: ['ground_doctrine'], contact: true, name: 'Laser Rifles', desc: 'Our troops fight harder: +5 strength per pod.'},
+  {id: 'powered_armor', f: 'gnd', cost: 600, req: ['ground_doctrine'], contact: true, name: 'Powered Armor', desc: '+5 strength per pod.'},
+  {id: 'field_biosuits', f: 'gnd', cost: 700, req: ['ground_doctrine'], contact: true, name: 'Field Biosuits', desc: 'Troops lose 25% less strength on worlds harsh to humans.'},
+  {id: 'occupation_logistics', f: 'gnd', cost: 1000, req: ['ground_doctrine'], contact: true, name: 'Occupation Logistics', desc: 'Uprisings are 25% less likely and garrisons cost 25% less upkeep.'},
+  {id: 'plasma_rifles', f: 'gnd', cost: 1600, req: ['laser_rifles'], contact: true, name: 'Plasma Rifles', desc: '+15 strength per pod (replaces Laser Rifles\' +5).'},
+  {id: 'combat_exo', f: 'gnd', cost: 1800, req: ['powered_armor'], contact: true, name: 'Combat Exoskeletons', desc: '+15 strength per pod (replaces Powered Armor\'s +5).'},
+  {id: 'sealed_suits', f: 'gnd', cost: 1500, req: ['field_biosuits'], contact: true, name: 'Sealed Environment Suits', desc: 'Troops lose half as much strength on harsh worlds (instead of 25% less).'},
   {id: 'xenology', f: 'soc', cost: 1800, req: ['biosignatures'], name: 'Xenology', desc: 'Anomalies give 50% more research.'},
 ];
 const TECH = {}; TECHS.forEach(t => TECH[t.id] = t);
