@@ -13,6 +13,7 @@ function startPlaying(isNew) {
 const FF_QUIET = new Set(['spot', 'info']);
 async function runEndTurn(skip) {
   if (UI.busy || !S || S.over || modalOpen()) return;
+  if (S.ev && S.ev.decq && S.ev.decq.length) { await showDecisions(); return; }
   UI.busy = true; $('#endturn').disabled = true; $('#ffwd').disabled = true; sfx('turn');
   try {
     let n = 0; const allMsgs = [];
@@ -27,6 +28,7 @@ async function runEndTurn(skip) {
     refresh(); showNews(); newsSound(S.msgs);
     for (const m of S.msgs) if (m.kind === 'life' && m.star != null) addPulse(m.star);
     if (S.popq && S.popq.length) { await showMilestones(); if (modalOpen()) return; }
+    if (S.ev && S.ev.decq && S.ev.decq.length) { await showDecisions(); if (modalOpen()) return; }
     if (S.over) { await showEnd(); return; }
     if (!S.res && availableTechs().length) await ACT.openResearch();
   } catch (e) { console.error(e); toast('Error: ' + e.message, 6000); }

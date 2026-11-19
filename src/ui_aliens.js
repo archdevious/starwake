@@ -254,3 +254,45 @@ function refitActions(f) {
   return [`<button class="btn sm" data-a="refitLab" data-v="${f.id}" ${S.bc < REFIT_COST ? 'disabled' : ''} title="Takes 1 year; the ship must stay in orbit">Refit Science Lab (${REFIT_COST} credits, 1 yr)</button>`];
 }
 ACT.refitLab = v => { const f = FL(v); if (S.bc < REFIT_COST) return; S.bc = r1(S.bc - REFIT_COST); f.task = {type: 'refit', star: f.star, paid: REFIT_COST}; f.auto = false; renderSide(); renderTop(); toast('Refitting the Science Lab'); };
+// ----- event decisions and effects on the colony panel -----
+async function showDecisions() {
+  const E = S.ev; if (!E || !E.decq) return;
+  while (E.decq.length) {
+    const d = E.decq[0];
+    if (d.body != null && !(B(d.body) && B(d.body).owner === 0 && B(d.body).col)) { E.decq.shift(); continue; }
+    const h = decisionHTML(d);
+    if (!h) { E.decq.shift(); continue; }
+    const btns = h.opts.map(([v, name], i) => `<button class="btn ${i === h.opts.length - 1 ? 'primary' : ''}" data-a="mclose" data-v="${v}" ${(v === 'pay' && S.bc < 50) || (v === 'take' && S.bc < 350) ? 'disabled title="Not enough credits"' : ''}>${name}</button>`).join('');
+    const go = h.go != null ? `<button class="btn" data-a="mclose" data-v="go">Go to ${esc(B(h.go).name)}</button>` : '';
+    const pr = modal({title: h.title + ' <span class="tiny" style="letter-spacing:2px;color:#ff9a7a;margin-left:8px">DECISION</span>', w: 480, noClose: true, kind: 'decision',
+      body: `<div class="small" style="line-height:1.55">${h.text}</div>${h.opts.map(([v, name, eff]) => `<div class="card small" style="margin-top:8px"><b>${name}</b><div class="dim">${eff}</div></div>`).join('')}`, foot: go + btns});
+    const r = await pr;
+    if (r === 'go') { centerOn(B(h.go).star); selectColony(h.go); toast('The decision will reopen when you end the year.', 4000); return; }
+    if (d.k === 'refugees') d.pick = UI.refPick;
+    E.decq.shift(); resolveDecision(d, r); showNews(); refresh(); autosave();
+  }
+}
+document.addEventListener('change', e => { if (e.target && e.target.id === 'refpick') UI.refPick = e.target.value; });
+function eventFxHTML(b) {
+  const c = b.col, out = [];
+  for (const x of c.fx || []) {
+    if (x.until && S.year >= x.until) continue;
+    const parts = []; if (x.prod != null && x.prod !== 1) parts.push((x.prod > 1 ? '+' : '−') + Math.round(Math.abs(1 - x.prod) * 100) + '% production'); if (x.rp != null && x.rp !== 1) parts.push('+' + Math.round((x.rp - 1) * 100) + '% research');
+    if (x.bc != null && x.bc !== 1) parts.push((x.bc > 1 ? '+' : '−') + Math.round(Math.abs(1 - x.bc) * 100) + '% credits'); if (x.grow === 0) parts.push('no growth'); else if (x.grow) parts.push('+' + Math.round((x.grow - 1) * 100) + '% growth'); if (x.keep) parts.push('keeps its own credits');
+    const good = (x.prod || 1) >= 1 && (x.bc || 1) >= 1 && x.grow !== 0;
+    out.push(`<div class="${good ? 'good' : 'bad'}">${esc(x.name)}: ${parts.join(', ')}${x.until ? ` · ${x.until - S.year} yr left` : ''}</div>`);
+  }
+  const inv = S.ev && S.ev.inv;
+  if (inv && !inv.cured && inv.star === b.star) {
+    const queued = c.queue.some(it => it.kind === 'cure');
+    out.push(`<div class="bad">Invasive species: no growth, food output halved, half its research goes to the cure.</div><div class="bar" style="margin:4px 0"><i style="width:${Math.min(100, inv.prog / inv.need * 100)}%;background:#5be08a"></i></div><div class="tiny dim">Cure ${Math.floor(inv.prog / inv.need * 100)}% found</div>${queued ? '<div class="tiny">This colony\'s production is going to the cure.</div>' : `<button class="btn sm" data-a="queueCure" data-v="${b.id}" style="margin-top:4px">Put production toward the cure</button>`}`);
+  }
+  const cm = S.ev && S.ev.comet;
+  if (cm && !cm.done && cm.body === b.id) {
+    const queued = c.queue.some(it => it.kind === 'deflect');
+    out.push(`<div class="bad">Comet strikes in ${cm.by - S.year} year${cm.by - S.year === 1 ? '' : 's'} unless the deflector (${cm.cost} production) is built.</div>${queued ? '' : `<button class="btn sm" data-a="queueDeflect" data-v="${b.id}" style="margin-top:4px">Build the deflector</button>`}`);
+  }
+  return out.length ? `<div class="sec">Events</div><div class="card small">${out.join('')}</div>` : '';
+}
+ACT.queueCure = v => { const b = B(+v); if (!b.col.queue.some(it => it.kind === 'cure')) b.col.queue.unshift({kind: 'cure'}); renderSide(); };
+ACT.queueDeflect = v => { const b = B(+v); if (!b.col.queue.some(it => it.kind === 'deflect')) b.col.queue.unshift({kind: 'deflect'}); renderSide(); };

@@ -16,7 +16,7 @@ ACT.mres = v => { if (UI.modalRes) UI.modalRes(v); };
 function confirmBox(title, text, yes) { modal({title, w: 460, body: `<div>${text}</div>`, foot: `<button class="btn" data-a="mres" data-v="no">Cancel</button><button class="btn danger" data-a="mres" data-v="yes">Confirm</button>`}).then(v => { if (v === 'yes') yes(); }); }
 
 // ---------- news feed ----------
-const NEWS_ICON = {life: '🌿', info: 'ℹ️', tech: '🔬', build: '🏗️', ship: '🚀', colony: '🪐', warn: '⚠️', arrive: '🔭', spot: '✧', survey: '🧪', lost: '💥', stage: '🏙️', idle: '💤', budget: '🛰️', route: '📦'};
+const NEWS_ICON = {evgood: '✨', evbad: '⚠️', life: '🌿', info: 'ℹ️', tech: '🔬', build: '🏗️', ship: '🚀', colony: '🪐', warn: '⚠️', arrive: '🔭', spot: '✧', survey: '🧪', lost: '💥', stage: '🏙️', idle: '💤', budget: '🛰️', route: '📦'};
 function showNews() {
   const el = $('#news'); if (!S) return;
   const list = S.msgs.slice(-14);

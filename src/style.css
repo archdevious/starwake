@@ -202,3 +202,5 @@ table.list tr.click{cursor:pointer}table.list tr.click:hover td{background:#121d
 .mile .mfx{margin-top:10px;padding:10px 12px;border:1px solid #23415a;border-radius:8px;font-size:13px;color:#9fd6ee;line-height:1.7}
 #mapfilters{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);display:flex;gap:6px;z-index:5}
 #mapfilters .btn{height:32px}
+#news .ni.k-evgood,#modal .ni.k-evgood{background:#2a2410;border-left:3px solid #ffc94a;padding-left:6px;color:#fbefcf}
+#news .ni.k-evbad,#modal .ni.k-evbad{background:#2c1216;border-left:3px solid #ff5d5d;padding-left:6px;color:#f8d6d6}

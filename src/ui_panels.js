@@ -125,6 +125,7 @@ function colonyPanel(b) {
     ${c.home ? budgetHTML() : ''}
     <div class="sec">Output per year</div>
     ${outputHTML(b, o)}
+    ${eventFxHTML(b)}
     <div class="sec">Focus</div><div class="row wrap" style="gap:4px">${Object.keys(FOCUS).map(k => `<button class="btn sm ${c.focus === k ? 'on' : ''}" data-a="focus" data-v="${b.id}:${k}" title="${esc(FOCUS[k].desc)}">${FOCUS[k].name}</button>`).join('')}</div>
     <div class="tiny dim" style="margin-top:3px">${esc(FOCUS[c.focus].desc)}</div>`;
   const built = Object.keys(c.proj).filter(k => PROJECTS[k]);

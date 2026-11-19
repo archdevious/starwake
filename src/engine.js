@@ -288,11 +288,13 @@ function colOut(b) {
   let food = st.food * fert * fm.food + (p.agridomes ? (3 + 3 * Math.max(0, lvl - 0)) * (has('bt_seeds') ? 2 : 1) : 0) + (c.home ? S.mods.earthFood : 0);
   if (stg === 'outpost') { food = 0; }
   if (c.enslaved) prod += slaveProd(b);
+  const fx = colFx(b); prod *= fx.prod; rp *= fx.rp; bc *= fx.bc; if (fx.keep) bc = 0;
   return {stage: stg, prod: r1(prod * bf), rp: r1(rp * bf), bc: r1(bc * bf), food: r1(food), eat: st.eat, cap: popCap(b), hab: h};
 }
 function systemFood(starId) {
   let made = 0, eaten = 0;
   for (const bid of ST(starId).bodies) { const b = B(bid); if (b.owner !== 0 || !b.col) continue; const o = colOut(b); made += o.food; eaten += o.eat; }
+  if (S.ev && S.ev.inv && !S.ev.inv.cured && S.ev.inv.star === starId) made *= 0.5;
   return {made: r1(made), eaten: r1(eaten), net: r1(made - eaten), stock: Math.floor(ST(starId).stock || 0)};
 }
 function suppliedTo(t) { let v = 0; for (const b of colonies(true)) if (supplyTarget(b) === t) v += colOut(b).prod * supplyRate(); return r1(v); }
@@ -305,14 +307,15 @@ function growthRate(b) {
   if (has('longevity')) g *= 1.25;
   if (has('bt_genome') && b.life !== 'none') g *= 1.25;
   if (stg === 'home') g = 0.004 * S.mods.growth;
+  if (b.col) g *= colFx(b).grow;
   return g;
 }
 function shipCost(d, b) { return Math.round(designCost(d) * (b && b.col.proj.elevator ? 0.75 : 1)); }
 function projCost(id) { return Math.round(PROJECTS[id].cost * (has('megastructures') ? 0.75 : 1)); }
 // projects that claim another world in the same system (no ship: they finish instantly with no travel)
 const OUTPOST_PROJ_COST = 60, SETTLE_PROJ_COST = 120;
-function itemCost(b, it) { return it.kind === 'proj' ? projCost(it.id) : it.kind === 'outpost' || it.kind === 'settle' ? Math.round((it.kind === 'outpost' ? OUTPOST_PROJ_COST : SETTLE_PROJ_COST) * (has('megastructures') ? 0.75 : 1)) : shipCost(design(it.id), b); }
-function itemName(it) { return it.kind === 'proj' ? PROJECTS[it.id].name : it.kind === 'outpost' ? 'Outpost on ' + B(it.id).name : it.kind === 'settle' ? 'Settle ' + B(it.id).name : design(it.id).name; }
+function itemCost(b, it) { if (it.kind === 'deflect') return (S.ev && S.ev.comet) ? S.ev.comet.cost : 1; if (it.kind === 'cure') { const v = S.ev && S.ev.inv; return v ? Math.max(1, Math.ceil((v.need - v.prog) / v.k)) : 1; } return it.kind === 'proj' ? projCost(it.id) : it.kind === 'outpost' || it.kind === 'settle' ? Math.round((it.kind === 'outpost' ? OUTPOST_PROJ_COST : SETTLE_PROJ_COST) * (has('megastructures') ? 0.75 : 1)) : shipCost(design(it.id), b); }
+function itemName(it) { if (it.kind === 'deflect') return 'Comet Deflector'; if (it.kind === 'cure') return 'Cure the Invasive Species'; return it.kind === 'proj' ? PROJECTS[it.id].name : it.kind === 'outpost' ? 'Outpost on ' + B(it.id).name : it.kind === 'settle' ? 'Settle ' + B(it.id).name : design(it.id).name; }
 function peopleCanLive(t) { const h = hab(t); return h !== 'none' && h !== 'outpost'; }
 function settleTargets(b) { if (b.col.outpost) return []; return ST(b.star).bodies.map(B).filter(x => x !== b && peopleCanLive(x) && !civBlocks(x) && (x.owner == null || (x.owner === 0 && x.col && x.col.outpost))); }
 function outpostTargets(b) { return ST(b.star).bodies.map(B).filter(x => x.owner == null && hab(x) !== 'none' && !civBlocks(x)); }
@@ -355,6 +358,7 @@ function shipReason(b, d) {
 function buyCost(b) { const c = b.col; if (!c.queue.length) return 0; const cost = itemCost(b, c.queue[0]); return Math.ceil(Math.max(0, cost - c.prog) * (c.prog > 0 ? 2 : 3)); }
 function buyItem(b) { const k = buyCost(b); if (k <= 0 || S.bc < k) return false; S.bc = r1(S.bc - k); b.col.prog = itemCost(b, b.col.queue[0]); return true; }
 function completeItem(b, it) {
+  if (it.kind === 'deflect') { const cm = S.ev.comet; cm.done = true; evMsg(true, 'The comet deflector on ' + b.name + ' did its job: the comet sailed safely past.', b.star); return; }
   if (it.kind === 'proj') {
     if (it.id === 'terraform') {
       b.tf = (b.tf || 0) + 1;
@@ -569,7 +573,7 @@ function routeArrive(f) {
     unloadCargo(f, false);
     const big = ourColoniesAt(here).sort((a, b) => b.col.pop - a.col.pop)[0];
     f.cargo = f.cargo || {pop: 0, food: 0, trade: null};
-    if (big) { const p = TRADE_PAY[stageOf(big)] || TRADE_PAY.city; f.cargo.trade = {prod: p[0], bc: p[1]}; }
+    if (big) { const p = TRADE_PAY[stageOf(big)] || TRADE_PAY.city, pm = S.ev && S.ev.pet && S.ev.pet.a === t.a && S.ev.pet.b === t.b ? 2 : 1; f.cargo.trade = {prod: p[0] * pm, bc: p[1] * pm}; }
     f.dest = t.a;
   } else if (here === t.a) {
     unloadCargo(f, true); loadCargo(f, t.b); routeCheck(f); f.dest = t.b;
@@ -597,11 +601,14 @@ function processEconomy() {
   for (const b of colonies(true)) { const t = supplyTarget(b); if (t) supplied[t.id] = (supplied[t.id] || 0) + colOut(b).prod * supplyRate(); }
   for (const b of colonies(true)) {
     const o = colOut(b), c = b.col;
-    rp += o.rp; bc += o.bc;
+    const inv = S.ev && S.ev.inv && !S.ev.inv.cured && S.ev.inv.star === b.star ? S.ev.inv : null;
+    if (inv) { inv.prog += o.rp * 0.5; rp += o.rp * 0.5; } else rp += o.rp;
+    bc += o.bc;
     if (supplyTarget(b)) continue;
     let prod = (o.prod + (supplied[b.id] || 0)) * (broke ? 0.5 : 1);
     dropInvalid(b);
     if (!c.queue.length) { bc += prod * 0.5; continue; }
+    if (c.queue[0].kind === 'cure') { if (inv) inv.prog += prod * inv.k; continue; }
     c.prog += prod;
     const it = c.queue[0], cost = itemCost(b, it);
     if (c.prog >= cost) {
@@ -658,6 +665,8 @@ function supplyTarget(b) {
   const t = B(c.supplyTo); return t && t.star === b.star && t.owner === 0 && t.col && !t.col.outpost ? t : null;
 }
 function itemValid(b, it) {
+  if (it.kind === 'deflect') { const cm = S.ev && S.ev.comet; return !!cm && !cm.done && cm.body === b.id; }
+  if (it.kind === 'cure') { const v = S.ev && S.ev.inv; return !!v && !v.cured && v.star === b.star; }
   if (it.kind === 'ship') return !!design(it.id) && !shipReason(b, design(it.id));
   if (it.kind === 'outpost') { const t = B(it.id); return !!t && !civBlocks(t) && t.star === b.star && t.owner == null && hab(t) !== 'none' && !b.col.outpost; }
   if (it.kind === 'settle') { const t = B(it.id); return !!t && !civBlocks(t) && t !== b && t.star === b.star && !b.col.outpost && peopleCanLive(t) && (t.owner == null || (t.owner === 0 && !!t.col && !!t.col.outpost)); }
@@ -683,6 +692,7 @@ function endTurn() {
   processSurveys();
   processEconomy();
   processCivs();
+  processEvents();
   autoExplore();
   budgetYearly();
   S.turn++; S.year++; S._inTurn = false;

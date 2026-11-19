@@ -209,6 +209,8 @@ table.list tr.click{cursor:pointer}table.list tr.click:hover td{background:#121d
 .mile .mfx{margin-top:10px;padding:10px 12px;border:1px solid #23415a;border-radius:8px;font-size:13px;color:#9fd6ee;line-height:1.7}
 #mapfilters{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);display:flex;gap:6px;z-index:5}
 #mapfilters .btn{height:32px}
+#news .ni.k-evgood,#modal .ni.k-evgood{background:#2a2410;border-left:3px solid #ffc94a;padding-left:6px;color:#fbefcf}
+#news .ni.k-evbad,#modal .ni.k-evbad{background:#2c1216;border-left:3px solid #ff5d5d;padding-left:6px;color:#f8d6d6}
 
 </style>
 </head>
@@ -248,7 +250,7 @@ const FAR_STARS=[{"n": "Achernar", "d": [0.184, -0.484, -0.855], "ly": 139}, {"n
 
 'use strict';
 // ===================== STARWAKE v2 — STATIC DATA =====================
-const GAME_VERSION = 20;
+const GAME_VERSION = 21;
 const SAVE_FORMAT = 2;
 const START_YEAR = 2326;
 const LENGTHS = {
@@ -954,11 +956,13 @@ function colOut(b) {
   let food = st.food * fert * fm.food + (p.agridomes ? (3 + 3 * Math.max(0, lvl - 0)) * (has('bt_seeds') ? 2 : 1) : 0) + (c.home ? S.mods.earthFood : 0);
   if (stg === 'outpost') { food = 0; }
   if (c.enslaved) prod += slaveProd(b);
+  const fx = colFx(b); prod *= fx.prod; rp *= fx.rp; bc *= fx.bc; if (fx.keep) bc = 0;
   return {stage: stg, prod: r1(prod * bf), rp: r1(rp * bf), bc: r1(bc * bf), food: r1(food), eat: st.eat, cap: popCap(b), hab: h};
 }
 function systemFood(starId) {
   let made = 0, eaten = 0;
   for (const bid of ST(starId).bodies) { const b = B(bid); if (b.owner !== 0 || !b.col) continue; const o = colOut(b); made += o.food; eaten += o.eat; }
+  if (S.ev && S.ev.inv && !S.ev.inv.cured && S.ev.inv.star === starId) made *= 0.5;
   return {made: r1(made), eaten: r1(eaten), net: r1(made - eaten), stock: Math.floor(ST(starId).stock || 0)};
 }
 function suppliedTo(t) { let v = 0; for (const b of colonies(true)) if (supplyTarget(b) === t) v += colOut(b).prod * supplyRate(); return r1(v); }
@@ -971,14 +975,15 @@ function growthRate(b) {
   if (has('longevity')) g *= 1.25;
   if (has('bt_genome') && b.life !== 'none') g *= 1.25;
   if (stg === 'home') g = 0.004 * S.mods.growth;
+  if (b.col) g *= colFx(b).grow;
   return g;
 }
 function shipCost(d, b) { return Math.round(designCost(d) * (b && b.col.proj.elevator ? 0.75 : 1)); }
 function projCost(id) { return Math.round(PROJECTS[id].cost * (has('megastructures') ? 0.75 : 1)); }
 // projects that claim another world in the same system (no ship: they finish instantly with no travel)
 const OUTPOST_PROJ_COST = 60, SETTLE_PROJ_COST = 120;
-function itemCost(b, it) { return it.kind === 'proj' ? projCost(it.id) : it.kind === 'outpost' || it.kind === 'settle' ? Math.round((it.kind === 'outpost' ? OUTPOST_PROJ_COST : SETTLE_PROJ_COST) * (has('megastructures') ? 0.75 : 1)) : shipCost(design(it.id), b); }
-function itemName(it) { return it.kind === 'proj' ? PROJECTS[it.id].name : it.kind === 'outpost' ? 'Outpost on ' + B(it.id).name : it.kind === 'settle' ? 'Settle ' + B(it.id).name : design(it.id).name; }
+function itemCost(b, it) { if (it.kind === 'deflect') return (S.ev && S.ev.comet) ? S.ev.comet.cost : 1; if (it.kind === 'cure') { const v = S.ev && S.ev.inv; return v ? Math.max(1, Math.ceil((v.need - v.prog) / v.k)) : 1; } return it.kind === 'proj' ? projCost(it.id) : it.kind === 'outpost' || it.kind === 'settle' ? Math.round((it.kind === 'outpost' ? OUTPOST_PROJ_COST : SETTLE_PROJ_COST) * (has('megastructures') ? 0.75 : 1)) : shipCost(design(it.id), b); }
+function itemName(it) { if (it.kind === 'deflect') return 'Comet Deflector'; if (it.kind === 'cure') return 'Cure the Invasive Species'; return it.kind === 'proj' ? PROJECTS[it.id].name : it.kind === 'outpost' ? 'Outpost on ' + B(it.id).name : it.kind === 'settle' ? 'Settle ' + B(it.id).name : design(it.id).name; }
 function peopleCanLive(t) { const h = hab(t); return h !== 'none' && h !== 'outpost'; }
 function settleTargets(b) { if (b.col.outpost) return []; return ST(b.star).bodies.map(B).filter(x => x !== b && peopleCanLive(x) && !civBlocks(x) && (x.owner == null || (x.owner === 0 && x.col && x.col.outpost))); }
 function outpostTargets(b) { return ST(b.star).bodies.map(B).filter(x => x.owner == null && hab(x) !== 'none' && !civBlocks(x)); }
@@ -1021,6 +1026,7 @@ function shipReason(b, d) {
 function buyCost(b) { const c = b.col; if (!c.queue.length) return 0; const cost = itemCost(b, c.queue[0]); return Math.ceil(Math.max(0, cost - c.prog) * (c.prog > 0 ? 2 : 3)); }
 function buyItem(b) { const k = buyCost(b); if (k <= 0 || S.bc < k) return false; S.bc = r1(S.bc - k); b.col.prog = itemCost(b, b.col.queue[0]); return true; }
 function completeItem(b, it) {
+  if (it.kind === 'deflect') { const cm = S.ev.comet; cm.done = true; evMsg(true, 'The comet deflector on ' + b.name + ' did its job: the comet sailed safely past.', b.star); return; }
   if (it.kind === 'proj') {
     if (it.id === 'terraform') {
       b.tf = (b.tf || 0) + 1;
@@ -1235,7 +1241,7 @@ function routeArrive(f) {
     unloadCargo(f, false);
     const big = ourColoniesAt(here).sort((a, b) => b.col.pop - a.col.pop)[0];
     f.cargo = f.cargo || {pop: 0, food: 0, trade: null};
-    if (big) { const p = TRADE_PAY[stageOf(big)] || TRADE_PAY.city; f.cargo.trade = {prod: p[0], bc: p[1]}; }
+    if (big) { const p = TRADE_PAY[stageOf(big)] || TRADE_PAY.city, pm = S.ev && S.ev.pet && S.ev.pet.a === t.a && S.ev.pet.b === t.b ? 2 : 1; f.cargo.trade = {prod: p[0] * pm, bc: p[1] * pm}; }
     f.dest = t.a;
   } else if (here === t.a) {
     unloadCargo(f, true); loadCargo(f, t.b); routeCheck(f); f.dest = t.b;
@@ -1263,11 +1269,14 @@ function processEconomy() {
   for (const b of colonies(true)) { const t = supplyTarget(b); if (t) supplied[t.id] = (supplied[t.id] || 0) + colOut(b).prod * supplyRate(); }
   for (const b of colonies(true)) {
     const o = colOut(b), c = b.col;
-    rp += o.rp; bc += o.bc;
+    const inv = S.ev && S.ev.inv && !S.ev.inv.cured && S.ev.inv.star === b.star ? S.ev.inv : null;
+    if (inv) { inv.prog += o.rp * 0.5; rp += o.rp * 0.5; } else rp += o.rp;
+    bc += o.bc;
     if (supplyTarget(b)) continue;
     let prod = (o.prod + (supplied[b.id] || 0)) * (broke ? 0.5 : 1);
     dropInvalid(b);
     if (!c.queue.length) { bc += prod * 0.5; continue; }
+    if (c.queue[0].kind === 'cure') { if (inv) inv.prog += prod * inv.k; continue; }
     c.prog += prod;
     const it = c.queue[0], cost = itemCost(b, it);
     if (c.prog >= cost) {
@@ -1324,6 +1333,8 @@ function supplyTarget(b) {
   const t = B(c.supplyTo); return t && t.star === b.star && t.owner === 0 && t.col && !t.col.outpost ? t : null;
 }
 function itemValid(b, it) {
+  if (it.kind === 'deflect') { const cm = S.ev && S.ev.comet; return !!cm && !cm.done && cm.body === b.id; }
+  if (it.kind === 'cure') { const v = S.ev && S.ev.inv; return !!v && !v.cured && v.star === b.star; }
   if (it.kind === 'ship') return !!design(it.id) && !shipReason(b, design(it.id));
   if (it.kind === 'outpost') { const t = B(it.id); return !!t && !civBlocks(t) && t.star === b.star && t.owner == null && hab(t) !== 'none' && !b.col.outpost; }
   if (it.kind === 'settle') { const t = B(it.id); return !!t && !civBlocks(t) && t !== b && t.star === b.star && !b.col.outpost && peopleCanLive(t) && (t.owner == null || (t.owner === 0 && !!t.col && !!t.col.outpost)); }
@@ -1349,6 +1360,7 @@ function endTurn() {
   processSurveys();
   processEconomy();
   processCivs();
+  processEvents();
   autoExplore();
   budgetYearly();
   S.turn++; S.year++; S._inTurn = false;
@@ -1696,6 +1708,126 @@ function civGarrisonYear(c) {
 }
 function civUpkeep() { let u = 0; for (const c of S.civs || []) if (c.status === 'enslaved') u += c.garrison / TROOPS_PER_POD * 2; for (const f of S.fleets) u += fleetTroops(f) / TROOPS_PER_POD * 0.5; return u * (has('occupation_logistics') ? 0.75 : 1); }
 function slaveProd(b) { const c = (S.civs || []).find(x => x.id === b.col.enslaved); if (!c || c.unrest) return 0; return SLAVE_PROD[c.stage] * (civRace(c).prod || 1); }
+
+// ---------- random events: each happens at most once per game, spread out, with good and bad kept in balance ----------
+const EV_GAP = 8, EV_CHANCE = 0.15, EV_START = 10;
+function evState() { if (!S.ev) S.ev = {done: {}, last: START_YEAR, goods: 0, bads: 0, streak: 0, decq: []}; S.ev.decq = S.ev.decq || []; return S.ev; }
+function people_(b) { return b.col && !b.col.outpost && b.col.pop > 0; }
+function settled(noHome) { return colonies().filter(b => people_(b) && !(noHome && b.col.home)); }
+function activeRoutes() { return S.fleets.filter(f => f.task && f.task.type === 'route'); }
+function addFx(b, fx) { b.col.fx = (b.col.fx || []).filter(x => x.id !== fx.id); b.col.fx.push(fx); }
+function colFx(b) {
+  const r = {prod: 1, rp: 1, bc: 1, grow: 1, keep: false}, c = b.col;
+  for (const x of c.fx || []) { if (x.until && S.year >= x.until) continue; if (x.prod != null) r.prod *= x.prod; if (x.rp != null) r.rp *= x.rp; if (x.bc != null) r.bc *= x.bc; if (x.grow != null) r.grow *= x.grow; if (x.keep) r.keep = true; }
+  const inv = S.ev && S.ev.inv; if (inv && !inv.cured && inv.star === b.star) r.grow = 0;
+  return r;
+}
+function lose(b, share) { const n = b.col.pop * share; b.col.pop = Math.max(0.001, b.col.pop - n); return n; }
+function pplText(m) { return people(m); }
+function evMsg(good, text, star) { msg(text, star, good ? 'evgood' : 'evbad'); journal(text, star); }
+// ----- the events -----
+const RANDOM_EVENTS = {
+  // good
+  pet: {type: 'good', ok: () => activeRoutes().some(f => !S.ev.pet), fire() {
+    const f = pick(activeRoutes()); const t = f.task; S.ev.pet = {a: t.a, b: t.b};
+    evMsg(true, 'A Freighter brought back a small, gentle animal from ' + ST(t.b).name + '. It has become the most popular pet in the ' + ST(t.a).name + ' system: trade coming back on the ' + routeName(t) + ' route is doubled.', t.a); }},
+  mining: {type: 'good', ok: () => colonies(true).some(b => b.col.outpost && b.min < 2), fire() {
+    const b = pick(colonies(true).filter(b => b.col.outpost && b.min < 2)); b.min = 2;
+    evMsg(true, 'Mining boom! The outpost on ' + b.name + ' struck a rich vein. Its minerals are now rich.', b.star); }},
+  genius: {type: 'good', ok: () => settled().length > 0, fire() {
+    const b = pick(settled()); addFx(b, {id: 'genius', name: 'Brilliant mind', rp: 1.25, until: S.year + 30});
+    evMsg(true, 'A brilliant mind has emerged on ' + b.name + '. Its research is 25% higher for 30 years.', b.star); }},
+  cargo: {type: 'good', ok: () => S.fleets.some(f => f.dest == null && f.star !== 0 && f.ships.length), fire() {
+    const f = pick(S.fleets.filter(f => f.dest == null && f.star !== 0 && f.ships.length)), v = ri(80, 150); S.bc = r1(S.bc + v);
+    evMsg(true, 'Our ' + fleetName0(f) + ' at ' + ST(f.star).name + ' found a lost freighter container drifting in the system. Its cargo was worth ' + v + ' credits.', f.star); }},
+  eureka: {type: 'good', ok: () => !!S.res, fire() {
+    const c = techCost(S.res.tech), v = Math.round(c * 0.25); S.res.prog += v;
+    evMsg(true, 'Eureka! A lucky insight puts our work on ' + TECH[S.res.tech].name + ' a quarter of the way ahead (+' + v + ' research).', null); }},
+  donor: {type: 'good', ok: () => S.designs.some(d => d.mods.includes('colony') && !designReason(d)), fire() {
+    const d = S.designs.find(d => d.mods.includes('colony') && !designReason(d)); const f = newFleetAt(0, d.id);
+    evMsg(true, 'A billionaire has paid for a ' + d.name + ' as a gift to humanity. It is waiting in orbit at Earth.', 0); }},
+  renaissance: {type: 'good', ok: () => colonies().some(b => ['city', 'core'].includes(stageOf(b)) && !b.col.home), fire() {
+    const b = pick(colonies().filter(b => ['city', 'core'].includes(stageOf(b)) && !b.col.home)); addFx(b, {id: 'renaissance', name: 'Renaissance', bc: 1.25, until: S.year + 20});
+    evMsg(true, b.name + ' has entered a cultural golden age. Its credits are 25% higher for 20 years.', b.star); }},
+  // bad
+  invasive: {type: 'bad', ok: () => activeRoutes().some(f => ST(f.task.a).bodies.some(id => people_(B(id)))), fire() {
+    const f = pick(activeRoutes().filter(f => ST(f.task.a).bodies.some(id => people_(B(id))))), sid = f.task.a, s = ST(sid);
+    const cols = s.bodies.map(B).filter(b => b.owner === 0 && b.col);
+    let R = 0, P = 0; for (const b of cols) { const o = colOut(b); R += o.rp; P += o.prod; }
+    R = Math.max(1, R); P = Math.max(1, P);
+    S.ev.inv = {star: sid, need: 10 * R, prog: 0, k: 0.93 * R / P, since: S.year}; s.stock = 0;
+    evMsg(false, 'An invasive species came back on a Freighter from ' + ST(f.task.b).name + ' and is destroying crops across the ' + s.name + ' system. Its food stores are gone, food output is halved and growth has stopped until a cure is found. Half the system\'s research now goes to the cure; its colonies can also put production toward it.', sid); }},
+  comet: {type: 'bad', ok: () => settled(true).length > 0, fire() {
+    const b = pick(settled(true)), cost = Math.max(40, Math.round(colOut(b).prod * 3.5));
+    S.ev.comet = {body: b.id, by: S.year + 5, cost};
+    S.ev.decq.push({k: 'comet', body: b.id});
+    evMsg(false, 'A comet is on course for ' + b.name + '. Unless a deflector is built within 5 years, it will strike.', b.star); }},
+  quake: {type: 'bad', ok: () => settled(true).length > 0, fire() {
+    const b = pick(settled(true)), n = lose(b, 0.1); addFx(b, {id: 'quake', name: 'Quake swarm', prod: 0.5, grow: 0, until: S.year + 10});
+    evMsg(false, 'A quake swarm has struck ' + b.name + ': ' + pplText(n) + ' people died. Its production is halved and growth has stopped for 10 years.', b.star); }},
+  recession: {type: 'bad', ok: () => true, fire() {
+    const e = colonies().find(b => b.col.home); addFx(e, {id: 'recession', name: 'Recession', prod: 0.75, bc: 0.75, until: S.year + 12});
+    evMsg(false, 'A deep recession has hit Earth. Its production and credits are 25% lower for 12 years.', 0); }},
+  disease: {type: 'bad', ok: () => colonies().some(b => ['settlement', 'city'].includes(stageOf(b)) && !b.col.home), fire() {
+    const b = pick(colonies().filter(b => ['settlement', 'city'].includes(stageOf(b)) && !b.col.home)), n = lose(b, 0.15); addFx(b, {id: 'disease', name: 'Disease', grow: 0, until: S.year + 8});
+    evMsg(false, 'Disease outbreak on ' + b.name + ': ' + pplText(n) + ' people died, and growth has stopped for 8 years.', b.star); }},
+  strike: {type: 'bad', ok: () => settled(true).length > 0, fire() { const b = pick(settled(true)); S.ev.decq.push({k: 'strike', body: b.id}); }},
+  // choices
+  independence: {type: 'choice', ok: () => colonies().some(b => stageOf(b) === 'city' && d3(ST(b.star), ST(0)) > 10), fire() {
+    const b = pick(colonies().filter(b => stageOf(b) === 'city' && d3(ST(b.star), ST(0)) > 10)); S.ev.decq.push({k: 'independence', body: b.id}); }},
+  refugees: {type: 'choice', ok: () => settled(true).some(b => popCap(b) - b.col.pop >= 1), fire() { S.ev.decq.push({k: 'refugees'}); }},
+};
+function processEvents() {
+  const E = evState();
+  // running effects
+  for (const b of colonies(true)) if (b.col.fx) {
+    for (const x of b.col.fx) if (x.until && S.year >= x.until && !x.ended) { x.ended = true; msg(b.name + ': ' + x.name + ' has ended.', b.star, 'info'); }
+    b.col.fx = b.col.fx.filter(x => !x.ended);
+  }
+  const inv = E.inv;
+  if (inv && !inv.cured) {
+    if (inv.prog >= inv.need || S.year - inv.since >= 30) { inv.cured = true; for (const b of ST(inv.star).bodies.map(B)) if (b.col) b.col.queue = b.col.queue.filter(it => it.kind !== 'cure'); evMsg(true, 'A cure for the invasive species in the ' + ST(inv.star).name + ' system has been found. Crops recover and growth resumes.', inv.star); }
+  }
+  const cm = E.comet;
+  if (cm && !cm.done && S.year >= cm.by) {
+    cm.done = true; const b = B(cm.body);
+    if (b && b.owner === 0 && b.col) { const n = lose(b, 1 / 3); b.col.queue = b.col.queue.filter(it => it.kind !== 'deflect'); evMsg(false, 'The comet struck ' + b.name + '. ' + pplText(n) + ' people died.', b.star); }
+  }
+  // a new event?
+  if (S.year < START_YEAR + EV_START || S.year - E.last < EV_GAP || rnd() > EV_CHANCE) return;
+  const avail = t => Object.keys(RANDOM_EVENTS).filter(k => RANDOM_EVENTS[k].type === t && !E.done[k] && RANDOM_EVENTS[k].ok());
+  let type;
+  if (E.streak >= 2) type = 'good';
+  else if (avail('choice').length && rnd() < 0.15) type = 'choice';
+  else type = rnd() < clamp(0.5 - 0.15 * (E.goods - E.bads), 0.2, 0.85) ? 'good' : 'bad';
+  let list = avail(type);
+  if (!list.length && type !== 'bad') list = avail(type === 'good' ? 'choice' : 'good');
+  if (!list.length) return;
+  const k = pick(list); E.done[k] = S.year; E.last = S.year;
+  const t = RANDOM_EVENTS[k].type;
+  if (t === 'good') { E.goods++; E.streak = 0; } else if (t === 'bad') { E.bads++; E.streak++; }
+  RANDOM_EVENTS[k].fire();
+}
+// ----- decisions (answered in a popup) -----
+function decisionHTML(d) {
+  const b = d.body != null ? B(d.body) : null;
+  if (d.k === 'comet') { const cm = S.ev.comet; return {title: 'Comet threat', text: `A comet is on course for ${esc(b.name)}. It will strike in 5 years unless we build a deflector there (${cm.cost} production).`,
+    opts: [['later', 'Decide later', 'The deflector can be ordered from the colony at any time before the deadline.'], ['build', 'Build the deflector now', 'It goes to the front of ' + esc(b.name) + '\'s build queue.']], go: b.id}; }
+  if (d.k === 'strike') return {title: 'Strike on ' + esc(b.name), text: `Workers on ${esc(b.name)} have walked off the job, demanding better pay for the hard years of building a new world.`,
+    opts: [['refuse', 'Refuse', esc(b.name) + ' makes 25% less production for 5 years.'], ['pay', 'Pay 50 credits', 'Work resumes at once.']], go: b.id};
+  if (d.k === 'independence') return {title: 'Independence movement', text: `${esc(b.name)}, ${d3(ST(b.star), ST(0)).toFixed(1)} light-years from Earth, demands the right to govern itself.`,
+    opts: [['refuse', 'Refuse', esc(b.name) + ' makes 25% less production for 10 years.'], ['grant', 'Grant self-rule', 'It keeps its own credits from now on, but grows 25% faster.']], go: b.id};
+  if (d.k === 'refugees') { const cand = settled(true).filter(b => popCap(b) - b.col.pop >= 1);
+    return {title: 'Refugee wave', text: `A crisis on Earth has left a million people wanting to leave for the colonies. Resettling them costs 350 credits.<div style="margin-top:8px">Settle them on: <select id="refpick">${cand.map(b => `<option value="${b.id}">${esc(b.name)} (${esc(ST(b.star).name)})</option>`).join('')}</select></div>`,
+      opts: [['away', 'Turn them away', 'Nothing changes.'], ['take', 'Take them in', '−350 credits. The colony gains a million people and the space budget rises by 1.']]}; }
+}
+function resolveDecision(d, r) {
+  const b = d.body != null ? B(d.body) : null;
+  if (d.k === 'comet') { if (r === 'build' && b.col && !b.col.queue.some(it => it.kind === 'deflect')) b.col.queue.unshift({kind: 'deflect'}); return; }
+  if (d.k === 'strike') { if (r === 'pay' && S.bc >= 50) { S.bc = r1(S.bc - 50); evMsg(true, 'Strike on ' + b.name + ': we paid 50 credits and work resumed.', b.star); } else { addFx(b, {id: 'strike', name: 'Strike', prod: 0.75, until: S.year + 5}); evMsg(false, 'Strike on ' + b.name + ': we refused. ' + b.name + ' makes 25% less production for 5 years.', b.star); } return; }
+  if (d.k === 'independence') { if (r === 'grant') { addFx(b, {id: 'selfrule', name: 'Self-rule', keep: true, grow: 1.25}); evMsg(true, b.name + ' now governs itself: it keeps its own credits but grows 25% faster.', b.star); } else { addFx(b, {id: 'refused', name: 'Unrest', prod: 0.75, until: S.year + 10}); evMsg(false, 'We refused ' + b.name + '\'s demand for self-rule. It makes 25% less production for 10 years.', b.star); } return; }
+  if (d.k === 'refugees') { if (r === 'take' && S.bc >= 350) { const t = B(+d.pick) || settled(true)[0]; S.bc = r1(S.bc - 350); t.col.pop += 1; evMsg(true, 'A million refugees from Earth have been resettled on ' + t.name + '.', t.star); budgetEvent(null, 1, 'Earth admires how the colonies took in its refugees.', t.star); } else { msg('We turned away the refugees from Earth.', 0, 'info'); journal('Turned away a wave of refugees from Earth.', 0); } }
+}
 
 'use strict';
 // ===================== STARWAKE v2 — UI CORE & 3D STAR MAP =====================
@@ -2397,6 +2529,7 @@ function colonyPanel(b) {
     ${c.home ? budgetHTML() : ''}
     <div class="sec">Output per year</div>
     ${outputHTML(b, o)}
+    ${eventFxHTML(b)}
     <div class="sec">Focus</div><div class="row wrap" style="gap:4px">${Object.keys(FOCUS).map(k => `<button class="btn sm ${c.focus === k ? 'on' : ''}" data-a="focus" data-v="${b.id}:${k}" title="${esc(FOCUS[k].desc)}">${FOCUS[k].name}</button>`).join('')}</div>
     <div class="tiny dim" style="margin-top:3px">${esc(FOCUS[c.focus].desc)}</div>`;
   const built = Object.keys(c.proj).filter(k => PROJECTS[k]);
@@ -2618,7 +2751,7 @@ ACT.mres = v => { if (UI.modalRes) UI.modalRes(v); };
 function confirmBox(title, text, yes) { modal({title, w: 460, body: `<div>${text}</div>`, foot: `<button class="btn" data-a="mres" data-v="no">Cancel</button><button class="btn danger" data-a="mres" data-v="yes">Confirm</button>`}).then(v => { if (v === 'yes') yes(); }); }
 
 // ---------- news feed ----------
-const NEWS_ICON = {life: '🌿', info: 'ℹ️', tech: '🔬', build: '🏗️', ship: '🚀', colony: '🪐', warn: '⚠️', arrive: '🔭', spot: '✧', survey: '🧪', lost: '💥', stage: '🏙️', idle: '💤', budget: '🛰️', route: '📦'};
+const NEWS_ICON = {evgood: '✨', evbad: '⚠️', life: '🌿', info: 'ℹ️', tech: '🔬', build: '🏗️', ship: '🚀', colony: '🪐', warn: '⚠️', arrive: '🔭', spot: '✧', survey: '🧪', lost: '💥', stage: '🏙️', idle: '💤', budget: '🛰️', route: '📦'};
 function showNews() {
   const el = $('#news'); if (!S) return;
   const list = S.msgs.slice(-14);
@@ -3162,6 +3295,48 @@ function refitActions(f) {
   return [`<button class="btn sm" data-a="refitLab" data-v="${f.id}" ${S.bc < REFIT_COST ? 'disabled' : ''} title="Takes 1 year; the ship must stay in orbit">Refit Science Lab (${REFIT_COST} credits, 1 yr)</button>`];
 }
 ACT.refitLab = v => { const f = FL(v); if (S.bc < REFIT_COST) return; S.bc = r1(S.bc - REFIT_COST); f.task = {type: 'refit', star: f.star, paid: REFIT_COST}; f.auto = false; renderSide(); renderTop(); toast('Refitting the Science Lab'); };
+// ----- event decisions and effects on the colony panel -----
+async function showDecisions() {
+  const E = S.ev; if (!E || !E.decq) return;
+  while (E.decq.length) {
+    const d = E.decq[0];
+    if (d.body != null && !(B(d.body) && B(d.body).owner === 0 && B(d.body).col)) { E.decq.shift(); continue; }
+    const h = decisionHTML(d);
+    if (!h) { E.decq.shift(); continue; }
+    const btns = h.opts.map(([v, name], i) => `<button class="btn ${i === h.opts.length - 1 ? 'primary' : ''}" data-a="mclose" data-v="${v}" ${(v === 'pay' && S.bc < 50) || (v === 'take' && S.bc < 350) ? 'disabled title="Not enough credits"' : ''}>${name}</button>`).join('');
+    const go = h.go != null ? `<button class="btn" data-a="mclose" data-v="go">Go to ${esc(B(h.go).name)}</button>` : '';
+    const pr = modal({title: h.title + ' <span class="tiny" style="letter-spacing:2px;color:#ff9a7a;margin-left:8px">DECISION</span>', w: 480, noClose: true, kind: 'decision',
+      body: `<div class="small" style="line-height:1.55">${h.text}</div>${h.opts.map(([v, name, eff]) => `<div class="card small" style="margin-top:8px"><b>${name}</b><div class="dim">${eff}</div></div>`).join('')}`, foot: go + btns});
+    const r = await pr;
+    if (r === 'go') { centerOn(B(h.go).star); selectColony(h.go); toast('The decision will reopen when you end the year.', 4000); return; }
+    if (d.k === 'refugees') d.pick = UI.refPick;
+    E.decq.shift(); resolveDecision(d, r); showNews(); refresh(); autosave();
+  }
+}
+document.addEventListener('change', e => { if (e.target && e.target.id === 'refpick') UI.refPick = e.target.value; });
+function eventFxHTML(b) {
+  const c = b.col, out = [];
+  for (const x of c.fx || []) {
+    if (x.until && S.year >= x.until) continue;
+    const parts = []; if (x.prod != null && x.prod !== 1) parts.push((x.prod > 1 ? '+' : '−') + Math.round(Math.abs(1 - x.prod) * 100) + '% production'); if (x.rp != null && x.rp !== 1) parts.push('+' + Math.round((x.rp - 1) * 100) + '% research');
+    if (x.bc != null && x.bc !== 1) parts.push((x.bc > 1 ? '+' : '−') + Math.round(Math.abs(1 - x.bc) * 100) + '% credits'); if (x.grow === 0) parts.push('no growth'); else if (x.grow) parts.push('+' + Math.round((x.grow - 1) * 100) + '% growth'); if (x.keep) parts.push('keeps its own credits');
+    const good = (x.prod || 1) >= 1 && (x.bc || 1) >= 1 && x.grow !== 0;
+    out.push(`<div class="${good ? 'good' : 'bad'}">${esc(x.name)}: ${parts.join(', ')}${x.until ? ` · ${x.until - S.year} yr left` : ''}</div>`);
+  }
+  const inv = S.ev && S.ev.inv;
+  if (inv && !inv.cured && inv.star === b.star) {
+    const queued = c.queue.some(it => it.kind === 'cure');
+    out.push(`<div class="bad">Invasive species: no growth, food output halved, half its research goes to the cure.</div><div class="bar" style="margin:4px 0"><i style="width:${Math.min(100, inv.prog / inv.need * 100)}%;background:#5be08a"></i></div><div class="tiny dim">Cure ${Math.floor(inv.prog / inv.need * 100)}% found</div>${queued ? '<div class="tiny">This colony\'s production is going to the cure.</div>' : `<button class="btn sm" data-a="queueCure" data-v="${b.id}" style="margin-top:4px">Put production toward the cure</button>`}`);
+  }
+  const cm = S.ev && S.ev.comet;
+  if (cm && !cm.done && cm.body === b.id) {
+    const queued = c.queue.some(it => it.kind === 'deflect');
+    out.push(`<div class="bad">Comet strikes in ${cm.by - S.year} year${cm.by - S.year === 1 ? '' : 's'} unless the deflector (${cm.cost} production) is built.</div>${queued ? '' : `<button class="btn sm" data-a="queueDeflect" data-v="${b.id}" style="margin-top:4px">Build the deflector</button>`}`);
+  }
+  return out.length ? `<div class="sec">Events</div><div class="card small">${out.join('')}</div>` : '';
+}
+ACT.queueCure = v => { const b = B(+v); if (!b.col.queue.some(it => it.kind === 'cure')) b.col.queue.unshift({kind: 'cure'}); renderSide(); };
+ACT.queueDeflect = v => { const b = B(+v); if (!b.col.queue.some(it => it.kind === 'deflect')) b.col.queue.unshift({kind: 'deflect'}); renderSide(); };
 
 'use strict';
 // ===================== STARWAKE v2 — GAME FLOW =====================
@@ -3178,6 +3353,7 @@ function startPlaying(isNew) {
 const FF_QUIET = new Set(['spot', 'info']);
 async function runEndTurn(skip) {
   if (UI.busy || !S || S.over || modalOpen()) return;
+  if (S.ev && S.ev.decq && S.ev.decq.length) { await showDecisions(); return; }
   UI.busy = true; $('#endturn').disabled = true; $('#ffwd').disabled = true; sfx('turn');
   try {
     let n = 0; const allMsgs = [];
@@ -3192,6 +3368,7 @@ async function runEndTurn(skip) {
     refresh(); showNews(); newsSound(S.msgs);
     for (const m of S.msgs) if (m.kind === 'life' && m.star != null) addPulse(m.star);
     if (S.popq && S.popq.length) { await showMilestones(); if (modalOpen()) return; }
+    if (S.ev && S.ev.decq && S.ev.decq.length) { await showDecisions(); if (modalOpen()) return; }
     if (S.over) { await showEnd(); return; }
     if (!S.res && availableTechs().length) await ACT.openResearch();
   } catch (e) { console.error(e); toast('Error: ' + e.message, 6000); }
