@@ -33,7 +33,7 @@ function habSeen(b) { // before life is known, the rating ignores hidden native 
 const SETTINGS = (() => { try { return Object.assign({near: 3, music: 40, sfx: 60}, JSON.parse(localStorage.getItem('starwake.settings') || '{}')); } catch (e) { return {near: 3, music: 40, sfx: 60}; } })();
 function saveSettings() { try { localStorage.setItem('starwake.settings', JSON.stringify(SETTINGS)); } catch (e) {} }
 // ---------- hotkeys (editable in Settings) ----------
-const HOTKEYS = [['endTurn', 'End the year', 'Enter'], ['skip', 'Skip ahead until something happens', 'f'], ['idle', 'Next idle colony, research or ship', ' '],
+const HOTKEYS = [['endTurn', 'End the year', 'Enter'], ['skip', 'Skip ahead until something happens', 'f'], ['idle', 'Next idle colony or ship', ' '],
   ['research', 'Research', 'r'], ['design', 'Ship design', 'd'], ['colonies', 'Colonies', 'c'], ['journal', 'Journal', 'j'], ['home', 'Center the map on the Sun', 'h']];
 const normKey = k => k.length === 1 ? k.toLowerCase() : k;
 function hotkey(act) { const s = SETTINGS.keys && SETTINGS.keys[act]; return s != null ? s : HOTKEYS.find(h => h[0] === act)[2]; }
@@ -45,7 +45,8 @@ function keyTitles() {
   if (b) b.title = `End the year (${keyName(hotkey('endTurn'))})`;
 }
 function nearest3(sid) { const s0 = ST(sid); return S.stars.filter(s => s.id !== sid && S.known[s.id]).map(s => ({s, d: d3(s0, s)})).sort((a, b) => a.d - b.d).slice(0, SETTINGS.near); }
-function lifeKnown(b) { return b.star === 0 || b.owner === 0 || S.surveyed[b.star] || has('biosignatures') || inGreatScope(ST(b.star)); }
+function telText(r) { return r > 0 ? (Math.round(r * 10) / 10) + ' ly' : 'none (sees worlds only in orbit)'; }
+function lifeKnown(b) { return b.star === 0 || b.owner === 0 || !!S.surveyed[b.star]; }
 function planetBall(b, px) {
   px = px || 30; const [c1, c2] = bodyColor(b);
   const bg = b.cls === 'belt' ? `radial-gradient(circle at 30% 30%,#aaa 0 10%,transparent 11%),radial-gradient(circle at 70% 60%,#888 0 12%,transparent 13%),radial-gradient(circle at 45% 75%,#999 0 9%,transparent 10%),radial-gradient(circle at 60% 25%,#777 0 7%,transparent 8%)`
@@ -63,7 +64,7 @@ function renderTop() {
     <div class="chip" title="Year (turn)"><span class="k">Year</span><b>${S.year}</b><span class="dim small">${S.turn}/${S.maxTurns}</span></div>
     <div class="chip" title="Credits (income minus ship upkeep)"><span class="k">Credits</span><b>${fmt(Math.floor(S.bc))}</b><span class="${t.net >= 0 ? 'good' : 'bad'}">${sgn(t.net)}</span></div>
     <div class="chip" title="Population"><span class="k">Population</span><b>${people(t.pop)}</b></div>
-    <div class="chip click rchip" data-a="openResearch" title="Research"><span class="k">Research</span>${res ? `<span class="ell" title="${esc(res.name)}">${esc(res.name)}</span><span class="dim">${Math.floor(S.res.prog + S.rpBank)}/${techCost(S.res.tech)}</span>` : (availableTechs().length ? '<span class="warn">Choose research!</span>' : '<span class="dim">All known</span>')}<span class="acc">+${fmt(t.rp)}</span></div>
+    <div class="chip click rchip ${!res && availableTechs().length ? 'residle' : ''}" data-a="openResearch" title="${!res && availableTechs().length ? 'Nothing is being researched. Click to choose.' : 'Research'}"><span class="k">Research</span>${res ? `<span class="ell" title="${esc(res.name)}">${esc(res.name)}</span><span class="dim">${Math.floor(S.res.prog + S.rpBank)}/${techCost(S.res.tech)}</span>` : (availableTechs().length ? '<span class="bad">Choose research!</span>' : '<span class="dim">All known</span>')}<span class="acc">+${fmt(t.rp)}</span></div>
     ${short.length ? `<div class="chip click" data-a="goStar" data-v="${short[0]}"><span class="bad">Food shortage: ${short.map(s => esc(ST(s).name)).join(', ')}</span></div>` : ''}
     <div class="chip" title="Top ship speed, as a share of light speed"><span class="k">Top speed</span><b>${pct(topSpeed())}</b></div><span id="attn"></span>`;
   renderAttn();
@@ -79,38 +80,34 @@ function idleFleets() { return S.fleets.filter(f => f.ships.length && ((f.dest =
 function attnKinds() {
   const k = [];
   const w = idleWorlds(); if (w.length) k.push({kind: 'world', n: w.length, list: w});
-  if (!S.res && availableTechs().length) k.push({kind: 'research'});
   const f = idleFleets(); if (f.length) k.push({kind: 'fleet', n: f.length, list: f});
   return k;
 }
-// What the next click (or hotkey) goes to: the next idle colony or ship after the last one shown; once past the last of a kind
-// (or after research was opened), it moves on to the next idle kind, wrapping round colonies → research → ships.
+// What the next click (or hotkey) goes to: the next idle colony or ship after the last one shown; past the last of a kind it
+// moves on to the other kind, so it goes round colonies → ships → colonies. Research has its own red box on the research bar.
 function attnPlan(ks) {
   if (!ks.length) return null;
   const i = ks.findIndex(x => x.kind === UI.attnKind);
-  if (i < 0) { // the kind shown last is no longer idle: carry on with the next kind in the cycle
-    const ord = ['world', 'research', 'fleet'], at = ord.indexOf(UI.attnKind);
-    const n = ks.find(x => ord.indexOf(x.kind) > at) || ks[0]; return {a: n, item: n.list ? n.list[0] : null};
-  }
+  if (i < 0) { const ord = ['world', 'fleet'], at = ord.indexOf(UI.attnKind); const n = ks.find(x => ord.indexOf(x.kind) > at) || ks[0]; return {a: n, item: n.list[0]}; }
   const a = ks[i];
   if (a.kind === 'world') { const j = UI.attnWorld == null ? 0 : a.list.findIndex(x => x.k > UI.attnWorld); if (j >= 0) return {a, item: a.list[j]}; }
-  else if (a.kind === 'fleet') { const f = UI.attnFleet == null ? a.list[0] : a.list.find(f => f.id > UI.attnFleet); if (f) return {a, item: f}; }
-  const n = ks[(i + 1) % ks.length]; return {a: n, item: n.list ? n.list[0] : null};
+  else { const f = UI.attnFleet == null ? a.list[0] : a.list.find(f => f.id > UI.attnFleet); if (f) return {a, item: f}; }
+  const n = ks[(i + 1) % ks.length]; return {a: n, item: n.list[0]};
 }
 function renderAttn() {
   const el = $('#attn'); if (!el || !S) return;
-  const ks = attnKinds(), p = attnPlan(ks);
-  if (!p) { el.innerHTML = `<div class="chip dim" title="Nothing needs your attention">Nothing idle</div>`; return; }
-  const word = a => a.kind === 'world' ? `${a.n} ${a.n === 1 ? 'colony' : 'colonies'}` : a.kind === 'research' ? 'research' : `${a.n} ${a.n === 1 ? 'ship' : 'ships'}`;
-  const parts = ks.map(a => `<span class="${a.kind === 'fleet' ? 'warn' : 'bad'} ${a === p.a ? 'attnnext' : ''}">${word(a)}</span>`).join('<span class="dim">·</span>');
-  el.innerHTML = `<div class="chip click attn" data-a="attnGo" title="Colonies with nothing being built, research with no topic, and ships waiting for orders (or freighters whose route is not at full value). Click or press ${keyName(hotkey('idle'))} to go to the underlined one; it steps through each, then moves on to the next kind."><span class="k">Idle</span>${parts}</div>`;
+  const ks = attnKinds();
+  if (!ks.length) { el.innerHTML = `<div class="chip dim" title="Nothing needs your attention">Nothing idle</div>`; return; }
+  const word = a => a.kind === 'world' ? `${a.n} ${a.n === 1 ? 'colony' : 'colonies'}` : `${a.n} ${a.n === 1 ? 'ship' : 'ships'}`;
+  // underline the kind you are looking at now (the one the button last took you to)
+  const parts = ks.map(a => `<span class="${a.kind === 'fleet' ? 'warn' : 'bad'} ${a.kind === UI.attnKind ? 'attnnext' : ''}">${word(a)}</span>`).join('<span class="dim">·</span>');
+  el.innerHTML = `<div class="chip click attn" data-a="attnGo" title="Colonies with nothing being built, and ships waiting for orders (or freighters whose route is not at full value). Click or press ${keyName(hotkey('idle'))} to go to the next one: colonies first, then ships. The underlined one is what you are looking at."><span class="k">Idle</span>${parts}</div>`;
 }
 ACT.attnGo = () => {
   if (!S) return;
   const p = attnPlan(attnKinds()); if (!p) return;
   UI.attnKind = p.a.kind;
   if (p.a.kind === 'world') { UI.attnWorld = p.item.k; selectColony(p.item.b.id); centerOn(p.item.b.star); }
-  else if (p.a.kind === 'research') ACT.openResearch();
   else { const f = p.item; UI.attnFleet = f.id; selectFleet(f.id); if (f.star != null) centerOn(f.star); else { const [ox, oy] = sideShift(); UI.cam.tx = f.x + ox; UI.cam.ty = f.y + oy; UI.cam.tz = 0; UI.dirty = true; } }
   renderAttn();
 };
@@ -177,9 +174,6 @@ function drawMap() {
   for (let i = 0; i < 12; i++) { const a = i / 12 * TAU; const [ax, ay] = proj(0, 0, 0), [bx, by] = proj(Math.cos(a) * R, Math.sin(a) * R, 0); x.strokeStyle = 'rgba(70,100,160,.09)'; x.beginPath(); x.moveTo(ax, ay); x.lineTo(bx, by); x.stroke(); }
   ring(R + 1, 0, 0, 'rgba(120,200,255,.5)', 1.5, [7, 6]);
   { const [ex, ey] = proj(0, -(R + 1), 0); x.fillStyle = 'rgba(150,210,255,.7)'; x.font = 'italic 12px Segoe UI, sans-serif'; x.textAlign = 'center'; x.fillText('Limit of reach: beyond lies centuries of travel', ex, ey + 16); }
-  // telescope coverage of colonies (faint)
-  const seen = new Set();
-  for (const b of colonies(true)) { if (seen.has(b.star)) continue; seen.add(b.star); const s = ST(b.star); x.fillStyle = 'rgba(74,168,255,.035)'; x.beginPath(); for (let i = 0; i <= 80; i++) { const a = i / 80 * TAU; const [sx, sy] = proj(s.x + Math.cos(a) * 16, s.y + Math.sin(a) * 16, 0); i ? x.lineTo(sx, sy) : x.moveTo(sx, sy); } x.fill(); }
   // distant beacons
   x.textAlign = 'left';
   for (const f of FAR_STARS) { const [sx, sy] = proj(f.d[0] * (R + 9), f.d[1] * (R + 9), f.d[2] * (R + 9)); x.fillStyle = 'rgba(150,165,200,.6)'; x.font = '13px Segoe UI, sans-serif'; x.fillText('✧', sx - 5, sy + 4); x.font = 'italic 10.5px Segoe UI, sans-serif'; x.fillStyle = 'rgba(130,145,180,.6)'; x.fillText(f.n + ' · ' + f.ly + ' ly', sx + 8, sy + 4); }
@@ -194,8 +188,8 @@ function drawMap() {
     const vis = !!S.visited[s.id]; const k = starKind(s.sp);
     if (showPins) { const f = proj(s.x, s.y, 0); x.strokeStyle = s.z >= 0 ? 'rgba(140,170,220,.33)' : 'rgba(150,120,180,.3)'; x.lineWidth = 1; x.beginPath(); x.moveTo(f[0], f[1]); x.lineTo(p[0], p[1]); x.stroke(); x.beginPath(); x.ellipse(f[0], f[1], 3, 3 * Math.cos(C.pitch), 0, 0, TAU); x.stroke(); }
     const rr = (vis ? 5 : 3.4) * clamp(C.zoom / 14, 0.75, 1.6) * (k.giant || k.cls === 'A' || k.cls === 'B' ? 1.3 : 1);
-    const gg = x.createRadialGradient(p[0], p[1], 0, p[0], p[1], rr * 3.2); gg.addColorStop(0, k.color + (vis ? 'cc' : '77')); gg.addColorStop(1, k.color + '00'); x.fillStyle = gg; x.beginPath(); x.arc(p[0], p[1], rr * 3.2, 0, TAU); x.fill();
-    x.fillStyle = vis ? k.color : k.color + 'aa'; x.beginPath(); x.arc(p[0], p[1], rr * 0.6, 0, TAU); x.fill();
+    const gg = x.createRadialGradient(p[0], p[1], 0, p[0], p[1], rr * 3.2); gg.addColorStop(0, k.color + (vis ? 'cc' : '4d')); gg.addColorStop(1, k.color + '00'); x.fillStyle = gg; x.beginPath(); x.arc(p[0], p[1], rr * 3.2, 0, TAU); x.fill();
+    x.fillStyle = vis ? k.color : k.color + '88'; x.beginPath(); x.arc(p[0], p[1], rr * 0.6, 0, TAU); x.fill();
     const ours = s.bodies.some(bid => B(bid).owner === 0);
     if (ours) { x.strokeStyle = S.empire.color; x.lineWidth = 2; x.beginPath(); x.arc(p[0], p[1], rr + 4, 0, TAU); x.stroke(); }
     if (UI.selStar === s.id) { x.strokeStyle = '#ffffffcc'; x.lineWidth = 1.5; x.setLineDash([4, 4]); x.beginPath(); x.arc(p[0], p[1], rr + 9, 0, TAU); x.stroke(); x.setLineDash([]); }
@@ -226,10 +220,10 @@ function drawMap() {
   const dots = LABELS.map(L => ({x: L.p[0] - L.rr, y: L.p[1] - L.rr, w: L.rr * 2, h: L.rr * 2}));
   for (const L of LABELS.sort((a, b) => b.pri - a.pri)) {
     const {s, p, rr} = L; const vis = !!S.visited[s.id];
-    x.font = (vis ? '600 ' : '') + '11.5px Segoe UI, sans-serif';
+    x.font = vis ? '600 11.5px Segoe UI, sans-serif' : '10.5px Segoe UI, sans-serif';
     const wd = x.measureText(s.name).width + 6; const bx = {x: p[0] - wd / 2, y: p[1] + rr + 3, w: wd, h: 14};
     if (L.pri < 3 && boxes.some(o => bx.x < o.x + o.w && bx.x + bx.w > o.x && bx.y < o.y + o.h && bx.y + bx.h > o.y)) continue;
-    boxes.push(bx); x.fillStyle = s.bodies.some(bid => B(bid).owner === 0) ? '#8ccaff' : vis ? '#e8eef8' : '#8a94aa'; x.fillText(s.name, p[0], p[1] + rr + 13);
+    boxes.push(bx); x.fillStyle = s.bodies.some(bid => B(bid).owner === 0) ? '#8ccaff' : vis ? '#e8eef8' : '#626b80'; x.fillText(s.name, p[0], p[1] + rr + 13);
   }
   boxes.push(...dots);
   // fleets
@@ -343,7 +337,7 @@ ACT.camFit = () => fitView();
 function updateHint() {
   const el = $('#hint'); const sf = UI.selFleet != null ? S.fleets.find(f => f.id === UI.selFleet) : null;
   if (sf) el.textContent = 'Fleet selected: click a star to send it there. Click empty space to deselect.';
-  else if (UI.hoverStar != null) { const s = ST(UI.hoverStar); el.textContent = s.name + ' · ' + starKind(s.sp).word + ' · ' + s.ly + ' ly from the Sun' + (S.visited[s.id] ? '' : ' · not yet visited'); }
+  else if (UI.hoverStar != null) { const s = ST(UI.hoverStar); el.textContent = s.name + ' · ' + starKind(s.sp).word + ' · ' + s.ly + ' ly from the Sun' + (S.surveyed[s.id] ? ' · surveyed' : S.visited[s.id] ? ' · charted' : ' · unexplored'); }
   else el.textContent = 'Drag to rotate · right-drag or Shift-drag to pan · scroll to zoom · Enter ends the year';
 }
 function sendFleet(f, sid) {

@@ -124,7 +124,7 @@ function newGame(o) {
   S = {version: GAME_VERSION, format: SAVE_FORMAT, turn: 1, year: START_YEAR, len: o.len, maxTurns: L.turns, radius: L.radius,
     stars: [], bodies: [], fleets: [], designs: [], techs: {}, res: null, rpBank: 0, bc: 200,
     known: {}, visited: {}, surveyed: {}, journal: [], hist: [], msgs: [], nextId: 1, story: o.story, empire: {name: o.name || 'United Earth', color: o.color || '#4aa8ff'},
-    mods: {prod: 1, rp: 1, bc: 1, growth: 1, earthFood: 0, earthTel: COLONY_TEL}, stats: {anomalies: 0, anomScore: 0, lost: 0}, awakened: false, over: null,
+    mods: {prod: 1, rp: 1, bc: 1, growth: 1, earthFood: 0}, stats: {anomalies: 0, anomScore: 0, lost: 0}, awakened: false, over: null,
     gameId: Date.now().toString(36) + Math.floor(rnd() * 1e6).toString(36), started: Date.now(), nextDesign: 1};
   list.forEach((s, i) => S.stars.push({id: i, name: s.n, x: s.x, y: s.y, z: s.z, sp: s.sp, cnt: s.c || 1, ly: s.ly, real: s.real || null, bodies: [], anom: null, anomDone: false, guard: false, stock: 0}));
   // the Solar System
@@ -163,13 +163,14 @@ function newGame(o) {
   const home = s => newFleetAt(0, s);
   home('scout'); home('science'); home('colony');
   if (st.e3 === 'ark') home('colony');
-  if (st.e3 === 'telescope') { earth.col.proj.greatscope = 1; S.mods.greatScope = 1; S.mods.earthTel = 24; }
+  if (st.e3 === 'telescope') { earth.col.proj.greatscope = 1; S.mods.greatScope = 1; }
   if (st.e3 === 'probes') {
     for (const n of ['Alpha Centauri', "Barnard's Star"]) { const t = S.stars.find(x => x.name === n); if (t) newFleetAt(t.id, 'scout'); }
     home('science');
   }
   for (const s of sun.bodies.map(B)) S.visited[0] = S.surveyed[0] = S.known[0] = 1;
-  updateKnowledge();
+  for (const s of S.stars) S.known[s.id] = 1; // every star is in Earth's catalogues; only their worlds are unknown
+  updateKnowledge(true);
   recordHistory();
   msg('The year is ' + START_YEAR + '. For the first time, humanity is ready to leave the Solar System. Choose a research project, then send your ships to the stars.', 0, 'info');
   return S;
@@ -204,8 +205,8 @@ function topSpeed() { return DRIVE_SPEEDS[driveLevel()]; }
 function designSpeed(d) { return Math.min(0.9999, topSpeed() * massFactor(designMass(d)) + (d.mods.includes('booster') ? 0.1 : 0)); }
 function isProbeDesign(d) { return d.mods.length > 0 && d.mods.every(m => m === 'tel_m' || m === 'tel_l' || m === 'booster'); }
 function canProbeSurvey(f) { return !!(f && f.star != null && f.dest == null && !S.surveyed[f.star] && !(f.task && f.task.type === 'survey') && f.ships.some(sh => isProbeDesign(design(sh.d)))); }
-function telBonus(r) { return r * (has('interferometry') ? 1.5 : 1) + (has('bt_lensing') ? 4 : 0); }
-function designTel(d) { return telBonus(d.mods.includes('tel_l') ? 16 : d.mods.includes('tel_m') ? 8 : SHIP_TEL); }
+function telBonus(r) { return r <= 0 ? 0 : r * (has('interferometry') ? 1.3 : 1) + (has('bt_lensing') ? 1 : 0); }
+function designTel(d) { return telBonus(d.mods.includes('tel_l') ? TEL_L : d.mods.includes('tel_m') ? TEL_M : 0); }
 function designHas(d, m) { return d.mods.includes(m); }
 function newFleetAt(starId, did) {
   const s = ST(starId);
@@ -405,31 +406,52 @@ function setResearch(id) { if (!TECH[id] || has(id) || !TECH[id].req.every(has))
 function learn(id, how) { if (has(id)) return; S.techs[id] = 1; msg((how || 'Research complete') + ': ' + TECH[id].name + '. ' + TECH[id].desc, null, 'tech'); }
 
 // ---------- knowledge ----------
+// Every star is known from the start. A system is Charted (its worlds seen) when a telescope has it in range or a ship reaches its orbit,
+// and Surveyed (life and minerals known) after a survey, or for free in range of the Great Telescope (5 ly of Earth) or, with
+// Biosignature Spectroscopy, of a Deep Sky Observatory.
 function telescopes() {
   const out = [];
   const seen = new Set();
   for (const b of colonies(true)) { if (seen.has(b.star)) continue; seen.add(b.star); const s = ST(b.star);
-    let r = COLONY_TEL; if (b.star === 0) r = S.mods.earthTel; for (const bb of s.bodies.map(B)) if (bb.owner === 0 && bb.col && bb.col.proj.observatory) r = Math.max(r, 24);
-    out.push({x: s.x, y: s.y, z: s.z, r: telBonus(r)}); }
-  for (const f of S.fleets) out.push({x: f.x, y: f.y, z: f.z, r: fleetTel(f)});
+    let r = COLONY_TEL, obs = false; if (b.star === 0 && S.mods.greatScope) r = GREAT_TEL;
+    for (const bb of s.bodies.map(B)) if (bb.owner === 0 && bb.col && bb.col.proj.observatory) { r = Math.max(r, OBS_TEL); obs = true; }
+    out.push({x: s.x, y: s.y, z: s.z, r: telBonus(r), obs, name: obs ? 'Deep Sky Observatory' : b.star === 0 && S.mods.greatScope ? 'Great Telescope' : 'colony telescopes'}); }
+  for (const f of S.fleets) { const r = fleetTel(f); if (r > 0) out.push({x: f.x, y: f.y, z: f.z, r, f}); }
   return out;
 }
-function updateKnowledge() {
+function updateKnowledge(start) {
   const tel = telescopes();
   for (const s of S.stars) {
-    if (!S.known[s.id] && tel.some(t => d3(t, s) <= t.r + 1e-6)) { S.known[s.id] = 1; if (S.turn > 1) msg('Telescopes have spotted ' + s.name + ' (' + starKind(s.sp).word.toLowerCase() + ', ' + s.ly + ' light-years from the Sun).', s.id, 'spot'); }
-    if (!S.visited[s.id]) for (const f of S.fleets) if (d3(f, s) <= DETAIL_RANGE + 1e-6) { visit(s); break; }
+    S.known[s.id] = 1;
+    if (!S.visited[s.id]) {
+      const orb = S.fleets.find(f => f.star === s.id && f.dest == null && f.ships.length);
+      if (orb) visit(s, 'Our ' + fleetName0(orb) + ' reached ' + s.name, start);
+      else { const t = tel.find(t => d3(t, s) <= t.r + 1e-6); if (t) visit(s, t.f ? 'Our ' + scopeShipName(t.f) + '\'s telescope can now make out ' + s.name + '\'s worlds' : 'Our ' + t.name + ' can now make out ' + s.name + '\'s worlds', start); }
+    }
+    if (!S.surveyed[s.id] && S.visited[s.id]) {
+      if (inGreatScope(s)) surveyStar(s, 'The Great Telescope', start);
+      else if (has('biosignatures')) { const t = tel.find(t => t.obs && d3(t, s) <= t.r + 1e-6); if (t) surveyStar(s, 'Our Deep Sky Observatory', start); }
+    }
   }
 }
-function visit(s) {
+function visit(s, how, quiet) {
   S.visited[s.id] = 1; S.known[s.id] = 1;
+  if (quiet) return;
   const n = s.bodies.length;
-  msg('Our ship reached ' + s.name + ': ' + (n ? n + ' world' + (n > 1 ? 's' : '') + ' found' : 'no planets') + (s.anom ? '. Strange readings detected!' : '.'), s.id, 'arrive');
-  journal('First visit to ' + s.name + (s.anom ? ' (strange readings)' : '') + '.', s.id);
+  msg((how || 'Our ship reached ' + s.name) + ': ' + (n ? n + ' world' + (n > 1 ? 's' : '') + ' found' : 'no planets') + (s.anom ? '. Strange readings detected!' : '.'), s.id, 'arrive');
+  journal('First look at ' + s.name + (s.anom ? ' (strange readings)' : '') + '.', s.id);
 }
-function inGreatScope(s) { return !!(S.mods.greatScope && d3(s, S.stars[0]) <= 8.65); }
-function worldsKnown(s) { return !!(S.visited[s.id] || inGreatScope(s)); }
-function lifeVisible(s) { return S.surveyed[s.id] || inGreatScope(s) || (has('biosignatures') && S.known[s.id]); }
+function surveyStar(s, who, quiet) {
+  if (S.surveyed[s.id]) return; S.surveyed[s.id] = 1;
+  if (quiet) return;
+  const life = s.bodies.map(B).filter(b => b.life !== 'none');
+  msg((who ? who + ' completed a survey of ' + s.name : 'Survey of ' + s.name + ' complete') + (life.length ? ': ' + life.map(b => LIFE[b.life].toLowerCase() + ' on ' + b.name).join(', ') + '!' : '. No life found.'), s.id, 'survey');
+  if (life.length) journal('Found ' + life.map(b => LIFE[b.life].toLowerCase() + ' on ' + b.name).join(', ') + '.', s.id);
+  if (life.length) budgetEvent('life', 1, 'Life beyond Earth! The discovery at ' + s.name + ' is on every screen on Earth.', s.id);
+}
+function inGreatScope(s) { return !!(S.mods.greatScope && d3(s, S.stars[0]) <= GREAT_SCAN + 1e-6); }
+function worldsKnown(s) { return !!S.visited[s.id]; }
+function lifeVisible(s) { return !!S.surveyed[s.id]; }
 
 // ---------- anomalies ----------
 function eventOf(s) { return EVENTS.find(e => e.id === s.anom); }
@@ -443,7 +465,7 @@ function resolveChoice(f, ci) {
   if (o.rp) { const v = Math.round(o.rp * (has('xenology') ? 1.5 : 1) * (1 + S.turn / 150)); S.rpBank += v; res.gains.push('+' + v + ' research'); }
   if (o.bc) { const v = Math.round(o.bc * (1 + S.turn / 200)); S.bc += v; res.gains.push('+' + v + ' credits'); }
   if (o.bt) { if (!has(o.bt)) { S.techs[o.bt] = 1; res.gains.push('Breakthrough: ' + TECH[o.bt].name + ' (' + TECH[o.bt].desc + ')'); } else { S.rpBank += 150; res.gains.push('+150 research'); } }
-  if (o.reveal) { const unk = S.stars.filter(x => !S.known[x.id]).sort((a, b) => d3(a, s) - d3(b, s)).slice(0, o.reveal); unk.forEach(x => S.known[x.id] = 1); if (unk.length) res.gains.push('Revealed: ' + unk.map(x => x.name).join(', ')); }
+  if (o.reveal) { const unk = S.stars.filter(x => !S.visited[x.id]).sort((a, b) => d3(a, s) - d3(b, s)).slice(0, o.reveal); unk.forEach(x => { S.visited[x.id] = 1; S.known[x.id] = 1; }); if (unk.length) res.gains.push('Charted: ' + unk.map(x => x.name).join(', ')); }
   if (o.score) S.stats.anomScore += o.score;
   if (o.lose) { const i = f.ships.findIndex(sh => designHas(design(sh.d), 'lab')); f.ships.splice(i >= 0 ? i : 0, 1); S.stats.lost++; res.gains.push('The ship was lost'); res.lost = true; cleanupFleets(); }
   journal(ev.title + ' at ' + s.name + ': ' + o.t, s.id);
@@ -537,11 +559,7 @@ function processSurveys() {
     if (--f.task.left <= 0) {
       const s = ST(f.star), probe = f.task.probe; f.task = null;
       if (probe) { const i = f.ships.findIndex(sh => isProbeDesign(design(sh.d))); if (i >= 0) { msg('Our ' + design(f.ships[i].d).name + ' at ' + s.name + ' broke itself apart into probes and landers to complete the survey.', s.id, 'survey'); f.ships.splice(i, 1); cleanupFleets(); } }
-      if (S.surveyed[s.id]) continue; S.surveyed[s.id] = 1;
-      const life = s.bodies.map(B).filter(b => b.life !== 'none');
-      msg('Survey of ' + s.name + ' complete' + (life.length ? ': ' + life.map(b => LIFE[b.life].toLowerCase() + ' on ' + b.name).join(', ') + '!' : '. No life found.'), s.id, 'survey');
-      if (life.length) journal('Found ' + life.map(b => LIFE[b.life].toLowerCase() + ' on ' + b.name).join(', ') + '.', s.id);
-      if (life.length) budgetEvent('life', 1, 'Life beyond Earth! The discovery at ' + s.name + ' is on every screen on Earth.', s.id);
+      surveyStar(s);
     }
   }
 }
@@ -647,6 +665,7 @@ function autoExplore() {
   }
 }
 function fleetName0(f) { return design(f.ships[0].d).name; }
+function scopeShipName(f) { let best = f.ships[0]; for (const sh of f.ships) if (designTel(design(sh.d)) > designTel(design(best.d))) best = sh; return design(best.d).name; }
 // ---------- space budget: Earth's share of its economy given to the space programme ----------
 function spaceBudget() {
   const B0 = S.budget || {perm: 0, temp: []};

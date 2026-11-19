@@ -191,3 +191,4 @@ table.list tr.click{cursor:pointer}table.list tr.click:hover td{background:#121d
 .colors{flex-wrap:wrap;max-width:330px}
 #attn .chip{gap:7px}.attnnext{text-decoration:underline;text-underline-offset:3px;font-weight:700}
 .hkrow{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)}.hkrow .btn{min-width:110px}.hkrow .btn.cap{border-color:var(--acc);color:var(--acc)}
+.chip.residle{border-color:#ff5d5d;box-shadow:0 0 0 1px #ff5d5d inset}

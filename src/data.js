@@ -1,13 +1,13 @@
 'use strict';
 // ===================== STARWAKE v2 — STATIC DATA =====================
-const GAME_VERSION = 15;
+const GAME_VERSION = 16;
 const SAVE_FORMAT = 2;
 const START_YEAR = 2326;
 const LENGTHS = {
   standard: {label: 'Standard', turns: 300, radius: 26},
   long:     {label: 'Long',     turns: 500, radius: 35},
 };
-const COLONY_TEL = 16, SHIP_TEL = 4, DETAIL_RANGE = 1;
+const COLONY_TEL = 1, TEL_M = 2.5, TEL_L = 4, OBS_TEL = 4, GREAT_TEL = 10, GREAT_SCAN = 5; // light-years within which worlds are seen (charted)
 
 // ---------- Planets ----------
 const PCLASS = {
@@ -76,10 +76,10 @@ const PROJECTS = {
   spires:      {name: 'Habitat Spires',       cost: 140, stage: 'settlement', req: 'habitat', replaces: 'habitat', tech: 'vertical_cities', desc: 'Upgrades the Habitat Expansion: +50% population capacity here.'},
   rstation:    {name: 'Robotic Research Station', cost: 60, stage: 'settlement', outpost: true, tech: 'survey_drones', desc: '+1 research a year, or +3 if this world has life, rings, an ocean under its ice or volcanoes.'},
   refinery:    {name: 'Gas Refinery',         cost: 60,  stage: 'settlement', outpost: true, outpostOnly: true, giantOnly: true, desc: '+2 credits a year. Outposts on gas and ice giants only.'},
-  observatory: {name: 'Deep Sky Observatory', cost: 250, stage: 'settlement', outpost: true, tech: 'deep_sky', space: true, desc: 'Telescopes here see 24 light-years instead of 16.'},
+  observatory: {name: 'Deep Sky Observatory', cost: 250, stage: 'settlement', outpost: true, tech: 'deep_sky', space: true, desc: 'Charts every star system within 4 light-years (its worlds become visible) and surveys them for free.'},
   elevator:    {name: 'Space Elevator',       cost: 400, stage: 'city', tech: 'space_elevator', space: true, desc: 'Ships built here cost 25% less.'},
   terraform:   {name: 'Terraforming',         cost: 600, stage: 'settlement', tech: 'terraforming', repeat: true, desc: 'Improves habitability one step (Hostile → Harsh → Livable → Garden). Destroys any native ecosystem.'},
-  greatscope:  {name: 'The Great Telescope',  cost: 0, stage: 'settlement', unique: true, desc: 'Unique. Earth\'s telescope sees 24 light-years away, and knows worlds within 8.6 light-years of Earth and any signs of life on them.'},
+  greatscope:  {name: 'The Great Telescope',  cost: 0, stage: 'settlement', unique: true, desc: 'Unique. Charts every star system within 10 light-years of Earth, and fully surveys those within 5.'},
 };
 
 // ---------- Ships ----------
@@ -89,8 +89,8 @@ const HULLS = {
   heavy:  {name: 'Heavy hull',  mass: 6, cost: 110, slots: 5},
 };
 const MODULES = {
-  tel_m:   {name: 'Medium Telescope', mass: 1, cost: 25,  desc: 'Telescope range 8 light-years (instead of 4).'},
-  tel_l:   {name: 'Large Telescope',  mass: 3, cost: 90,  desc: 'Telescope range 16 light-years.'},
+  tel_m:   {name: 'Medium Telescope', mass: 1, cost: 25,  desc: 'Charts star systems within 2.5 light-years of the ship (their worlds become visible). Without a telescope, a ship sees a system\'s worlds only once in orbit.'},
+  tel_l:   {name: 'Large Telescope',  mass: 3, cost: 90,  desc: 'Charts star systems within 4 light-years of the ship. With Biosignature Spectroscopy, the ship can also survey a system in 3 years without a Science Lab.'},
   lab:     {name: 'Science Lab',      mass: 1, cost: 40,  desc: 'Surveys systems and investigates anomalies.'},
   colony:  {name: 'Colony Pod',       mass: 4, cost: 120, desc: 'Carries 20,000 settlers to found or grow a colony (twice as many with Hibernation). Needs a medium or heavy hull.'},
   outpost: {name: 'Outpost Kit',      mass: 2, cost: 80,  desc: 'Builds a robotic outpost on almost any world, for star systems where we have no colony. Where we already have a colony, order an outpost from that colony instead: it costs far less.'},
@@ -121,9 +121,9 @@ const TECHS = [
   {id: 'relativistic', f: 'prop', cost: 3400, req: ['antimatter_drive'], name: 'Relativistic Flight', desc: 'Top speed 95% of light speed.'},
   {id: 'near_light', f: 'prop', cost: 5600, req: ['relativistic', 'exotic_matter'], name: 'Near-Light Drive', desc: 'Top speed 99.99% of light speed.'},
   {id: 'survey_drones', f: 'sens', cost: 250, req: [], name: 'Survey Drones', desc: 'Science surveys take 1 year instead of 3. Unlocks the Robotic Research Station for outposts.'},
-  {id: 'biosignatures', f: 'sens', cost: 650, req: ['survey_drones'], name: 'Biosignature Spectroscopy', desc: 'Your telescopes show whether a known system holds life, without visiting it.'},
-  {id: 'deep_sky', f: 'sens', cost: 950, req: ['biosignatures'], name: 'Deep Sky Surveys', desc: 'Unlocks the Deep Sky Observatory project (a colony\'s telescopes reach 24 light-years).'},
-  {id: 'interferometry', f: 'sens', cost: 1700, req: ['deep_sky'], name: 'Interferometry', desc: 'Every ship and colony telescope reaches 50% farther.'},
+  {id: 'biosignatures', f: 'sens', cost: 650, req: ['survey_drones'], name: 'Biosignature Spectroscopy', desc: 'Deep Sky Observatories survey every system in their range for free, and ships with a Large Telescope can survey a system (3 years, the ship is not used up).'},
+  {id: 'deep_sky', f: 'sens', cost: 950, req: ['biosignatures'], name: 'Deep Sky Surveys', desc: 'Unlocks the Deep Sky Observatory project (charts and surveys every system within 4 light-years).'},
+  {id: 'interferometry', f: 'sens', cost: 1700, req: ['deep_sky'], name: 'Interferometry', desc: 'Every telescope reaches 30% farther.'},
   {id: 'closed_ecology', f: 'bio', cost: 250, req: [], name: 'Closed Ecology', desc: 'Harsh and Hostile colonies make 50% more food.'},
   {id: 'hibernation', f: 'bio', cost: 500, req: [], name: 'Hibernation', desc: 'Colony Pods carry 40,000 settlers instead of 20,000.'},
   {id: 'gene_adaptation', f: 'bio', cost: 950, req: ['closed_ecology'], name: 'Genetic Adaptation', desc: 'Harsh worlds hold 50% more people and grow 50% faster.'},
@@ -157,7 +157,7 @@ const TECH = {}; TECHS.forEach(t => TECH[t.id] = t);
 const BREAKTHROUGHS = {
   bt_alloys:   {name: 'Precursor Alloys',          desc: 'Lighter hulls: every ship flies 10% closer to your top speed.'},
   bt_genome:   {name: 'Alien Genome Library',      desc: 'Colonies on worlds with native life grow 25% faster.'},
-  bt_lensing:  {name: 'Stellar Lensing',           desc: 'Every telescope reaches 4 light-years farther.'},
+  bt_lensing:  {name: 'Stellar Lensing',           desc: 'Every telescope reaches 1 light-year farther.'},
   bt_exotic:   {name: 'Exotic Matter Sample',      desc: 'Exotic Matter research costs half as much.'},
   bt_seeds:    {name: 'Cryo-Seed Vault',           desc: 'Agri-Domes produce twice as much food.'},
   bt_signal:   {name: 'Mathematics of the Signal', desc: '+15% research everywhere.'},
@@ -185,7 +185,7 @@ const ERAS = [
   ]},
   {years: '2251–2326', name: 'First Light', q: 'What was our first step toward the stars?', opts: [
     {id: 'ark', name: 'The Ark Program', text: 'A great colony ship was completed in orbit.', why: 'It was built before anyone chose where it would go.', fx: ['Start with 1 extra Colony Ship']},
-    {id: 'telescope', name: 'The Great Telescope', text: 'A telescope array mapped the nearby stars and the worlds around them.', why: 'Its main mirror was placed in orbit around Earth and is still in service.', fx: ['Start with a unique telescope on Earth that sees 24 light-years and knows the worlds and life within 8.6 light-years']},
+    {id: 'telescope', name: 'The Great Telescope', text: 'A telescope array mapped the worlds around the nearest stars.', why: 'Its main mirror was placed in orbit around Earth and is still in service.', fx: ['Start with a unique telescope on Earth that charts every star system within 10 light-years and fully surveys those within 5']},
     {id: 'probes', name: 'The Pathfinder Probes', text: 'Small, fast probes were built and launched toward the two nearest stars in the early 2300s.', why: 'After a couple of decades in transit, both have now arrived at Alpha Centauri and Barnard\'s Star, and the science vessel built to follow up on their findings is ready at Earth.', fx: ['Start with 2 Pathfinder Probes at Alpha Centauri and Barnard\'s Star, plus a free Science Vessel at Earth']},
   ]},
 ];

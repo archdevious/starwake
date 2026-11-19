@@ -57,10 +57,9 @@ function starPanel(sid) {
   h += `<div class="sdesc">${esc(starDesc(s))}</div>`;
   if (s.guardKnown) h += `<div class="card" style="border-color:#7a2a2a"><b class="bad">Guardian machines.</b> Ancient automated defenses destroy any ship that enters this system.</div>`;
   if (!worldsKnown(s)) {
-    h += `<div class="card dim">Only seen through telescopes. Send any ship here to see its worlds; a ship passing within 1 light-year will do.</div>`;
-    if (lifeVisible(s)) { const eco = s.bodies.map(B).some(b => b.life === 'ecosystem'), mic = s.bodies.map(B).some(b => b.life === 'microbial'); h += `<div class="card small">Biosignatures: ${eco ? '<span class="good">signs of a living ecosystem</span>' : mic ? '<span class="acc">faint signs of microbial life</span>' : '<span class="dim">no signs of life</span>'}</div>`; }
+    h += `<div class="card dim"><b>Unexplored.</b> Its worlds are unknown. Send any ship into orbit here, or get a ship's telescope within range (2.5 or 4 light-years, by module), to chart it.</div>`;
   } else {
-    if (!S.visited[sid]) h += `<div class="card small dim">Mapped by the Great Telescope. No ship has been here yet.</div>`;
+    if (!S.surveyed[sid]) h += `<div class="card small dim"><b>Charted.</b> Its worlds are known, but not their life or minerals. A ship with a Science Lab can survey it.</div>`;
     if (s.anom && !s.anomDone && S.visited[sid]) {
       const sci = S.fleets.find(f => f.star === sid && f.dest == null && fleetHas(f, 'lab'));
       h += `<div class="card" style="border-color:#6a5020"><b class="amber">◆ Strange readings</b><div class="small dim" style="margin-top:3px">Something here is worth a closer look. A ship with a Science Lab can investigate.</div>${sci ? `<button class="btn sm amber" style="margin-top:6px" data-a="investigate" data-v="${sci.id}">Investigate</button>` : ''}</div>`;
@@ -179,7 +178,7 @@ function designSummary(d) {
   const ab = [];
   if (designHas(d, 'colony')) ab.push('settlers'); if (designHas(d, 'outpost')) ab.push('outposts'); if (designHas(d, 'lab')) ab.push('science lab'); if (designHas(d, 'cargo')) ab.push('cargo');
   if (designHas(d, 'booster')) ab.push('booster');
-  return pct(designSpeed(d)) + ' light speed · telescope ' + Math.round(designTel(d)) + ' ly' + (ab.length ? ' · ' + ab.join(', ') : '') + (designHas(d, 'outpost') ? ' · for systems without a colony of ours' : '');
+  return pct(designSpeed(d)) + ' light speed' + (designTel(d) ? ' · telescope ' + telText(designTel(d)) : '') + (ab.length ? ' · ' + ab.join(', ') : '') + (designHas(d, 'outpost') ? ' · for systems without a colony of ours' : '');
 }
 ACT.focus = v => { const [bid, k] = v.split(':'); B(+bid).col.focus = k; renderSide(); };
 ACT.btab = v => { UI.buildTab = v; renderSide(); };
@@ -193,7 +192,7 @@ ACT.buy = v => { if (buyItem(B(+v))) toast('Bought: finishes next year'); render
 function fleetPanel(f) {
   const where = f.dest != null ? `En route to ${esc(ST(f.dest).name)} · ${etaTo(f, f.dest)} year${etaTo(f, f.dest) > 1 ? 's' : ''} left` : f.star != null ? 'At ' + esc(ST(f.star).name) : 'In deep space';
   let h = `<div class="hdr"><div><h2>${fleetName(f)}</h2><div class="dim small">${where}</div></div><button class="x" data-a="close">✕</button></div>
-    <div class="small dim">Speed ${pct(fleetSpeed(f))} of light (${fleetSpeed(f).toFixed(2)} ly per year) · telescope ${Math.round(fleetTel(f))} ly${fleetCargo(f) ? ' · carries ' + people(cargoCap(f).pop) + ' settlers and ' + Math.round(cargoCap(f).food) + ' food per trip' : ''}</div>
+    <div class="small dim">Speed ${pct(fleetSpeed(f))} of light (${fleetSpeed(f).toFixed(2)} ly per year)${fleetTel(f) ? ' · telescope ' + telText(fleetTel(f)) : ''}${fleetCargo(f) ? ' · carries ' + people(cargoCap(f).pop) + ' settlers and ' + Math.round(cargoCap(f).food) + ' food per trip' : ''}</div>
     <div class="small acc" style="margin-top:6px">Click any known star to send this ship there.</div>
     <div style="margin-top:6px"><button class="btn sm ${f.auto ? 'on' : ''}" data-a="autoExp" data-v="${f.id}">${f.auto ? 'Auto-explore: on (click to stop)' : 'Auto-explore'}</button></div>`;
   if (f.task && f.task.type === 'route') {
@@ -212,7 +211,9 @@ function fleetPanel(f) {
   if (f.star != null && f.dest == null) {
     const s = ST(f.star), acts = [];
     if (fleetHas(f, 'lab') && !S.surveyed[s.id] && !(f.task && f.task.type === 'survey')) acts.push(`<button class="btn sm primary" data-a="survey" data-v="${f.id}">Survey system (${has('survey_drones') ? 1 : 3} yr)</button>`);
-    if (canProbeSurvey(f) && !fleetHas(f, 'lab')) acts.push(`<button class="btn sm" data-a="probeSurvey" data-v="${f.id}" title="The ship is used up when the survey finishes">Probe survey (5 yr, uses up the ship)</button>`);
+    const scope = has('biosignatures') && fleetHas(f, 'tel_l') && !fleetHas(f, 'lab') && !S.surveyed[s.id] && !(f.task && f.task.type === 'survey');
+    if (scope) acts.push(`<button class="btn sm primary" data-a="scopeSurvey" data-v="${f.id}" title="Uses the Large Telescope with Biosignature Spectroscopy. The ship is not used up.">Telescope survey (3 yr)</button>`);
+    if (!scope && canProbeSurvey(f) && !fleetHas(f, 'lab')) acts.push(`<button class="btn sm" data-a="probeSurvey" data-v="${f.id}" title="The ship is used up when the survey finishes">Probe survey (5 yr, uses up the ship)</button>`);
     if (canInvestigate(f)) acts.push(`<button class="btn sm amber" data-a="investigate" data-v="${f.id}">Investigate strange readings</button>`);
     if (fleetHas(f, 'colony') || fleetHas(f, 'outpost')) acts.push(`<button class="btn sm" data-a="star" data-v="${s.id}">Choose a world to settle ▸</button>`);
     if (acts.length) h += `<div class="sec">Actions</div><div class="row wrap" style="gap:5px">${acts.join('')}</div>`;
@@ -233,6 +234,7 @@ function fleetPanel(f) {
 }
 ACT.probeSurvey = v => { const f = S.fleets.find(x => x.id === +v); f.task = {type: 'survey', left: 5, probe: true}; f.auto = false; renderSide(); toast('Probe survey started'); };
 ACT.autoExp = v => { const f = S.fleets.find(x => x.id === +v); f.auto = !f.auto; if (f.auto && f.dest == null && !f.task) { const t = exploreTarget(f); if (t) { orderMove(f, t.id); toast('Exploring: heading to ' + ST(t.id).name); } else { f.auto = false; toast('No unexplored stars on our charts'); } } UI.dirty = true; renderSide(); };
+ACT.scopeSurvey = v => { const f = S.fleets.find(x => x.id === +v); f.task = {type: 'survey', left: 3}; f.auto = false; renderSide(); toast('Telescope survey started'); };
 ACT.survey = v => { const f = S.fleets.find(x => x.id === +v); f.task = {type: 'survey', left: has('survey_drones') ? 1 : 3}; renderSide(); toast('Survey started'); };
 ACT.endRoute = v => { const f = S.fleets.find(x => x.id === +v); f.task = null; renderSide(); };
 function routeSetupHTML(f) {
