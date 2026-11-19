@@ -112,7 +112,7 @@ function decisionHTML(d) {
 }
 function resolveDecision(d, r) {
   const b = d.body != null ? B(d.body) : null;
-  if (d.k === 'comet') { if (r === 'build' && b.col && !b.col.queue.some(it => it.kind === 'deflect')) b.col.queue.unshift({kind: 'deflect'}); return; }
+  if (d.k === 'comet') { const cm = S.ev.comet; if (r === 'build' && cm && !cm.done && b.col && !b.col.queue.some(it => it.kind === 'deflect')) b.col.queue.unshift({kind: 'deflect'}); return; }
   if (d.k === 'strike') { if (r === 'pay' && S.bc >= 50) { S.bc = r1(S.bc - 50); evMsg(true, 'Strike on ' + b.name + ': we paid 50 credits and work resumed.', b.star); } else { addFx(b, {id: 'strike', name: 'Strike', prod: 0.75, until: S.year + 5}); evMsg(false, 'Strike on ' + b.name + ': we refused. ' + b.name + ' makes 25% less production for 5 years.', b.star); } return; }
   if (d.k === 'independence') { if (r === 'grant') { addFx(b, {id: 'selfrule', name: 'Self-rule', keep: true, grow: 1.25}); evMsg(true, b.name + ' now governs itself: it keeps its own credits but grows 25% faster.', b.star); } else { addFx(b, {id: 'refused', name: 'Unrest', prod: 0.75, until: S.year + 10}); evMsg(false, 'We refused ' + b.name + '\'s demand for self-rule. It makes 25% less production for 10 years.', b.star); } return; }
   if (d.k === 'refugees') { if (r === 'take' && S.bc >= 350) { const t = B(+d.pick) || settled(true)[0]; S.bc = r1(S.bc - 350); t.col.pop += 1; evMsg(true, 'A million refugees from Earth have been resettled on ' + t.name + '.', t.star); budgetEvent(null, 1, 'Earth admires how the colonies took in its refugees.', t.star); } else { msg('We turned away the refugees from Earth.', 0, 'info'); journal('Turned away a wave of refugees from Earth.', 0); } }

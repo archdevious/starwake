@@ -375,7 +375,7 @@ function needsRoute(s) {
 function filterMatch(k, s) {
   if (k === 'unexp') return !S.visited[s.id];
   if (k === 'chart') return !!S.visited[s.id] && !S.surveyed[s.id];
-  if (k === 'surv') return !!S.surveyed[s.id] && s.id !== 0;
+  if (k === 'surv') return !!S.surveyed[s.id] && s.id !== 0 && !ourStar(s);
   if (k === 'trade') return needsRoute(s);
   return false;
 }
@@ -386,13 +386,27 @@ function renderFilters() {
 ACT.mapFilter = k => { UI.mapFilter = UI.mapFilter === k ? null : k; renderFilters(); UI.dirty = true; };
 function shipRole(f) { return fleetHas(f, 'colony') ? 'colony' : fleetHas(f, 'outpost') ? 'outpost' : fleetHas(f, 'lab') ? 'chart' : fleetCargo(f) ? 'trade' : 'unexp'; }
 function shipTarget(f) {
-  const role = shipRole(f), pos = f.dest == null ? ST(f.star) : f;
-  const busy = new Set(S.fleets.filter(o => o !== f).map(o => o.dest != null ? o.dest : (o.task && o.task.type === 'survey' ? o.star : null)).filter(x => x != null));
+  const role = shipRole(f), pos = f.dest == null ? ST(f.star) : f, spd = fleetSpeed(f);
+  // the earliest any competing ship reaches each star (0 = already there, surveying or waiting)
+  const rival = {};
+  for (const o of S.fleets) {
+    if (o === f || !o.ships.length) continue;
+    const compete = role === 'unexp' ? true : role === 'chart' ? fleetHas(o, 'lab') : (role === 'colony' || role === 'outpost') ? shipRole(o) === role : false;
+    if (!compete) continue;
+    let sid = null, t = 0;
+    if (o.dest != null) { sid = o.dest; t = d3(o, ST(sid)) / fleetSpeed(o); }
+    else if (role === 'chart' && o.task && o.task.type === 'survey') sid = o.star;
+    else if ((role === 'colony' || role === 'outpost') && o.star != null && o.star !== 0) sid = o.star;
+    if (sid == null) continue;
+    if (rival[sid] == null || t < rival[sid]) rival[sid] = t;
+  }
+  const beaten = s => rival[s.id] != null && rival[s.id] <= d3(pos, s) / spd;
   const ok = s => {
     if (s.guardKnown) return false;
-    if (role === 'unexp') return !S.visited[s.id] && !busy.has(s.id);
-    if (role === 'chart') return !!S.visited[s.id] && !S.surveyed[s.id] && !busy.has(s.id);
     if (role === 'trade') return needsRoute(s);
+    if (beaten(s)) return false;
+    if (role === 'unexp') return !S.visited[s.id];
+    if (role === 'chart') return !!S.visited[s.id] && !S.surveyed[s.id];
     if (role === 'colony') return !!S.surveyed[s.id] && s.bodies.some(id => { const b = B(id); return b.owner == null && peopleCanLive(b) && !civBlocks(b); });
     if (role === 'outpost') return !!S.visited[s.id] && s.bodies.some(id => { const b = B(id); return b.owner == null && hab(b) !== 'none' && !civBlocks(b); });
   };
