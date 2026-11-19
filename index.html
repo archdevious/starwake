@@ -150,7 +150,7 @@ table.list tr.click{cursor:pointer}table.list tr.click:hover td{background:#121d
 #news .nh{display:flex;justify-content:space-between;align-items:center;color:var(--acc);font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:4px}
 .camctl{position:absolute;left:10px;bottom:10px;display:flex;gap:4px}
 .camctl .btn{height:32px;min-width:32px;padding:0 8px}
-#hint{left:auto;right:390px;bottom:12px}
+#hint{left:auto;right:390px;bottom:52px}
 .body{display:flex;gap:9px;align-items:flex-start}
 .facts{display:flex;flex-wrap:wrap;gap:2px;margin-top:4px}
 .habtag{font-weight:600}
@@ -207,6 +207,8 @@ table.list tr.click{cursor:pointer}table.list tr.click:hover td{background:#121d
 .mile h3{margin:2px 0 8px;font-size:24px;font-weight:500;color:#eef6ff}
 .mile p{font-size:14px;line-height:1.55;margin:0 0 10px;color:#c2d3e4}
 .mile .mfx{margin-top:10px;padding:10px 12px;border:1px solid #23415a;border-radius:8px;font-size:13px;color:#9fd6ee;line-height:1.7}
+#mapfilters{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);display:flex;gap:6px;z-index:5}
+#mapfilters .btn{height:32px}
 
 </style>
 </head>
@@ -232,6 +234,7 @@ table.list tr.click{cursor:pointer}table.list tr.click:hover td{background:#121d
     <div id="news"></div>
     <div id="side"></div>
     <div class="camctl"><button class="btn" data-a="camZoom" data-v="1" title="Zoom in">+</button><button class="btn" data-a="camZoom" data-v="-1" title="Zoom out">−</button><button class="btn" data-a="camRot" data-v="-1" title="Rotate left">⟲</button><button class="btn" data-a="camRot" data-v="1" title="Rotate right">⟳</button><button class="btn" data-a="camTop" title="Toggle top-down / tilted view">Top / Tilt</button><button class="btn" data-a="camSun" title="Centre on the Sun (H)">Sun</button><button class="btn" data-a="camFit" title="Show the whole map">Whole map</button></div>
+    <div id="mapfilters"></div>
     <div id="hint"></div>
     <div id="toast"></div>
   </div>
@@ -245,7 +248,7 @@ const FAR_STARS=[{"n": "Achernar", "d": [0.184, -0.484, -0.855], "ly": 139}, {"n
 
 'use strict';
 // ===================== STARWAKE v2 — STATIC DATA =====================
-const GAME_VERSION = 19;
+const GAME_VERSION = 20;
 const SAVE_FORMAT = 2;
 const START_YEAR = 2326;
 const LENGTHS = {
@@ -334,9 +337,9 @@ const HULLS = {
   heavy:  {name: 'Heavy hull',  mass: 6, cost: 110, slots: 5},
 };
 const MODULES = {
-  tel_m:   {name: 'Medium Telescope', mass: 1, cost: 25,  desc: 'Charts star systems within 2.5 light-years of the ship (their worlds become visible). Without a telescope, a ship sees a system\'s worlds only once in orbit.'},
-  tel_l:   {name: 'Large Telescope',  mass: 3, cost: 90,  desc: 'Charts star systems within 4 light-years of the ship. With Biosignature Spectroscopy, the ship can also survey a system in 3 years without a Science Lab.'},
-  lab:     {name: 'Science Lab',      mass: 1, cost: 40,  desc: 'Surveys systems and investigates anomalies.'},
+  tel_m:   {name: 'Medium Telescope', mass: 1, cost: 15,  desc: 'Charts star systems within 2.5 light-years of the ship (their worlds become visible). Without a telescope, a ship sees a system\'s worlds only once in orbit.'},
+  tel_l:   {name: 'Large Telescope',  mass: 3, cost: 55,  desc: 'Charts star systems within 4 light-years of the ship. With Biosignature Spectroscopy, the ship can also survey a system in 3 years without a Science Lab.'},
+  lab:     {name: 'Science Lab',      mass: 1, cost: 60,  desc: 'Surveys systems and investigates anomalies.'},
   colony:  {name: 'Colony Pod',       mass: 4, cost: 120, desc: 'Carries 20,000 settlers to found or grow a colony (twice as many with Hibernation). Needs a medium or heavy hull.'},
   outpost: {name: 'Outpost Kit',      mass: 2, cost: 80,  desc: 'Builds a robotic outpost on almost any world, for star systems where we have no colony. Where we already have a colony, order an outpost from that colony instead: it costs far less.'},
   booster: {name: 'Booster',          mass: 1, cost: 20,  desc: '+10% of light speed (30% becomes 40%). Only one Booster counts. Light hulls only.'},
@@ -1003,6 +1006,7 @@ function designReason(d) {
   if (d.hull === 'light' && d.mods.some(m => m === 'colony' || m === 'cargo')) return 'Colony Pods and Cargo Bays need a medium or heavy hull';
   if (d.hull !== 'light' && d.mods.includes('booster')) return 'Boosters only fit light hulls';
   if (d.hull === 'light' && d.mods.includes('assault')) return 'Assault Pods need a medium or heavy hull';
+  if (d.hull === 'light' && d.mods.includes('tel_l')) return 'The Large Telescope needs a medium or heavy hull';
   if (d.mods.includes('assault') && !has('ground_doctrine')) return 'Assault Pods need Ground Assault Doctrine';
   return null;
 }
@@ -1041,6 +1045,7 @@ function colonizeCheck(f, b, kind) {
     if (!fleetHas(f, 'colony')) return 'No Colony Pod in this fleet';
     const h = hab(b);
     if (b.owner === 0 && b.col && !b.col.outpost) return null; // add settlers
+    if (!S.surveyed[b.star]) return 'Needs a survey first: we must study the environment before colonists land';
     if (h === 'none' || h === 'outpost') return 'People cannot live there (use an Outpost Kit)';
     if (b.owner === 0 && b.col && b.col.outpost) return null;
     return null;
@@ -1173,6 +1178,7 @@ function moveFleets() {
 }
 function arrive(f) {
   const s = ST(f.star);
+  if (!s.guard && (fleetHas(f, 'outpost') || fleetHas(f, 'colony'))) { const c = civAt(s.id); if (c && !c.known) civDiscover(s, false, 'Our ' + fleetName0(f) + ' at ' + s.name); }
   if (s.guard) {
     S.stats.lost += f.ships.length; f.ships = [];
     s.guardKnown = true; S.visited[s.id] = 1;
@@ -1550,16 +1556,16 @@ function ensureCivs() {
   for (const s of S.stars) if (s.short && !s.shortSince) s.shortSince = S.year;
 }
 // ----- discovery -----
-function civDiscover(s, quiet) {
+function civDiscover(s, quiet, how) {
   const c = civAt(s.id); if (!c || c.known) return;
   c.known = true; const R = civRace(c);
   if (quiet) { S.contact = true; return; }
-  msg('First contact! Our survey of ' + s.name + ' found a civilization on ' + B(c.body).name + ': the ' + R.name + ', at ' + CIV_STAGES[c.stage].toLowerCase() + ' level. They have no way to reach space yet. See Diplomacy.', s.id, 'contact');
+  msg('First contact! ' + (how || 'Our survey of ' + s.name) + ' found a civilization on ' + B(c.body).name + ': the ' + R.name + ', at ' + CIV_STAGES[c.stage].toLowerCase() + ' level. They have no way to reach space yet. See Diplomacy.', s.id, 'contact');
   journal('Discovered the ' + R.name + ' (' + CIV_STAGES[c.stage].toLowerCase() + ') on ' + B(c.body).name + '.', s.id);
   if (!S.contact) {
     S.contact = true;
     budgetEvent('contact', 5, 'We are not alone. The discovery of the ' + R.name + ' changes how Earth sees the stars, and calls to prepare for other minds out there grow loud.', s.id);
-    if (!S.mile.contact) { S.mile.contact = 1; S.popq.push({k: 'contact', star: s.id, body: c.body, civ: c.id, year: S.year, fx: ['Space budget +5 (now ' + spaceBudget() + '% of Earth\'s economy)', 'Ground Forces research is now possible', 'Diplomacy is open (top bar, or P)']}); }
+    if (!S.mile.contact) { S.mile.contact = 1; S.popq.push({k: 'contact', star: s.id, body: c.body, civ: c.id, year: S.year, how: how || null, fx: ['Space budget +5 (now ' + spaceBudget() + '% of Earth\'s economy)', 'Ground Forces research is now possible', 'Diplomacy is open (top bar, or P)']}); }
     msg('Ground Forces research is now possible: assault doctrine, rifles, armor and environment suits.', null, 'info');
   }
 }
@@ -1727,7 +1733,8 @@ const SETTINGS = (() => { try { return Object.assign({near: 3, music: 40, sfx: 6
 function saveSettings() { try { localStorage.setItem('starwake.settings', JSON.stringify(SETTINGS)); } catch (e) {} }
 // ---------- hotkeys (editable in Settings) ----------
 const HOTKEYS = [['endTurn', 'End the year', 'Enter'], ['skip', 'Skip ahead until something happens', 'f'], ['idle', 'Next idle colony or ship', ' '],
-  ['research', 'Research', 'r'], ['design', 'Ship design', 'd'], ['colonies', 'Colonies', 'c'], ['journal', 'Journal', 'j'], ['home', 'Center the map on the Sun', 'h'], ['near', 'Show or hide nearest-star lines', 'n'], ['diplo', 'Diplomacy', 'p']];
+  ['research', 'Research', 'r'], ['design', 'Ship design', 'd'], ['colonies', 'Colonies', 'c'], ['journal', 'Journal', 'j'], ['home', 'Center the map on the Sun', 'h'], ['near', 'Show or hide nearest-star lines', 'n'], ['diplo', 'Diplomacy', 'p'],
+  ['f_unexp', 'Map filter: unexplored stars', '1'], ['f_chart', 'Map filter: charted stars', '2'], ['f_surv', 'Map filter: surveyed stars', '3'], ['f_trade', 'Map filter: stars needing a trade route', '4']];
 const normKey = k => k.length === 1 ? k.toLowerCase() : k;
 function hotkey(act) { const s = SETTINGS.keys && SETTINGS.keys[act]; return s != null ? s : HOTKEYS.find(h => h[0] === act)[2]; }
 function keyName(k) { return k === ' ' ? 'Space' : k.length === 1 ? k.toUpperCase() : k.replace(/^Arrow/, '').replace(/^./, c => c.toUpperCase()); }
@@ -1760,7 +1767,7 @@ function renderTop() {
     <div class="chip click rchip ${!res && availableTechs().length ? 'residle' : ''}" data-a="openResearch" title="${!res && availableTechs().length ? 'Nothing is being researched. Click to choose.' : 'Research'}"><span class="k">Research</span>${res ? `<span class="ell" title="${esc(res.name)}">${esc(res.name)}</span><span class="dim">${Math.floor(S.res.prog + S.rpBank)}/${techCost(S.res.tech)}</span>` : (availableTechs().length ? '<span class="bad">Choose research!</span>' : '<span class="dim">All known</span>')}<span class="acc">+${fmt(t.rp)}</span></div>
     ${short.length ? `<div class="chip click" data-a="goStar" data-v="${short[0]}"><span class="bad">Food shortage: ${short.map(s => esc(ST(s).name)).join(', ')}</span></div>` : ''}
     <div class="chip" title="Top ship speed, as a share of light speed"><span class="k">Top speed</span><b>${pct(topSpeed())}</b><span class="dim small">of light</span></div><span id="attn"></span>`;
-  renderAttn();
+  renderAttn(); renderFilters();
   const db = $('#diplobtn'); if (db) db.style.display = S.contact ? '' : 'none';
 }
 // ---------- "needs attention" button ----------
@@ -1896,6 +1903,7 @@ function drawMap() {
     if (lifeVisible(s)) { const lf = s.bodies.map(B).some(b => b.life === 'ecosystem' && b.star !== 0) ? '#5be08a' : s.bodies.map(B).some(b => b.life === 'microbial' && b.star !== 0) ? '#2ee6d6' : null; if (lf) { x.fillStyle = lf; x.beginPath(); x.arc(p[0] - rr - 4, p[1] - rr - 2, 2.6, 0, TAU); x.fill(); } }
     LABELS.push({s, p, rr, pri: s.id === 0 ? 4 : ours ? 3 : UI.selStar === s.id ? 3.5 : vis ? 2 : 1});
   }
+  drawFilterAndTarget(x);
   // the 3 nearest systems to the selected star
   if (UI.selStar != null && S.known[UI.selStar]) {
     const s0 = ST(UI.selStar), p0 = proj(s0.x, s0.y, s0.z);
@@ -2055,6 +2063,61 @@ function selectFleet(fid) { const f = S.fleets.find(x => x.id === fid); if (!f) 
 function selectColony(bid) { UI.selStar = B(bid).star; UI.selFleet = null; UI.view = 'colony'; UI.viewId = bid; UI.dirty = true; renderSide(); }
 function closeSide() { UI.view = null; $('#side').classList.remove('show'); UI.dirty = true; updateHint(); }
 ACT.goStar = v => { selectStar(+v); centerOn(+v); };
+
+// ---------- map filters and the nearest target for the selected ship ----------
+const MAP_FILTERS = [['unexp', 'Unexplored', '#cfd8e6'], ['chart', 'Charted', '#5ad1ff'], ['surv', 'Surveyed', '#5be08a'], ['trade', 'Trade', '#b98cff']];
+function ourStar(s) { return s.bodies.some(id => B(id).owner === 0); }
+function needsRoute(s) {
+  if (s.id === 0 || !s.bodies.some(id => { const b = B(id); return b.owner === 0 && b.col && !b.col.outpost && b.col.pop > 0; })) return false;
+  return !S.fleets.some(f => f.task && f.task.type === 'route' && f.task.b === s.id);
+}
+function filterMatch(k, s) {
+  if (k === 'unexp') return !S.visited[s.id];
+  if (k === 'chart') return !!S.visited[s.id] && !S.surveyed[s.id];
+  if (k === 'surv') return !!S.surveyed[s.id] && s.id !== 0;
+  if (k === 'trade') return needsRoute(s);
+  return false;
+}
+function renderFilters() {
+  const el = $('#mapfilters'); if (!el || !S) return;
+  el.innerHTML = MAP_FILTERS.map(([k, n, col], i) => `<button class="btn sm ${UI.mapFilter === k ? 'on' : ''}" data-a="mapFilter" data-v="${k}" title="${n} (${keyName(hotkey('f_' + k))})"><span style="color:${col}">●</span> ${n}</button>`).join('');
+}
+ACT.mapFilter = k => { UI.mapFilter = UI.mapFilter === k ? null : k; renderFilters(); UI.dirty = true; };
+function shipRole(f) { return fleetHas(f, 'colony') ? 'colony' : fleetHas(f, 'outpost') ? 'outpost' : fleetHas(f, 'lab') ? 'chart' : fleetCargo(f) ? 'trade' : 'unexp'; }
+function shipTarget(f) {
+  const role = shipRole(f), pos = f.dest == null ? ST(f.star) : f;
+  const busy = new Set(S.fleets.filter(o => o !== f).map(o => o.dest != null ? o.dest : (o.task && o.task.type === 'survey' ? o.star : null)).filter(x => x != null));
+  const ok = s => {
+    if (s.guardKnown) return false;
+    if (role === 'unexp') return !S.visited[s.id] && !busy.has(s.id);
+    if (role === 'chart') return !!S.visited[s.id] && !S.surveyed[s.id] && !busy.has(s.id);
+    if (role === 'trade') return needsRoute(s);
+    if (role === 'colony') return !!S.surveyed[s.id] && s.bodies.some(id => { const b = B(id); return b.owner == null && peopleCanLive(b) && !civBlocks(b); });
+    if (role === 'outpost') return !!S.visited[s.id] && s.bodies.some(id => { const b = B(id); return b.owner == null && hab(b) !== 'none' && !civBlocks(b); });
+  };
+  let best = null, bd = 1e9, held = null, hd = 1e9;
+  for (const s of S.stars) {
+    if (!ok(s)) continue; const d = d3(pos, s);
+    if ((role === 'colony' || role === 'outpost') && ourStar(s)) { if (d < hd) { hd = d; held = s; } continue; }
+    if (d < bd) { bd = d; best = s; }
+  }
+  return best || held;
+}
+function drawFilterAndTarget(x) {
+  if (UI.mapFilter) {
+    x.fillStyle = 'rgba(4,7,14,.45)'; x.fillRect(0, 0, x.canvas.width, x.canvas.height);
+    const col = MAP_FILTERS.find(m => m[0] === UI.mapFilter)[2];
+    for (const s of S.stars) { if (!filterMatch(UI.mapFilter, s)) continue; const p = proj(s.x, s.y, s.z); x.strokeStyle = UI.mapFilter === 'trade' && s.short ? '#ff5d5d' : col; x.lineWidth = 2; x.beginPath(); x.arc(p[0], p[1], 10, 0, TAU); x.stroke(); }
+  }
+  const f = UI.selFleet != null && SETTINGS.target !== false ? S.fleets.find(o => o.id === UI.selFleet) : null;
+  if (f && f.ships.length) {
+    const t = shipTarget(f); if (!t) return;
+    const p = proj(t.x, t.y, t.z), q = f.dest == null ? proj(ST(f.star).x, ST(f.star).y, ST(f.star).z) : [movePos(f).px, movePos(f).py];
+    x.strokeStyle = 'rgba(255,214,120,.5)'; x.lineWidth = 1.2; x.setLineDash([2, 4]); x.beginPath(); x.moveTo(q[0], q[1]); x.lineTo(p[0], p[1]); x.stroke(); x.setLineDash([]);
+    x.strokeStyle = '#ffd678'; x.lineWidth = 2.5; x.beginPath(); x.arc(p[0], p[1], 13, 0, TAU); x.stroke(); x.lineWidth = 1.2; x.beginPath(); x.arc(p[0], p[1], 17, 0, TAU); x.stroke();
+    x.font = 'bold 10.5px Segoe UI, sans-serif'; x.textAlign = 'center'; x.fillStyle = '#ffd678'; x.fillText('Nearest', p[0], p[1] - 21);
+  }
+}
 
 'use strict';
 // ===================== STARWAKE — SHIP ICONS (two colours: p = civilisation colour, a = design's secondary) =====================
@@ -2630,8 +2693,8 @@ function designHTML() {
     ${d.src ? `<button class="btn" style="width:100%;margin-top:8px" data-a="saveLook" ${iconOk ? '' : 'disabled'}>Save look only (icon and colour)</button><div class="tiny dim" style="margin-top:4px">Restyles ${esc(design(d.src).name)} and its ${shipsOfDesign(d.src)} ship${shipsOfDesign(d.src) === 1 ? '' : 's'} in service. Nothing else changes.${design(d.src).std ? ' Starting designs keep this look in new games.' : ''}</div>` : ''}</div></div>`;
   return h;
 }
-function modFits(hull, m) { if (MODULES[m].tech && !has(MODULES[m].tech)) return 'needs ' + TECH[MODULES[m].tech].name; if (hull === 'light' && m === 'assault') return 'medium or heavy hull'; return hull === 'light' && (m === 'colony' || m === 'cargo') ? 'medium or heavy hull' : hull !== 'light' && m === 'booster' ? 'light hulls only' : null; }
-function newDesignEdit() { const f = freeIcons(null); return {name: 'New Design', hull: 'light', mods: ['tel_m', ''], icon: f[0] || 'dart', acc: '#eef2f8', src: null}; }
+function modFits(hull, m) { if (MODULES[m].tech && !has(MODULES[m].tech)) return 'needs ' + TECH[MODULES[m].tech].name; if (hull === 'light' && (m === 'assault' || m === 'tel_l')) return 'medium or heavy hull'; return hull === 'light' && (m === 'colony' || m === 'cargo') ? 'medium or heavy hull' : hull !== 'light' && m === 'booster' ? 'light hulls only' : null; }
+function newDesignEdit() { const f = freeIcons(null); return {name: 'New Design', hull: 'light', mods: ['', ''], icon: f[0] || 'dart', acc: '#eef2f8', src: null}; }
 ACT.openDesign = () => { UI.designEdit = newDesignEdit(); return modal({title: 'Ship Design', w: 1100, kind: 'design', body: designHTML(), foot: `<button class="btn" data-a="newDesignEd">New design</button><button class="btn" data-a="mclose">Close</button>`}).then(() => { renderSide(); UI.dirty = true; }); };
 ACT.newDesignEd = () => { UI.designEdit = newDesignEdit(); modalBody(designHTML()); };
 function rerenderDesign() { const n = $('#dname'); if (n) UI.designEdit.name = n.value; modalBody(designHTML()); }
@@ -2706,8 +2769,8 @@ ACT.menuGo = v => {
 const HELP = `<div class="small" style="line-height:1.65">
 <h3>The setting</h3><p>It is ${START_YEAR}, and you run Earth's space programme. Nothing goes faster than light: one year passes each turn, and your first ships fly at 30% of light speed, so a star 5 light-years away takes about 17 years to reach. The map uses real nearby stars at their real positions.</p>
 <h3>Earth and the space budget</h3><p>Earth gives a share of its economy to space, shown on Earth's screen. It moves with events and some technologies. Earth only builds space projects, like ships and orbital structures.</p>
-<h3>Exploring</h3><p>Every star is known from Earth's catalogues, but not what orbits it. Each star system is <b>Unexplored</b>, <b>Charted</b> (its worlds are seen) or <b>Surveyed</b> (its life and minerals are known). A system is charted when one of your ships reaches its orbit, or when a ship's telescope module has it in range (2.5 or 4 light-years). Ships with a Science Lab <b>survey</b> systems and <b>investigate</b> strange readings (◆). Scouts are fast explorers with an auto-explore button.</p>
-<h3>Settling</h3><p>Colony and Outpost Ships travel between stars. Within your own star systems, use a colony's <b>New colonies</b> tab instead: no ship needed. Settlements grow to Province, then Core World, and <b>projects</b> improve them. <b>Ships</b> need an Orbital Dock (light hulls) or a Shipyard (all hulls).</p>
+<h3>Exploring</h3><p>The <b>map filters</b> at the bottom of the screen (keys 1 to 4) highlight unexplored, charted and surveyed stars, and stars with a Settlement that no Freighter route serves yet. When you select a ship, the nearest star worth sending it to is marked <b>Nearest</b> (turn this off in Settings). Every star is known from Earth's catalogues, but not what orbits it. Each star system is <b>Unexplored</b>, <b>Charted</b> (its worlds are seen) or <b>Surveyed</b> (its life and minerals are known). A system is charted when one of your ships reaches its orbit, or when a ship's telescope module has it in range (2.5 or 4 light-years). Ships with a Science Lab <b>survey</b> systems and <b>investigate</b> strange readings (◆). Scouts are fast explorers with an auto-explore button.</p>
+<h3>Settling</h3><p>Colony and Outpost Ships travel between stars. <b>Outpost Ships</b> can land on any charted world; <b>colonists</b> only land in a <b>surveyed</b> system, since the environment must be studied first. Within your own star systems, use a colony's <b>New colonies</b> tab instead: no ship needed. Settlements grow to Province, then Core World, and <b>projects</b> improve them. <b>Ships</b> need an Orbital Dock (light hulls) or a Shipyard (all hulls).</p>
 <h3>What's shared</h3><p>Production stays with each colony. Research and credits go into one empire-wide total. Food is shared by everything at the same star. Outposts can send their production to a colony in their system.</p>
 <h3>Freighters</h3><p>A trade route between two of your systems carries settlers and food out and brings trade back. Short routes pay best.</p>
 <h3>Staying on top</h3><p>The Idle button in the top bar counts colonies with nothing to build and ships waiting for orders. Each click (or its hotkey, Space unless changed) goes to the next one: colonies first, then ships, and round again. The research bar turns red when nothing is being researched.</p>
@@ -2803,6 +2866,8 @@ function settingsHTML() {
   return slider('music', 'Music', 'Slow ambient music, generated live as you play.') + slider('sfx', 'Sound effects', 'Buttons, arrivals, discoveries and warnings.') +
     `<div class="setline"><div><b>Nearest systems</b><div class="tiny dim">When you select a star, number its closest systems on the map and list them.</div></div>
     <select data-c="setNear">${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => `<option value="${n}" ${SETTINGS.near === n ? 'selected' : ''}>${n ? n : 'Off'}</option>`).join('')}</select></div>
+    <div class="setline"><div><b>Nearest target for ships</b><div class="tiny dim">When you select a ship, mark the nearest star worth sending it to.</div></div>
+    <select data-c="setTarget"><option value="1" ${SETTINGS.target !== false ? 'selected' : ''}>On</option><option value="0" ${SETTINGS.target === false ? 'selected' : ''}>Off</option></select></div>
     <div class="setline"><div><b>Hotkeys</b><div class="tiny dim">See and change the keyboard shortcuts.</div></div><button class="btn" data-a="openHotkeys">Hotkeys…</button></div>
     <div class="tiny dim" style="margin-top:12px">Settings are kept in this browser and apply to every game. Sound starts after your first click.</div>`;
 }
@@ -2828,6 +2893,7 @@ function hotkeyCaptured(e) {
 }
 ACT.setVol = (v, el) => { SETTINGS[el.dataset.k] = +v; saveSettings(); audioVolumes(); if (el.dataset.k === 'sfx') sfx('arrive'); modalBody(settingsHTML()); };
 ACT.openSettings = () => modal({title: 'Settings', w: 520, body: settingsHTML(), foot: `<button class="btn primary" data-a="mclose">Done</button>`});
+ACT.setTarget = v => { SETTINGS.target = v === '1'; saveSettings(); UI.dirty = true; };
 ACT.setNear = v => { SETTINGS.near = +v; saveSettings(); UI.dirty = true; if (S) renderSide(); };
 
 // ---------- opening briefing ----------
@@ -3067,7 +3133,7 @@ function milestoneHTML(p) {
   const s = ST(p.star), b = B(p.body);
   let title, text, art, extra = '';
   if (p.k === 'eco') { title = 'Life beyond Earth'; art = planetArt(b); text = [`Our survey of ${esc(s.name)} has found a living world. ${esc(b.name)} is covered in a diverse ecosystem: forests, oceans and alien animals we never knew could exist.`, 'For the first time, humanity knows Earth is not the only living world. The news is on every screen on Earth.']; }
-  if (p.k === 'contact') { const c = (S.civs || []).find(x => x.id === p.civ), R = RACES[c.race]; title = 'We are not alone'; art = thumbSVG(); text = [`Our survey of ${esc(s.name)} found a civilization on ${esc(b.name)}: the ${R.name}, a people in their ${STAGE_WORDS[c.stage]}. They cannot reach space, and they do not know we exist.`, 'Earth will never see the stars the same way again.']; extra = `<button class="btn" data-a="mclose" data-v="diplo">Open Diplomacy</button>`; }
+  if (p.k === 'contact') { const c = (S.civs || []).find(x => x.id === p.civ), R = RACES[c.race]; title = 'We are not alone'; art = thumbSVG(); text = [`${p.how ? esc(p.how) : 'Our survey of ' + esc(s.name)} found a civilization on ${esc(b.name)}: the ${R.name}, a people in their ${STAGE_WORDS[c.stage]}. They cannot reach space, and they do not know we exist.`, 'Earth will never see the stars the same way again.']; extra = `<button class="btn" data-a="mclose" data-v="diplo">Open Diplomacy</button>`; }
   if (p.k === 'colony') { title = 'Humanity among the stars'; art = planetArt(b, {lights: true, ship: true}); text = [`${Math.round(p.pop * 1e6).toLocaleString()} settlers have founded a colony on ${esc(b.name)}. For the first time, people live and work under the light of another sun.`, 'Humanity is no longer a one-star species, and millions on Earth are inspired.']; }
   return {body: `<div class="mile"><div class="mtag">HISTORIC MOMENT · ${p.year}</div><div class="mbd"><div class="mart">${art}</div><div><h3>${title}</h3>${text.map(t => `<p>${t}</p>`).join('')}</div></div>${p.fx.length ? `<div class="mfx">${p.fx.map(esc).join('<br>')}</div>` : ''}</div>`,
     foot: `<button class="btn" data-a="mclose" data-v="go">Go to ${esc(p.k === 'colony' ? b.name : s.name)}</button>${extra}<button class="btn primary" data-a="mclose">Continue</button>`};
@@ -3087,7 +3153,7 @@ async function showMilestones() {
 function addPulse(sid) { UI.pulses = (UI.pulses || []).filter(p => p.star !== sid); UI.pulses.push({star: sid, t: performance.now()}); UI.dirty = true; }
 
 // ----- Science Lab refit at a colony that can build ships -----
-const REFIT_COST = 20;
+const REFIT_COST = MODULES.lab.cost; // full price of a Science Lab
 function refitActions(f) {
   if (f.dest != null || !f.ships.some(sh => sh.lost && sh.lost.includes('lab'))) return [];
   if (f.task && f.task.type === 'refit') return [];
@@ -3136,7 +3202,8 @@ ACT.skip = () => runEndTurn(true);
 const KEY_DO = {endTurn: () => runEndTurn(false), skip: () => runEndTurn(true), idle: () => ACT.attnGo(), research: () => ACT.openResearch(),
   design: () => ACT.openDesign(), colonies: () => ACT.openColonies(), journal: () => ACT.openJournal(), home: () => centerOn(0),
   near: () => { if (SETTINGS.near > 0) { SETTINGS.nearLast = SETTINGS.near; SETTINGS.near = 0; } else SETTINGS.near = SETTINGS.nearLast || 3; saveSettings(); UI.dirty = true; renderSide(); toast(SETTINGS.near ? 'Nearest-star lines: ' + SETTINGS.near : 'Nearest-star lines off'); },
-  diplo: () => ACT.openDiplo()};
+  diplo: () => ACT.openDiplo(),
+  f_unexp: () => ACT.mapFilter('unexp'), f_chart: () => ACT.mapFilter('chart'), f_surv: () => ACT.mapFilter('surv'), f_trade: () => ACT.mapFilter('trade')};
 document.addEventListener('keydown', e => {
   if (UI.keyCap && !modalOpen('hotkeys')) UI.keyCap = null;
   if (UI.keyCap) { e.preventDefault(); e.stopPropagation(); hotkeyCaptured(e); return; }

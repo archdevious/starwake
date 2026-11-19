@@ -1,6 +1,6 @@
 'use strict';
 // ===================== STARWAKE v2 — STATIC DATA =====================
-const GAME_VERSION = 19;
+const GAME_VERSION = 20;
 const SAVE_FORMAT = 2;
 const START_YEAR = 2326;
 const LENGTHS = {
@@ -89,9 +89,9 @@ const HULLS = {
   heavy:  {name: 'Heavy hull',  mass: 6, cost: 110, slots: 5},
 };
 const MODULES = {
-  tel_m:   {name: 'Medium Telescope', mass: 1, cost: 25,  desc: 'Charts star systems within 2.5 light-years of the ship (their worlds become visible). Without a telescope, a ship sees a system\'s worlds only once in orbit.'},
-  tel_l:   {name: 'Large Telescope',  mass: 3, cost: 90,  desc: 'Charts star systems within 4 light-years of the ship. With Biosignature Spectroscopy, the ship can also survey a system in 3 years without a Science Lab.'},
-  lab:     {name: 'Science Lab',      mass: 1, cost: 40,  desc: 'Surveys systems and investigates anomalies.'},
+  tel_m:   {name: 'Medium Telescope', mass: 1, cost: 15,  desc: 'Charts star systems within 2.5 light-years of the ship (their worlds become visible). Without a telescope, a ship sees a system\'s worlds only once in orbit.'},
+  tel_l:   {name: 'Large Telescope',  mass: 3, cost: 55,  desc: 'Charts star systems within 4 light-years of the ship. With Biosignature Spectroscopy, the ship can also survey a system in 3 years without a Science Lab.'},
+  lab:     {name: 'Science Lab',      mass: 1, cost: 60,  desc: 'Surveys systems and investigates anomalies.'},
   colony:  {name: 'Colony Pod',       mass: 4, cost: 120, desc: 'Carries 20,000 settlers to found or grow a colony (twice as many with Hibernation). Needs a medium or heavy hull.'},
   outpost: {name: 'Outpost Kit',      mass: 2, cost: 80,  desc: 'Builds a robotic outpost on almost any world, for star systems where we have no colony. Where we already have a colony, order an outpost from that colony instead: it costs far less.'},
   booster: {name: 'Booster',          mass: 1, cost: 20,  desc: '+10% of light speed (30% becomes 40%). Only one Booster counts. Light hulls only.'},

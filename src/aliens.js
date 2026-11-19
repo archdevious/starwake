@@ -132,16 +132,16 @@ function ensureCivs() {
   for (const s of S.stars) if (s.short && !s.shortSince) s.shortSince = S.year;
 }
 // ----- discovery -----
-function civDiscover(s, quiet) {
+function civDiscover(s, quiet, how) {
   const c = civAt(s.id); if (!c || c.known) return;
   c.known = true; const R = civRace(c);
   if (quiet) { S.contact = true; return; }
-  msg('First contact! Our survey of ' + s.name + ' found a civilization on ' + B(c.body).name + ': the ' + R.name + ', at ' + CIV_STAGES[c.stage].toLowerCase() + ' level. They have no way to reach space yet. See Diplomacy.', s.id, 'contact');
+  msg('First contact! ' + (how || 'Our survey of ' + s.name) + ' found a civilization on ' + B(c.body).name + ': the ' + R.name + ', at ' + CIV_STAGES[c.stage].toLowerCase() + ' level. They have no way to reach space yet. See Diplomacy.', s.id, 'contact');
   journal('Discovered the ' + R.name + ' (' + CIV_STAGES[c.stage].toLowerCase() + ') on ' + B(c.body).name + '.', s.id);
   if (!S.contact) {
     S.contact = true;
     budgetEvent('contact', 5, 'We are not alone. The discovery of the ' + R.name + ' changes how Earth sees the stars, and calls to prepare for other minds out there grow loud.', s.id);
-    if (!S.mile.contact) { S.mile.contact = 1; S.popq.push({k: 'contact', star: s.id, body: c.body, civ: c.id, year: S.year, fx: ['Space budget +5 (now ' + spaceBudget() + '% of Earth\'s economy)', 'Ground Forces research is now possible', 'Diplomacy is open (top bar, or P)']}); }
+    if (!S.mile.contact) { S.mile.contact = 1; S.popq.push({k: 'contact', star: s.id, body: c.body, civ: c.id, year: S.year, how: how || null, fx: ['Space budget +5 (now ' + spaceBudget() + '% of Earth\'s economy)', 'Ground Forces research is now possible', 'Diplomacy is open (top bar, or P)']}); }
     msg('Ground Forces research is now possible: assault doctrine, rifles, armor and environment suits.', null, 'info');
   }
 }

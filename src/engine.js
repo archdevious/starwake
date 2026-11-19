@@ -340,6 +340,7 @@ function designReason(d) {
   if (d.hull === 'light' && d.mods.some(m => m === 'colony' || m === 'cargo')) return 'Colony Pods and Cargo Bays need a medium or heavy hull';
   if (d.hull !== 'light' && d.mods.includes('booster')) return 'Boosters only fit light hulls';
   if (d.hull === 'light' && d.mods.includes('assault')) return 'Assault Pods need a medium or heavy hull';
+  if (d.hull === 'light' && d.mods.includes('tel_l')) return 'The Large Telescope needs a medium or heavy hull';
   if (d.mods.includes('assault') && !has('ground_doctrine')) return 'Assault Pods need Ground Assault Doctrine';
   return null;
 }
@@ -378,6 +379,7 @@ function colonizeCheck(f, b, kind) {
     if (!fleetHas(f, 'colony')) return 'No Colony Pod in this fleet';
     const h = hab(b);
     if (b.owner === 0 && b.col && !b.col.outpost) return null; // add settlers
+    if (!S.surveyed[b.star]) return 'Needs a survey first: we must study the environment before colonists land';
     if (h === 'none' || h === 'outpost') return 'People cannot live there (use an Outpost Kit)';
     if (b.owner === 0 && b.col && b.col.outpost) return null;
     return null;
@@ -510,6 +512,7 @@ function moveFleets() {
 }
 function arrive(f) {
   const s = ST(f.star);
+  if (!s.guard && (fleetHas(f, 'outpost') || fleetHas(f, 'colony'))) { const c = civAt(s.id); if (c && !c.known) civDiscover(s, false, 'Our ' + fleetName0(f) + ' at ' + s.name); }
   if (s.guard) {
     S.stats.lost += f.ships.length; f.ships = [];
     s.guardKnown = true; S.visited[s.id] = 1;

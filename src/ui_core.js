@@ -34,7 +34,8 @@ const SETTINGS = (() => { try { return Object.assign({near: 3, music: 40, sfx: 6
 function saveSettings() { try { localStorage.setItem('starwake.settings', JSON.stringify(SETTINGS)); } catch (e) {} }
 // ---------- hotkeys (editable in Settings) ----------
 const HOTKEYS = [['endTurn', 'End the year', 'Enter'], ['skip', 'Skip ahead until something happens', 'f'], ['idle', 'Next idle colony or ship', ' '],
-  ['research', 'Research', 'r'], ['design', 'Ship design', 'd'], ['colonies', 'Colonies', 'c'], ['journal', 'Journal', 'j'], ['home', 'Center the map on the Sun', 'h'], ['near', 'Show or hide nearest-star lines', 'n'], ['diplo', 'Diplomacy', 'p']];
+  ['research', 'Research', 'r'], ['design', 'Ship design', 'd'], ['colonies', 'Colonies', 'c'], ['journal', 'Journal', 'j'], ['home', 'Center the map on the Sun', 'h'], ['near', 'Show or hide nearest-star lines', 'n'], ['diplo', 'Diplomacy', 'p'],
+  ['f_unexp', 'Map filter: unexplored stars', '1'], ['f_chart', 'Map filter: charted stars', '2'], ['f_surv', 'Map filter: surveyed stars', '3'], ['f_trade', 'Map filter: stars needing a trade route', '4']];
 const normKey = k => k.length === 1 ? k.toLowerCase() : k;
 function hotkey(act) { const s = SETTINGS.keys && SETTINGS.keys[act]; return s != null ? s : HOTKEYS.find(h => h[0] === act)[2]; }
 function keyName(k) { return k === ' ' ? 'Space' : k.length === 1 ? k.toUpperCase() : k.replace(/^Arrow/, '').replace(/^./, c => c.toUpperCase()); }
@@ -67,7 +68,7 @@ function renderTop() {
     <div class="chip click rchip ${!res && availableTechs().length ? 'residle' : ''}" data-a="openResearch" title="${!res && availableTechs().length ? 'Nothing is being researched. Click to choose.' : 'Research'}"><span class="k">Research</span>${res ? `<span class="ell" title="${esc(res.name)}">${esc(res.name)}</span><span class="dim">${Math.floor(S.res.prog + S.rpBank)}/${techCost(S.res.tech)}</span>` : (availableTechs().length ? '<span class="bad">Choose research!</span>' : '<span class="dim">All known</span>')}<span class="acc">+${fmt(t.rp)}</span></div>
     ${short.length ? `<div class="chip click" data-a="goStar" data-v="${short[0]}"><span class="bad">Food shortage: ${short.map(s => esc(ST(s).name)).join(', ')}</span></div>` : ''}
     <div class="chip" title="Top ship speed, as a share of light speed"><span class="k">Top speed</span><b>${pct(topSpeed())}</b><span class="dim small">of light</span></div><span id="attn"></span>`;
-  renderAttn();
+  renderAttn(); renderFilters();
   const db = $('#diplobtn'); if (db) db.style.display = S.contact ? '' : 'none';
 }
 // ---------- "needs attention" button ----------
@@ -203,6 +204,7 @@ function drawMap() {
     if (lifeVisible(s)) { const lf = s.bodies.map(B).some(b => b.life === 'ecosystem' && b.star !== 0) ? '#5be08a' : s.bodies.map(B).some(b => b.life === 'microbial' && b.star !== 0) ? '#2ee6d6' : null; if (lf) { x.fillStyle = lf; x.beginPath(); x.arc(p[0] - rr - 4, p[1] - rr - 2, 2.6, 0, TAU); x.fill(); } }
     LABELS.push({s, p, rr, pri: s.id === 0 ? 4 : ours ? 3 : UI.selStar === s.id ? 3.5 : vis ? 2 : 1});
   }
+  drawFilterAndTarget(x);
   // the 3 nearest systems to the selected star
   if (UI.selStar != null && S.known[UI.selStar]) {
     const s0 = ST(UI.selStar), p0 = proj(s0.x, s0.y, s0.z);
@@ -362,3 +364,58 @@ function selectFleet(fid) { const f = S.fleets.find(x => x.id === fid); if (!f) 
 function selectColony(bid) { UI.selStar = B(bid).star; UI.selFleet = null; UI.view = 'colony'; UI.viewId = bid; UI.dirty = true; renderSide(); }
 function closeSide() { UI.view = null; $('#side').classList.remove('show'); UI.dirty = true; updateHint(); }
 ACT.goStar = v => { selectStar(+v); centerOn(+v); };
+
+// ---------- map filters and the nearest target for the selected ship ----------
+const MAP_FILTERS = [['unexp', 'Unexplored', '#cfd8e6'], ['chart', 'Charted', '#5ad1ff'], ['surv', 'Surveyed', '#5be08a'], ['trade', 'Trade', '#b98cff']];
+function ourStar(s) { return s.bodies.some(id => B(id).owner === 0); }
+function needsRoute(s) {
+  if (s.id === 0 || !s.bodies.some(id => { const b = B(id); return b.owner === 0 && b.col && !b.col.outpost && b.col.pop > 0; })) return false;
+  return !S.fleets.some(f => f.task && f.task.type === 'route' && f.task.b === s.id);
+}
+function filterMatch(k, s) {
+  if (k === 'unexp') return !S.visited[s.id];
+  if (k === 'chart') return !!S.visited[s.id] && !S.surveyed[s.id];
+  if (k === 'surv') return !!S.surveyed[s.id] && s.id !== 0;
+  if (k === 'trade') return needsRoute(s);
+  return false;
+}
+function renderFilters() {
+  const el = $('#mapfilters'); if (!el || !S) return;
+  el.innerHTML = MAP_FILTERS.map(([k, n, col], i) => `<button class="btn sm ${UI.mapFilter === k ? 'on' : ''}" data-a="mapFilter" data-v="${k}" title="${n} (${keyName(hotkey('f_' + k))})"><span style="color:${col}">●</span> ${n}</button>`).join('');
+}
+ACT.mapFilter = k => { UI.mapFilter = UI.mapFilter === k ? null : k; renderFilters(); UI.dirty = true; };
+function shipRole(f) { return fleetHas(f, 'colony') ? 'colony' : fleetHas(f, 'outpost') ? 'outpost' : fleetHas(f, 'lab') ? 'chart' : fleetCargo(f) ? 'trade' : 'unexp'; }
+function shipTarget(f) {
+  const role = shipRole(f), pos = f.dest == null ? ST(f.star) : f;
+  const busy = new Set(S.fleets.filter(o => o !== f).map(o => o.dest != null ? o.dest : (o.task && o.task.type === 'survey' ? o.star : null)).filter(x => x != null));
+  const ok = s => {
+    if (s.guardKnown) return false;
+    if (role === 'unexp') return !S.visited[s.id] && !busy.has(s.id);
+    if (role === 'chart') return !!S.visited[s.id] && !S.surveyed[s.id] && !busy.has(s.id);
+    if (role === 'trade') return needsRoute(s);
+    if (role === 'colony') return !!S.surveyed[s.id] && s.bodies.some(id => { const b = B(id); return b.owner == null && peopleCanLive(b) && !civBlocks(b); });
+    if (role === 'outpost') return !!S.visited[s.id] && s.bodies.some(id => { const b = B(id); return b.owner == null && hab(b) !== 'none' && !civBlocks(b); });
+  };
+  let best = null, bd = 1e9, held = null, hd = 1e9;
+  for (const s of S.stars) {
+    if (!ok(s)) continue; const d = d3(pos, s);
+    if ((role === 'colony' || role === 'outpost') && ourStar(s)) { if (d < hd) { hd = d; held = s; } continue; }
+    if (d < bd) { bd = d; best = s; }
+  }
+  return best || held;
+}
+function drawFilterAndTarget(x) {
+  if (UI.mapFilter) {
+    x.fillStyle = 'rgba(4,7,14,.45)'; x.fillRect(0, 0, x.canvas.width, x.canvas.height);
+    const col = MAP_FILTERS.find(m => m[0] === UI.mapFilter)[2];
+    for (const s of S.stars) { if (!filterMatch(UI.mapFilter, s)) continue; const p = proj(s.x, s.y, s.z); x.strokeStyle = UI.mapFilter === 'trade' && s.short ? '#ff5d5d' : col; x.lineWidth = 2; x.beginPath(); x.arc(p[0], p[1], 10, 0, TAU); x.stroke(); }
+  }
+  const f = UI.selFleet != null && SETTINGS.target !== false ? S.fleets.find(o => o.id === UI.selFleet) : null;
+  if (f && f.ships.length) {
+    const t = shipTarget(f); if (!t) return;
+    const p = proj(t.x, t.y, t.z), q = f.dest == null ? proj(ST(f.star).x, ST(f.star).y, ST(f.star).z) : [movePos(f).px, movePos(f).py];
+    x.strokeStyle = 'rgba(255,214,120,.5)'; x.lineWidth = 1.2; x.setLineDash([2, 4]); x.beginPath(); x.moveTo(q[0], q[1]); x.lineTo(p[0], p[1]); x.stroke(); x.setLineDash([]);
+    x.strokeStyle = '#ffd678'; x.lineWidth = 2.5; x.beginPath(); x.arc(p[0], p[1], 13, 0, TAU); x.stroke(); x.lineWidth = 1.2; x.beginPath(); x.arc(p[0], p[1], 17, 0, TAU); x.stroke();
+    x.font = 'bold 10.5px Segoe UI, sans-serif'; x.textAlign = 'center'; x.fillStyle = '#ffd678'; x.fillText('Nearest', p[0], p[1] - 21);
+  }
+}

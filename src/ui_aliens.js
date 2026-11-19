@@ -225,7 +225,7 @@ function milestoneHTML(p) {
   const s = ST(p.star), b = B(p.body);
   let title, text, art, extra = '';
   if (p.k === 'eco') { title = 'Life beyond Earth'; art = planetArt(b); text = [`Our survey of ${esc(s.name)} has found a living world. ${esc(b.name)} is covered in a diverse ecosystem: forests, oceans and alien animals we never knew could exist.`, 'For the first time, humanity knows Earth is not the only living world. The news is on every screen on Earth.']; }
-  if (p.k === 'contact') { const c = (S.civs || []).find(x => x.id === p.civ), R = RACES[c.race]; title = 'We are not alone'; art = thumbSVG(); text = [`Our survey of ${esc(s.name)} found a civilization on ${esc(b.name)}: the ${R.name}, a people in their ${STAGE_WORDS[c.stage]}. They cannot reach space, and they do not know we exist.`, 'Earth will never see the stars the same way again.']; extra = `<button class="btn" data-a="mclose" data-v="diplo">Open Diplomacy</button>`; }
+  if (p.k === 'contact') { const c = (S.civs || []).find(x => x.id === p.civ), R = RACES[c.race]; title = 'We are not alone'; art = thumbSVG(); text = [`${p.how ? esc(p.how) : 'Our survey of ' + esc(s.name)} found a civilization on ${esc(b.name)}: the ${R.name}, a people in their ${STAGE_WORDS[c.stage]}. They cannot reach space, and they do not know we exist.`, 'Earth will never see the stars the same way again.']; extra = `<button class="btn" data-a="mclose" data-v="diplo">Open Diplomacy</button>`; }
   if (p.k === 'colony') { title = 'Humanity among the stars'; art = planetArt(b, {lights: true, ship: true}); text = [`${Math.round(p.pop * 1e6).toLocaleString()} settlers have founded a colony on ${esc(b.name)}. For the first time, people live and work under the light of another sun.`, 'Humanity is no longer a one-star species, and millions on Earth are inspired.']; }
   return {body: `<div class="mile"><div class="mtag">HISTORIC MOMENT · ${p.year}</div><div class="mbd"><div class="mart">${art}</div><div><h3>${title}</h3>${text.map(t => `<p>${t}</p>`).join('')}</div></div>${p.fx.length ? `<div class="mfx">${p.fx.map(esc).join('<br>')}</div>` : ''}</div>`,
     foot: `<button class="btn" data-a="mclose" data-v="go">Go to ${esc(p.k === 'colony' ? b.name : s.name)}</button>${extra}<button class="btn primary" data-a="mclose">Continue</button>`};
@@ -245,7 +245,7 @@ async function showMilestones() {
 function addPulse(sid) { UI.pulses = (UI.pulses || []).filter(p => p.star !== sid); UI.pulses.push({star: sid, t: performance.now()}); UI.dirty = true; }
 
 // ----- Science Lab refit at a colony that can build ships -----
-const REFIT_COST = 20;
+const REFIT_COST = MODULES.lab.cost; // full price of a Science Lab
 function refitActions(f) {
   if (f.dest != null || !f.ships.some(sh => sh.lost && sh.lost.includes('lab'))) return [];
   if (f.task && f.task.type === 'refit') return [];

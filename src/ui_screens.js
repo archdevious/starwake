@@ -91,8 +91,8 @@ function designHTML() {
     ${d.src ? `<button class="btn" style="width:100%;margin-top:8px" data-a="saveLook" ${iconOk ? '' : 'disabled'}>Save look only (icon and colour)</button><div class="tiny dim" style="margin-top:4px">Restyles ${esc(design(d.src).name)} and its ${shipsOfDesign(d.src)} ship${shipsOfDesign(d.src) === 1 ? '' : 's'} in service. Nothing else changes.${design(d.src).std ? ' Starting designs keep this look in new games.' : ''}</div>` : ''}</div></div>`;
   return h;
 }
-function modFits(hull, m) { if (MODULES[m].tech && !has(MODULES[m].tech)) return 'needs ' + TECH[MODULES[m].tech].name; if (hull === 'light' && m === 'assault') return 'medium or heavy hull'; return hull === 'light' && (m === 'colony' || m === 'cargo') ? 'medium or heavy hull' : hull !== 'light' && m === 'booster' ? 'light hulls only' : null; }
-function newDesignEdit() { const f = freeIcons(null); return {name: 'New Design', hull: 'light', mods: ['tel_m', ''], icon: f[0] || 'dart', acc: '#eef2f8', src: null}; }
+function modFits(hull, m) { if (MODULES[m].tech && !has(MODULES[m].tech)) return 'needs ' + TECH[MODULES[m].tech].name; if (hull === 'light' && (m === 'assault' || m === 'tel_l')) return 'medium or heavy hull'; return hull === 'light' && (m === 'colony' || m === 'cargo') ? 'medium or heavy hull' : hull !== 'light' && m === 'booster' ? 'light hulls only' : null; }
+function newDesignEdit() { const f = freeIcons(null); return {name: 'New Design', hull: 'light', mods: ['', ''], icon: f[0] || 'dart', acc: '#eef2f8', src: null}; }
 ACT.openDesign = () => { UI.designEdit = newDesignEdit(); return modal({title: 'Ship Design', w: 1100, kind: 'design', body: designHTML(), foot: `<button class="btn" data-a="newDesignEd">New design</button><button class="btn" data-a="mclose">Close</button>`}).then(() => { renderSide(); UI.dirty = true; }); };
 ACT.newDesignEd = () => { UI.designEdit = newDesignEdit(); modalBody(designHTML()); };
 function rerenderDesign() { const n = $('#dname'); if (n) UI.designEdit.name = n.value; modalBody(designHTML()); }
@@ -167,8 +167,8 @@ ACT.menuGo = v => {
 const HELP = `<div class="small" style="line-height:1.65">
 <h3>The setting</h3><p>It is ${START_YEAR}, and you run Earth's space programme. Nothing goes faster than light: one year passes each turn, and your first ships fly at 30% of light speed, so a star 5 light-years away takes about 17 years to reach. The map uses real nearby stars at their real positions.</p>
 <h3>Earth and the space budget</h3><p>Earth gives a share of its economy to space, shown on Earth's screen. It moves with events and some technologies. Earth only builds space projects, like ships and orbital structures.</p>
-<h3>Exploring</h3><p>Every star is known from Earth's catalogues, but not what orbits it. Each star system is <b>Unexplored</b>, <b>Charted</b> (its worlds are seen) or <b>Surveyed</b> (its life and minerals are known). A system is charted when one of your ships reaches its orbit, or when a ship's telescope module has it in range (2.5 or 4 light-years). Ships with a Science Lab <b>survey</b> systems and <b>investigate</b> strange readings (◆). Scouts are fast explorers with an auto-explore button.</p>
-<h3>Settling</h3><p>Colony and Outpost Ships travel between stars. Within your own star systems, use a colony's <b>New colonies</b> tab instead: no ship needed. Settlements grow to Province, then Core World, and <b>projects</b> improve them. <b>Ships</b> need an Orbital Dock (light hulls) or a Shipyard (all hulls).</p>
+<h3>Exploring</h3><p>The <b>map filters</b> at the bottom of the screen (keys 1 to 4) highlight unexplored, charted and surveyed stars, and stars with a Settlement that no Freighter route serves yet. When you select a ship, the nearest star worth sending it to is marked <b>Nearest</b> (turn this off in Settings). Every star is known from Earth's catalogues, but not what orbits it. Each star system is <b>Unexplored</b>, <b>Charted</b> (its worlds are seen) or <b>Surveyed</b> (its life and minerals are known). A system is charted when one of your ships reaches its orbit, or when a ship's telescope module has it in range (2.5 or 4 light-years). Ships with a Science Lab <b>survey</b> systems and <b>investigate</b> strange readings (◆). Scouts are fast explorers with an auto-explore button.</p>
+<h3>Settling</h3><p>Colony and Outpost Ships travel between stars. <b>Outpost Ships</b> can land on any charted world; <b>colonists</b> only land in a <b>surveyed</b> system, since the environment must be studied first. Within your own star systems, use a colony's <b>New colonies</b> tab instead: no ship needed. Settlements grow to Province, then Core World, and <b>projects</b> improve them. <b>Ships</b> need an Orbital Dock (light hulls) or a Shipyard (all hulls).</p>
 <h3>What's shared</h3><p>Production stays with each colony. Research and credits go into one empire-wide total. Food is shared by everything at the same star. Outposts can send their production to a colony in their system.</p>
 <h3>Freighters</h3><p>A trade route between two of your systems carries settlers and food out and brings trade back. Short routes pay best.</p>
 <h3>Staying on top</h3><p>The Idle button in the top bar counts colonies with nothing to build and ships waiting for orders. Each click (or its hotkey, Space unless changed) goes to the next one: colonies first, then ships, and round again. The research bar turns red when nothing is being researched.</p>
@@ -264,6 +264,8 @@ function settingsHTML() {
   return slider('music', 'Music', 'Slow ambient music, generated live as you play.') + slider('sfx', 'Sound effects', 'Buttons, arrivals, discoveries and warnings.') +
     `<div class="setline"><div><b>Nearest systems</b><div class="tiny dim">When you select a star, number its closest systems on the map and list them.</div></div>
     <select data-c="setNear">${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => `<option value="${n}" ${SETTINGS.near === n ? 'selected' : ''}>${n ? n : 'Off'}</option>`).join('')}</select></div>
+    <div class="setline"><div><b>Nearest target for ships</b><div class="tiny dim">When you select a ship, mark the nearest star worth sending it to.</div></div>
+    <select data-c="setTarget"><option value="1" ${SETTINGS.target !== false ? 'selected' : ''}>On</option><option value="0" ${SETTINGS.target === false ? 'selected' : ''}>Off</option></select></div>
     <div class="setline"><div><b>Hotkeys</b><div class="tiny dim">See and change the keyboard shortcuts.</div></div><button class="btn" data-a="openHotkeys">Hotkeys…</button></div>
     <div class="tiny dim" style="margin-top:12px">Settings are kept in this browser and apply to every game. Sound starts after your first click.</div>`;
 }
@@ -289,6 +291,7 @@ function hotkeyCaptured(e) {
 }
 ACT.setVol = (v, el) => { SETTINGS[el.dataset.k] = +v; saveSettings(); audioVolumes(); if (el.dataset.k === 'sfx') sfx('arrive'); modalBody(settingsHTML()); };
 ACT.openSettings = () => modal({title: 'Settings', w: 520, body: settingsHTML(), foot: `<button class="btn primary" data-a="mclose">Done</button>`});
+ACT.setTarget = v => { SETTINGS.target = v === '1'; saveSettings(); UI.dirty = true; };
 ACT.setNear = v => { SETTINGS.near = +v; saveSettings(); UI.dirty = true; if (S) renderSide(); };
 
 // ---------- opening briefing ----------

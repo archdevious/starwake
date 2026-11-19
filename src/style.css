@@ -143,7 +143,7 @@ table.list tr.click{cursor:pointer}table.list tr.click:hover td{background:#121d
 #news .nh{display:flex;justify-content:space-between;align-items:center;color:var(--acc);font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:4px}
 .camctl{position:absolute;left:10px;bottom:10px;display:flex;gap:4px}
 .camctl .btn{height:32px;min-width:32px;padding:0 8px}
-#hint{left:auto;right:390px;bottom:12px}
+#hint{left:auto;right:390px;bottom:52px}
 .body{display:flex;gap:9px;align-items:flex-start}
 .facts{display:flex;flex-wrap:wrap;gap:2px;margin-top:4px}
 .habtag{font-weight:600}
@@ -200,3 +200,5 @@ table.list tr.click{cursor:pointer}table.list tr.click:hover td{background:#121d
 .mile h3{margin:2px 0 8px;font-size:24px;font-weight:500;color:#eef6ff}
 .mile p{font-size:14px;line-height:1.55;margin:0 0 10px;color:#c2d3e4}
 .mile .mfx{margin-top:10px;padding:10px 12px;border:1px solid #23415a;border-radius:8px;font-size:13px;color:#9fd6ee;line-height:1.7}
+#mapfilters{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);display:flex;gap:6px;z-index:5}
+#mapfilters .btn{height:32px}
