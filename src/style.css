@@ -192,3 +192,11 @@ table.list tr.click{cursor:pointer}table.list tr.click:hover td{background:#121d
 #attn .chip{gap:7px}.attnnext{text-decoration:underline;text-underline-offset:3px;font-weight:700}
 .hkrow{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)}.hkrow .btn{min-width:110px}.hkrow .btn.cap{border-color:var(--acc);color:var(--acc)}
 .chip.residle{border-color:#ff5d5d;box-shadow:0 0 0 1px #ff5d5d inset}
+#news .ni.k-life,#modal .ni.k-life{background:#0f2a1a;border-left:3px solid #4fcf5f;padding-left:6px;color:#d8f5dc}
+.mile .mtag{font-size:11px;letter-spacing:3px;color:#ffb84a;margin-bottom:6px}
+.mile .mbd{display:flex;gap:16px}
+.mile .mart{flex:none;width:150px;height:170px;background:#03070d;border:1px solid #1e3a4e;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.mile .mart .civthumb{width:150px;height:170px}
+.mile h3{margin:2px 0 8px;font-size:24px;font-weight:500;color:#eef6ff}
+.mile p{font-size:14px;line-height:1.55;margin:0 0 10px;color:#c2d3e4}
+.mile .mfx{margin-top:10px;padding:10px 12px;border:1px solid #23415a;border-radius:8px;font-size:13px;color:#9fd6ee;line-height:1.7}

@@ -134,7 +134,7 @@ function newGame(o) {
   const gc = shuffle(S.stars.filter(s => s.ly >= 10 && s.ly <= L.radius - 2 && s.name !== 'Alpha Centauri' && s.bodies.length));
   gc.slice(0, o.len === 'long' ? 3 : 2).forEach(s => s.guard = true);
   assignLife();
-  S.civs = []; S.contact = false; placeCivs();
+  S.civs = []; S.contact = false; S.mile = {}; S.popq = []; placeCivs();
   // anomalies
   const ev = shuffle(EVENTS.map(e => e.id));
   let k = 0;
@@ -295,6 +295,7 @@ function systemFood(starId) {
   for (const bid of ST(starId).bodies) { const b = B(bid); if (b.owner !== 0 || !b.col) continue; const o = colOut(b); made += o.food; eaten += o.eat; }
   return {made: r1(made), eaten: r1(eaten), net: r1(made - eaten), stock: Math.floor(ST(starId).stock || 0)};
 }
+function suppliedTo(t) { let v = 0; for (const b of colonies(true)) if (supplyTarget(b) === t) v += colOut(b).prod * supplyRate(); return r1(v); }
 function colonyStars() { return [...new Set(colonies(true).map(b => b.star))]; }
 function growthRate(b) {
   const h = hab(b), stg = stageOf(b);
@@ -390,7 +391,11 @@ function foundColony(b, add) {
   const old = b.col; b.owner = 0; b.col = {pop: add, focus: 'balanced', proj: old ? old.proj : {}, queue: old ? old.queue.filter(q => !(q.kind === 'proj' && PROJECTS[q.id] && PROJECTS[q.id].outpostOnly)) : [], prog: old ? old.prog : 0, founded: S.year};
   msg((old ? 'The outpost on ' + b.name + ' became a colony' : 'A new colony is founded on ' + b.name) + ' with ' + Math.round(add * 1e6).toLocaleString() + ' settlers.', b.star, 'colony'); journal('Founded a colony on ' + b.name + '.', b.star);
   for (const f of S.fleets) if (f.star === b.star && f.dest == null && hasLoad(f) && !(f.task && f.task.type === 'route')) unloadCargo(f, true);
-  if (b.star !== 0) budgetEvent('firstStar', 1, 'Humanity\'s first colony at another star, on ' + b.name + ', inspires millions.', b.star);
+  if (b.star !== 0) {
+    const fresh = !(S.budget && S.budget.seen.firstStar);
+    budgetEvent('firstStar', 1, 'Humanity\'s first colony at another star, on ' + b.name + ', inspires millions.', b.star);
+    if (!S.mile.colony) { S.mile.colony = 1; S.popq.push({k: 'colony', star: b.star, body: b.id, pop: add, year: S.year, fx: fresh ? ['Space budget +1 (now ' + spaceBudget() + '% of Earth\'s economy)'] : []}); }
+  }
 }
 function colonize(f, b, kind) {
   if (colonizeCheck(f, b, kind)) return false;
@@ -453,10 +458,20 @@ function surveyStar(s, who, quiet) {
   if (S.surveyed[s.id]) return; S.surveyed[s.id] = 1;
   civDiscover(s, quiet);
   if (quiet) return;
-  const life = s.bodies.map(B).filter(b => b.life !== 'none');
-  msg((who ? who + ' completed a survey of ' + s.name : 'Survey of ' + s.name + ' complete') + (life.length ? ': ' + life.map(b => LIFE[b.life].toLowerCase() + ' on ' + b.name).join(', ') + '!' : '. No life found.'), s.id, 'survey');
+  const life = s.bodies.map(B).filter(b => b.life !== 'none'), eco = life.filter(b => b.life === 'ecosystem');
+  msg((who ? who + ' completed a survey of ' + s.name : 'Survey of ' + s.name + ' complete') + (life.length ? ': ' + life.map(b => LIFE[b.life].toLowerCase() + ' on ' + b.name).join(', ') + '!' : '. No life found.'), s.id, life.length ? 'life' : 'survey');
   if (life.length) journal('Found ' + life.map(b => LIFE[b.life].toLowerCase() + ' on ' + b.name).join(', ') + '.', s.id);
-  if (life.length) budgetEvent('life', 1, 'Life beyond Earth! The discovery at ' + s.name + ' is on every screen on Earth.', s.id);
+  if (eco.length) {
+    const fresh = !(S.budget && S.budget.seen.life);
+    budgetEvent('life', 1, 'Life beyond Earth! The living world at ' + s.name + ' is on every screen on Earth.', s.id);
+    if (!S.mile.eco) {
+      S.mile.eco = 1;
+      const fx = fresh ? ['Space budget +1 (now ' + spaceBudget() + '% of Earth\'s economy)'] : [];
+      const cp = S.popq.find(p => p.k === 'contact' && p.star === s.id);
+      if (cp) cp.fx.push('Their world is the first living world we have found' + (fresh ? ': space budget +1 more' : ''));
+      else S.popq.push({k: 'eco', star: s.id, body: eco[0].id, year: S.year, fx});
+    }
+  }
 }
 function inGreatScope(s) { return !!(S.mods.greatScope && d3(s, S.stars[0]) <= GREAT_SCAN + 1e-6); }
 function worldsKnown(s) { return !!S.visited[s.id]; }
@@ -598,7 +613,11 @@ function processEconomy() {
     const s = ST(sid), f = systemFood(sid);
     s.short = false;
     if (f.net >= 0) { s.stock += f.net; if (s.stock > 60) { bc += (s.stock - 60) * 0.2; s.stock = 60; } }
-    else { s.stock += f.net; if (s.stock < 0) { s.stock = 0; s.short = true; msg('Food is running out in the ' + s.name + ' system. Colonies there are shrinking. Switch a colony to Farming, build Agri-Domes, or send food by Freighter.', sid, 'warn'); } }
+    else { s.stock += f.net; if (s.stock < 0) { s.stock = 0; s.short = true; } }
+    if (s.short) {
+      if (!s.shortSince) { s.shortSince = S.year; msg('Food is running out in the ' + s.name + ' system. Colonies there are shrinking. Switch a colony to Farming, build Agri-Domes, or send food by Freighter.', sid, 'warn'); }
+      else if ((S.year - s.shortSince) % 10 === 0) msg('The ' + s.name + ' system is still short of food (' + (S.year - s.shortSince) + ' years now). Its colonies keep shrinking.', sid, 'warn');
+    } else if (s.shortSince) { s.shortSince = 0; msg('The food shortage in the ' + s.name + ' system is over.', sid, 'info'); }
   }
   // growth
   for (const b of colonies()) {

@@ -49,7 +49,7 @@ function bodyActions(b) {
 }
 ACT.colonize = v => {
   const [fid, bid, kind] = v.split(':'); const f = S.fleets.find(x => x.id === +fid), b = B(+bid);
-  if (colonize(f, b, kind)) { showNews(); if (kind === 'colony') selectColony(b.id); else renderSide(); UI.dirty = true; autosave(); }
+  if (colonize(f, b, kind)) { showNews(); if (kind === 'colony') selectColony(b.id); else renderSide(); UI.dirty = true; autosave(); if (S.popq && S.popq.length) showMilestones(); }
 };
 function starPanel(sid) {
   const s = ST(sid);
@@ -94,7 +94,7 @@ function buildLine(b) {
   const c = b.col, sup = supplyTarget(b);
   if (sup) return `<span class="dim">Supplying ${esc(sup.name)}</span>`;
   if (!c.queue.length) return `<span class="bad">Nothing being built</span>`;
-  const it = c.queue[0], o = colOut(b), cost = itemCost(b, it), yrs = o.prod > 0 ? Math.max(1, Math.ceil((cost - c.prog) / o.prod)) : '∞';
+  const it = c.queue[0], o = colOut(b); o.prod = r1(o.prod + suppliedTo(b)); const cost = itemCost(b, it), yrs = o.prod > 0 ? Math.max(1, Math.ceil((cost - c.prog) / o.prod)) : '∞';
   return `<span class="dim">Building:</span> ${esc(itemName(it))}${it.n > 1 ? ' ×' + it.n : ''} <span class="dim">(${yrs} yr)${c.queue.length > 1 ? ' +' + (c.queue.length - 1) + ' more' : ''}</span>`;
 }
 function shipNotes(list) { const lost = list.filter(sh => sh.lost && sh.lost.length).length, pods = list.reduce((a, sh) => a + shipPods(sh), 0), tr = list.reduce((a, sh) => a + shipTroops(sh), 0); return (lost ? `<div class="tiny bad">Science Lab lost on ${lost === list.length ? (list.length > 1 ? 'all' : 'this ship') : lost}</div>` : '') + (pods ? `<div class="tiny ${tr ? 'good' : 'dim'}">Troops ${people(tr / 1e6)} of ${people(pods * TROOPS_PER_POD / 1e6)}${tr < pods * TROOPS_PER_POD ? ' (refill at a star with one of our colonies)' : ''}</div>` : ''); }
@@ -107,11 +107,13 @@ function outputHTML(b, o) {
   const tg = (t, tip) => `<span class="otag" title="${tip}">${t}</span>`;
   const loc = tg('local', 'Production is used only by this colony (or by outposts supplying it).');
   const emp = tg('empire', 'Research and credits from every colony go into one empire-wide total.');
-  return `<div class="grid2 small"><div>Production <b>${o.prod}</b> ${loc}</div><div>Research <b>${o.rp}</b> ${emp}</div><div>Credits <b>${o.bc}</b> ${emp}</div><div>Food <b>${o.food}</b> <span class="dim">(eats ${o.eat})</span> ${tg('system', 'Food is shared by everything at the same star.')}</div></div>
+  const fromW = o.sup ? colonies(true).filter(x => supplyTarget(x) === b).map(x => esc(x.name)) : [];
+  return `<div class="grid2 small"><div>Production <b>${o.prod}</b> ${loc}${o.sup ? `<div class="tiny dim">${o.own} made here + ${o.sup} from ${fromW.join(', ')}</div>` : ''}</div><div>Research <b>${o.rp}</b> ${emp}</div><div>Credits <b>${o.bc}</b> ${emp}</div><div>Food <b>${o.food}</b> <span class="dim">(eats ${o.eat})</span> ${tg('system', 'Food is shared by everything at the same star.')}</div></div>
     <div class="tiny ${bad ? 'bad' : 'dim'}" style="margin-top:3px">${esc(ST(b.star).name)} system food: ${sf.net >= 0 ? '+' : ''}${sf.net} a year${sf.net >= 0 ? ' surplus' : ' shortfall'}, ${sf.stock} stored</div>`;
 }
 function colonyPanel(b) {
   const c = b.col, o = colOut(b), st = stageOf(b);
+  o.own = o.prod; o.sup = suppliedTo(b); o.prod = r1(o.own + o.sup);
   const cap = o.cap, g = growthRate(b);
   const nextT = {settlement: 0.1, city: 10}[st];
   let h = `<div class="hdr"><div class="row">${planetBall(b, 42)}<div><h2>${esc(b.name)} <button class="x ren" data-a="renBody" data-v="${b.id}" title="Rename this world">✎</button></h2><div class="dim small">${STAGES[st].name} · ${HAB[o.hab].name} ${lc(PCLASS[b.cls].name)}</div></div></div><button class="x" data-a="close">✕</button></div>
@@ -304,7 +306,7 @@ function outpostPanel(b) {
   h += `<div class="row" style="margin:8px 0 4px;gap:4px"><button class="btn sm ${tab === 'proj' ? 'on' : ''}" data-a="btab" data-v="proj">Projects</button><button class="btn sm ${tab === 'ship' ? 'on' : ''}" data-a="btab" data-v="ship">Ships</button></div>`;
   if (tab === 'proj') {
     for (const id in PROJECTS) {
-      const P = PROJECTS[id]; if (!P.outpost || (c.proj[id] && !P.repeat)) continue;
+      const P = PROJECTS[id]; if (!P.outpost || (P.tech && !has(P.tech)) || (c.proj[id] && !P.repeat)) continue;
       if (P.giantOnly && b.cls !== 'gasgiant' && b.cls !== 'icegiant') continue; if (P.replaces && c.proj[P.replaces] == null && !P.req) continue; if (P.req === 'shallow' && c.proj.mines) continue;
       const why = projReason(b, id), cost = projCost(id);
       h += `<div class="opt" ${why ? `style="opacity:.45;cursor:default"` : `data-a="qadd" data-v="${b.id}:proj:${id}"`}><span class="nm">${P.name}<div class="tiny dim">${esc(why || P.desc)}</div></span><span class="tiny dim">${cost} · ${o.prod > 0 ? Math.ceil(cost / o.prod) : '∞'} yr</span></div>`;

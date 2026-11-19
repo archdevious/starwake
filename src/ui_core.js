@@ -66,7 +66,7 @@ function renderTop() {
     <div class="chip" title="Population"><span class="k">Population</span><b>${people(t.pop)}</b></div>
     <div class="chip click rchip ${!res && availableTechs().length ? 'residle' : ''}" data-a="openResearch" title="${!res && availableTechs().length ? 'Nothing is being researched. Click to choose.' : 'Research'}"><span class="k">Research</span>${res ? `<span class="ell" title="${esc(res.name)}">${esc(res.name)}</span><span class="dim">${Math.floor(S.res.prog + S.rpBank)}/${techCost(S.res.tech)}</span>` : (availableTechs().length ? '<span class="bad">Choose research!</span>' : '<span class="dim">All known</span>')}<span class="acc">+${fmt(t.rp)}</span></div>
     ${short.length ? `<div class="chip click" data-a="goStar" data-v="${short[0]}"><span class="bad">Food shortage: ${short.map(s => esc(ST(s).name)).join(', ')}</span></div>` : ''}
-    <div class="chip" title="Top ship speed, as a share of light speed"><span class="k">Top speed</span><b>${pct(topSpeed())}</b></div><span id="attn"></span>`;
+    <div class="chip" title="Top ship speed, as a share of light speed"><span class="k">Top speed</span><b>${pct(topSpeed())}</b><span class="dim small">of light</span></div><span id="attn"></span>`;
   renderAttn();
   const db = $('#diplobtn'); if (db) db.style.display = S.contact ? '' : 'none';
 }
@@ -263,6 +263,9 @@ function drawMap() {
     const list = byStar[sid], top = p[1] - (list.length - 1) * 13.5;
     list.forEach((f, i) => { const fx = p[0] + 42, fy = top + i * 27; drawShipIcon(x, fx, fy, f, 0, UI.selFleet === f.id); UI.fleetBoxes.push({x: fx - 16, y: fy - 13, w: 32, h: 26, f: f.id}); });
   }
+  // pulses on stars where life was just found
+  const now = performance.now(); UI.pulses = (UI.pulses || []).filter(p => now - p.t < 4000);
+  for (const p of UI.pulses) { const s = ST(p.star), q = proj(s.x, s.y, s.z); for (let k = 0; k < 2; k++) { const ph = ((now - p.t) / 1500 + k * 0.5) % 1; x.strokeStyle = `rgba(126,224,138,${((1 - ph) * 0.9).toFixed(2)})`; x.lineWidth = 2; x.beginPath(); x.arc(q[0], q[1], 8 + ph * 34, 0, TAU); x.stroke(); } }
   // move preview
   const sf = UI.selFleet != null ? S.fleets.find(f => f.id === UI.selFleet) : null;
   if (sf && UI.hoverStar != null && UI.hoverStar !== sf.star) {
@@ -272,7 +275,7 @@ function drawMap() {
     x.font = 'bold 12px Segoe UI, sans-serif'; x.textAlign = 'center'; x.fillStyle = '#7fe0ff';
     x.fillText(dist.toFixed(1) + ' ly · ' + yrs + ' year' + (yrs > 1 ? 's' : '') + ' at ' + pct(fleetSpeed(sf)) + ' light speed', b[0], b[1] - 18);
   }
-  UI.dirty = false;
+  UI.dirty = false; if (UI.pulses.length && !UI.pulseT) UI.pulseT = setTimeout(() => { UI.pulseT = null; UI.dirty = true; }, 60);
 }
 function fleetLook(f) { const d = design(f.ships[0].d) || {}; return d; }
 function drawShipIcon(x, px, py, f, ang, sel) {

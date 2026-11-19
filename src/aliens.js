@@ -77,7 +77,12 @@ function civModernOutposts(c) {
   const s = ST(c.star); const n = ri(2, 3);
   for (const b of shuffle(s.bodies.map(B).filter(x => x.id !== c.body && x.owner == null && x.civ == null && PCLASS[x.cls].solid))) { if (c.outs.length >= n) break; b.civ = c.id; c.outs.push(b.id); }
 }
-function ensureCivs() { if (!S.civs) { S.civs = []; placeCivs(true); } if (S.contact == null) S.contact = false; }
+function ensureCivs() {
+  if (!S.civs) { S.civs = []; placeCivs(true); } if (S.contact == null) S.contact = false;
+  if (!S.mile) S.mile = {eco: S.bodies.some(b => b.star !== 0 && b.life === 'ecosystem' && S.surveyed[b.star]) ? 1 : 0, contact: S.contact ? 1 : 0, colony: colonies().some(b => b.star !== 0) ? 1 : 0};
+  S.popq = S.popq || [];
+  for (const s of S.stars) if (s.short && !s.shortSince) s.shortSince = S.year;
+}
 // ----- discovery -----
 function civDiscover(s, quiet) {
   const c = civAt(s.id); if (!c || c.known) return;
@@ -88,6 +93,7 @@ function civDiscover(s, quiet) {
   if (!S.contact) {
     S.contact = true;
     budgetEvent('contact', 5, 'We are not alone. The discovery of the ' + R.name + ' changes how Earth sees the stars, and calls to prepare for other minds out there grow loud.', s.id);
+    if (!S.mile.contact) { S.mile.contact = 1; S.popq.push({k: 'contact', star: s.id, body: c.body, civ: c.id, year: S.year, fx: ['Space budget +5 (now ' + spaceBudget() + '% of Earth\'s economy)', 'Ground Forces research is now possible', 'Diplomacy is open (top bar, or P)']}); }
     msg('Ground Forces research is now possible: assault doctrine, rifles, armor and environment suits.', null, 'info');
   }
 }

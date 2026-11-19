@@ -25,6 +25,8 @@ async function runEndTurn(skip) {
     if (skip) S.msgs = allMsgs;
     autosave();
     refresh(); showNews(); newsSound(S.msgs);
+    for (const m of S.msgs) if (m.kind === 'life' && m.star != null) addPulse(m.star);
+    if (S.popq && S.popq.length) { await showMilestones(); if (modalOpen()) return; }
     if (S.over) { await showEnd(); return; }
     if (!S.res && availableTechs().length) await ACT.openResearch();
   } catch (e) { console.error(e); toast('Error: ' + e.message, 6000); }

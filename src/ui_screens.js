@@ -16,18 +16,18 @@ ACT.mres = v => { if (UI.modalRes) UI.modalRes(v); };
 function confirmBox(title, text, yes) { modal({title, w: 460, body: `<div>${text}</div>`, foot: `<button class="btn" data-a="mres" data-v="no">Cancel</button><button class="btn danger" data-a="mres" data-v="yes">Confirm</button>`}).then(v => { if (v === 'yes') yes(); }); }
 
 // ---------- news feed ----------
-const NEWS_ICON = {info: 'ℹ️', tech: '🔬', build: '🏗️', ship: '🚀', colony: '🪐', warn: '⚠️', arrive: '🔭', spot: '✧', survey: '🧪', lost: '💥', stage: '🏙️', idle: '💤', budget: '🛰️', route: '📦'};
+const NEWS_ICON = {life: '🌿', info: 'ℹ️', tech: '🔬', build: '🏗️', ship: '🚀', colony: '🪐', warn: '⚠️', arrive: '🔭', spot: '✧', survey: '🧪', lost: '💥', stage: '🏙️', idle: '💤', budget: '🛰️', route: '📦'};
 function showNews() {
   const el = $('#news'); if (!S) return;
   const list = S.msgs.slice(-14);
   if (!list.length || !UI.newsOpen) { el.classList.toggle('show', false); return; }
   el.innerHTML = `<div class="nh"><span class="click" data-a="openNewsLog" title="Click to see all past news">Year ${S.year} news</span><button class="x" data-a="newsClose">✕</button></div>` +
-    list.map(m => `<div class="ni ${m.star != null ? 'click' : ''}" ${m.star != null ? `data-a="goStar" data-v="${m.star}"` : ''}>${NEWS_ICON[m.kind] || 'ℹ️'} ${esc(m.text)}</div>`).join('');
+    list.map(m => `<div class="ni k-${m.kind} ${m.star != null ? 'click' : ''}" ${m.star != null ? `data-a="goStar" data-v="${m.star}"` : ''}>${NEWS_ICON[m.kind] || 'ℹ️'} ${esc(m.text)}</div>`).join('');
   el.classList.add('show');
 }
 ACT.openNewsLog = () => {
   const log = (S.newsLog || []).slice().reverse(); let h = '', y = null;
-  for (const m of log) { if (m.y !== y) { y = m.y; h += `<div class="sec">${y}</div>`; } h += `<div class="ni ${m.star != null ? 'click' : ''}" ${m.star != null ? `data-a="logGo" data-v="${m.star}"` : ''}>${NEWS_ICON[m.kind] || 'ℹ️'} ${esc(m.text)}</div>`; }
+  for (const m of log) { if (m.y !== y) { y = m.y; h += `<div class="sec">${y}</div>`; } h += `<div class="ni k-${m.kind} ${m.star != null ? 'click' : ''}" ${m.star != null ? `data-a="logGo" data-v="${m.star}"` : ''}>${NEWS_ICON[m.kind] || 'ℹ️'} ${esc(m.text)}</div>`; }
   modal({title: 'All news', w: 720, kind: 'newslog', body: h || '<div class="dim">No news yet.</div>', foot: `<button class="btn primary" data-a="mclose">Close</button>`});
 };
 ACT.logGo = v => { ACT.mclose(); ACT.goStar(v); };

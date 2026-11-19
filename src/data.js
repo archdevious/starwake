@@ -1,6 +1,6 @@
 'use strict';
 // ===================== STARWAKE v2 — STATIC DATA =====================
-const GAME_VERSION = 17;
+const GAME_VERSION = 18;
 const SAVE_FORMAT = 2;
 const START_YEAR = 2326;
 const LENGTHS = {
