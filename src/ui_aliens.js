@@ -2,6 +2,7 @@
 // ===================== STARWAKE — ALIENS: scans, diplomacy, ground actions =====================
 // ----- rotating 3D wireframe scan (one animates at a time) -----
 let WIRE_TOK = 0;
+const BODY_TINTABLE = ['#5EC8E8', '#9ED8EA', '#B5D4F4', '#85B7EB', '#E6F1FB', '#9FE1CB'];
 function WIRE(root, o) {
   const tok = ++WIRE_TOK;
   const SC = o.scale, CX = o.cx, GY = o.gy, PIT = 0.12, REV = 24000, SCAN = 5000, ZR = o.zr || 1.3, H = o.h;
@@ -11,7 +12,7 @@ function WIRE(root, o) {
   function tube(ctrl, seg, n) { const pts = cat(ctrl.map(p => [p[0], p[1], p[2], p[3], p[4] == null ? 1 : p[4]]), n), R = []; pts.forEach((p, i) => { const t = nz(sub(pts[Math.min(i + 1, pts.length - 1)], pts[Math.max(i - 1, 0)])); const rf = Math.abs(dot(t, [0, 0, 1])) > .9 ? [0, 1, 0] : [0, 0, 1]; const u = nz(cr(t, rf)), w = nz(cr(t, u)), r = []; for (let k = 0; k < seg; k++) { const g = 2 * Math.PI * k / seg; r.push(add(p, add(mul(u, Math.cos(g) * p[3]), mul(w, Math.sin(g) * p[3] * p[4])))); } R.push(r); }); return R; }
   const SEG = [];
   for (const pt of o.parts) for (const sd of pt.m ? [1, -1] : [1]) {
-    const R = tube(pt.p.map(q => [q[0] - o.ox, q[1], q[2] * sd, q[3], q[4]]), pt.s || 12, pt.n || 4), col = pt.c || '#5EC8E8', op = pt.o || 1;
+    const R = tube(pt.p.map(q => [q[0] - o.ox, q[1], q[2] * sd, q[3], q[4]]), pt.s || 12, pt.n || 4), col = o.tint && (!pt.c || BODY_TINTABLE.includes(pt.c)) ? o.tint : (pt.c || '#5EC8E8'), op = pt.o || 1;
     R.forEach(r => r.forEach((a, k) => SEG.push([a, r[(k + 1) % r.length], col, op])));
     for (let k = 0; k < R[0].length; k++) for (let i = 0; i < R.length - 1; i++) SEG.push([R[i][k], R[i + 1][k], col, op * .85]);
   }
@@ -40,9 +41,9 @@ function WIRE(root, o) {
   function loop(t) { if (!root.isConnected || tok !== WIRE_TOK) return; if (t - last > 33) { last = t; frame(t); } requestAnimationFrame(loop); }
   frame(0); requestAnimationFrame(loop);
 }
-const THUMB_SCALE = {tide: 32, dusk: 26, crag: 25, stone: 24, shell: 36, wire: 27, cat: 28, veil: 22};
+function thumbScale(m) { return Math.min(185 / (m.h + 0.4), 88 / Math.max(m.ring[0], 0.8)); }
 function thumbSVG() { return `<svg viewBox="0 0 200 230" width="200" height="230" class="civthumb" style="background:#06121C;border-radius:6px;flex:none"><line x1="10" y1="214" x2="190" y2="214" stroke="#1E4A5E"/><g class="mesh"></g><path class="scan" fill="none" stroke="#5EC8E8" stroke-width="1.2"/></svg>`; }
-function startThumb(race) { const el = $('#modal .civthumb'); if (!el) return; const m = RACE_MODELS[race]; WIRE(el, Object.assign({}, m, {anchors: {}, gy: 214, cx: 100, scale: THUMB_SCALE[race] || 26})); }
+function startThumb(race, tint) { const el = $('#modal .civthumb'); if (!el) return; const m = RACE_MODELS[race]; WIRE(el, Object.assign({}, m, {anchors: {}, gy: 214, cx: 100, scale: thumbScale(m), tint})); }
 function fullScanSVG(race) {
   const sp = RACE_MODELS[race], S0 = sp.scale, maxft = sp.maxft, bt = sp.bottom;
   let ticks = '', labels = '';
@@ -65,7 +66,7 @@ function fullScanSVG(race) {
 ACT.openScan = race => {
   UI.scanBack = UI.diploSel;
   modal({title: RACE_MODELS[race].name + ' · scan file', kind: 'scan', w: 760, body: fullScanSVG(race), foot: `<button class="btn" data-a="openDiplo">◂ Diplomacy</button><button class="btn primary" data-a="mclose">Close</button>`});
-  WIRE($('#modal .civscan'), RACE_MODELS[race]);
+  const cv = (S.civs || []).find(c => c.race === race); WIRE($('#modal .civscan'), Object.assign({}, RACE_MODELS[race], {tint: cv && civColor(cv)}));
 };
 // ----- diplomacy screen -----
 function trustWord(t) { return t >= 90 ? 'Worshipful' : t >= 70 ? 'Devoted' : t >= 55 ? 'Friendly' : t >= 40 ? 'Wary' : t >= 20 ? 'Hostile' : 'Hateful'; }
@@ -85,11 +86,11 @@ ACT.openDiplo = v => {
   if (!list.some(c => c.id === UI.diploSel)) UI.diploSel = list[0].id;
   UI.diploTab = 'pre';
   modal({title: 'Diplomacy', kind: 'diplo', w: 980, body: diploHTML(), foot: `<button class="btn primary" data-a="mclose">Close</button>`});
-  startThumb(diploCiv().race);
+  startThumb(diploCiv().race, civColor(diploCiv()));
 };
 function diploCiv() { return (S.civs || []).find(c => c.id === UI.diploSel); }
-ACT.diploSel = v => { UI.diploSel = +v; modalBody(diploHTML()); startThumb(diploCiv().race); };
-ACT.diploTab = v => { UI.diploTab = v; modalBody(diploHTML()); if (v === 'pre') startThumb(diploCiv().race); };
+ACT.diploSel = v => { UI.diploSel = +v; modalBody(diploHTML()); startThumb(diploCiv().race, civColor(diploCiv())); };
+ACT.diploTab = v => { UI.diploTab = v; modalBody(diploHTML()); if (v === 'pre') startThumb(diploCiv().race, civColor(diploCiv())); };
 const unk = t => `<span class="dim" style="font-style:italic">${t}</span>`;
 function diploHTML() {
   const list = knownCivs();
@@ -97,18 +98,18 @@ function diploHTML() {
   if (UI.diploTab === 'space') return h + `<div class="card dim">No spacefaring civilizations have been found.</div>`;
   const c = diploCiv(), R = civRace(c), wb = B(c.body);
   h += `<div style="display:grid;grid-template-columns:200px minmax(0,1fr);gap:12px"><div>`;
-  for (const x of list) h += `<div class="card click ${x.id === c.id ? 'on' : ''}" style="${x.id === c.id ? 'border-color:#5EC8E8' : ''}" data-a="diploSel" data-v="${x.id}"><b>${RACES[x.race].name}</b><div class="tiny dim">${x.status === 'dead' ? 'Exterminated' : CIV_STAGES[x.stage] + ' · ' + (x.met ? 'trust ' + Math.round(x.trust) : 'not met')}</div></div>`;
+  for (const x of list) h += `<div class="card click ${x.id === c.id ? 'on' : ''}" style="${x.id === c.id ? 'border-color:#5EC8E8' : ''}" data-a="diploSel" data-v="${x.id}"><b style="color:${civColor(x)}">${RACES[x.race].name}</b><div class="tiny dim">${x.status === 'dead' ? 'Exterminated' : CIV_STAGES[x.stage] + ' · ' + (x.met ? 'trust ' + Math.round(x.trust) : 'not met')}</div></div>`;
   h += `</div><div>`;
   const nextStage = c.stage >= 3 ? 'Spacefaring (not in this version)' : CIV_STAGES[c.stage + 1];
   h += `<div class="card" style="display:flex;gap:12px;align-items:flex-start">${thumbSVG()}<div style="flex:1;min-width:0">
-    <h2 style="margin:0">${R.name}</h2><div class="small dim">${esc(R.home)} · <a class="acc" style="cursor:pointer" data-a="jGo" data-v="${c.star}">${esc(wb.name)}, ${esc(ST(c.star).name)}</a></div>
+    <h2 style="margin:0;color:${civColor(c)}">${R.name}</h2><div class="small dim">${esc(R.home)} · <a class="acc" style="cursor:pointer" data-a="jGo" data-v="${c.star}">${esc(wb.name)}, ${esc(ST(c.star).name)}</a></div>
     <div class="small" style="margin:6px 0"><span class="otag">${CIV_STAGES[c.stage]}</span> <span class="otag">${civStatusText(c)}</span></div>
     <div class="sec" style="margin-top:6px">Tech · ${CIV_STAGES[c.stage]} → ${nextStage}</div><div class="bar"><i style="width:${Math.min(100, c.tech)}%;background:#4aa8ff"></i></div>
     <div class="sec">Trust</div>${c.met ? `<div class="row sb small"><span>${Math.round(c.trust)} / 100</span><span>${trustWord(c.trust)}</span></div><div class="bar"><i style="width:${c.trust}%;background:#5DCAA5"></i></div>` : unk('Unknown: shown once we meet them in person')}
     <div class="sec">Language</div><div class="bar"><i style="width:${c.lang}%;background:#9FE1CB"></i></div><div class="tiny dim">${c.lang >= 100 ? 'Learned' : Math.floor(c.lang) + '% learned'}</div>
     <div style="margin-top:8px"><button class="btn sm" data-a="openScan" data-v="${c.race}">Open scan file ▸</button></div></div></div>`;
   h += `<div class="sec">Body (from survey)</div><div class="small">${esc(R.body)} ${esc(R.comm)}</div>`;
-  h += `<div class="sec">Culture (from language)</div><div class="small">${c.lang >= 100 ? R.culture.map(x => `<span class="otag">${x}</span>`).join(' ') : unk('Unknown: learn their language')}</div>`;
+  h += `<div class="sec">Culture (from language)</div><div class="small">${c.lang >= 100 ? R.culture.map(x => `<span class="otag">${x}</span>`).join(' ') + (R.path ? `<div style="margin-top:4px">${esc(R.path)}</div>` : '') : unk('Unknown: learn their language')}</div>`;
   h += `<div class="sec">How they see us (from meeting)</div><div class="small">${c.met ? esc(R.feel) : unk('Unknown: needs a meeting in person')}</div>`;
   h += `<div class="sec">Revolt tendency</div><div class="small">${c.seenRevolt ? (R.revolt >= 1.25 ? 'Rebellious: they rise up often.' : R.revolt <= 0.7 ? 'Submissive: they rarely rise up.' : 'They rise up when guards are few.') + (R.revoltGrow ? ' Their anger grows the longer they are held.' : '') : unk('Unknown: learned only by ruling them')}</div>`;
   h += `<div class="sec">View on interference</div><div class="small">${c.aware ? (R.awe ? 'They see visitors from the sky with awe.' : 'They distrust outsiders who watch or meddle.') : unk('Unknown: revealed once they notice us')}</div>`;
@@ -127,21 +128,21 @@ function relHTML(c) {
   if (m === 'give') { const r = giveRate(c, c.give); h += `<div class="row sb"><span>Give <b>${c.give}</b> credits a year</span><span class="dim">${yrs(r.tech)} · trust +${r.trust.toFixed(1)} a year</span></div><input type="range" min="5" max="100" step="5" value="${c.give}" data-c="civGive" style="width:100%"><div class="tiny dim">Costs credits every year, but raises them much faster than trade and wins their loyalty.</div>`; }
   return h;
 }
-ACT.civMode = v => { const c = diploCiv(); c.mode = v; modalBody(diploHTML()); startThumb(c.race); renderTop(); };
-ACT.civGive = v => { const c = diploCiv(); c.give = +v; modalBody(diploHTML()); startThumb(c.race); };
+ACT.civMode = v => { const c = diploCiv(); c.mode = v; modalBody(diploHTML()); startThumb(c.race, civColor(c)); renderTop(); };
+ACT.civGive = v => { const c = diploCiv(); c.give = +v; modalBody(diploHTML()); startThumb(c.race, civColor(c)); };
 ACT.colonyGo = v => { ACT.mclose(); selectColony(+v); };
 // ----- star panel pieces -----
 function civStarHTML(s) {
   const c = (S.civs || []).find(x => x.star === s.id && x.known); if (!c) return '';
   const R = civRace(c);
   if (c.status === 'dead') return `<div class="card small" style="border-color:#5a3030"><b>Ruins of the ${R.name}</b><div class="dim">${esc(B(c.body).name)} is empty now.</div></div>`;
-  return `<div class="card" style="border-color:#2a6a8a"><div class="row sb"><b class="acc">◉ The ${R.name}</b><span class="small dim">${CIV_STAGES[c.stage]}</span></div><div class="small dim" style="margin-top:3px">${civStatusText(c)}</div>
+  return `<div class="card" style="border-color:${civColor(c)}"><div class="row sb"><b style="color:${civColor(c)}">◉ The ${R.name}</b><span class="small dim">${CIV_STAGES[c.stage]}</span></div><div class="small dim" style="margin-top:3px">${civStatusText(c)}</div>
     <button class="btn sm" style="margin-top:6px" data-a="openDiplo" data-v="${c.id}">Diplomacy ▸</button></div>`;
 }
 function civBodyLine(b) {
   const c = civOfBody(b); if (!c || !c.known) return b.ruins ? `<div class="tiny dim">Ruins of the ${RACES[b.ruins].name}</div>` : '';
   const R = civRace(c);
-  return c.body === b.id ? `<div class="tiny acc">Homeworld of the ${R.name}${c.status === 'enslaved' ? ' · under our rule' : ''}</div>` : `<div class="tiny acc">${R.one} outpost</div>`;
+  return c.body === b.id ? `<div class="tiny" style="color:${civColor(c)}">Homeworld of the ${R.name}${c.status === 'enslaved' ? ' · under our rule' : ''}</div>` : `<div class="tiny" style="color:${civColor(c)}">${R.one} outpost</div>`;
 }
 // ----- ship actions -----
 function civActions(f) {
@@ -165,7 +166,7 @@ ACT.civLand = v => {
 ACT.civAssault = v => {
   const f = FL(v), c = civAt(f.star), R = civRace(c), p = assaultPreview(f, false), px = assaultPreview(f, true);
   const hp = Math.round((1 - harshFactor(c)) * 100);
-  const line = (q, ext) => `<div class="card small"><b>${ext ? 'Exterminate' : 'Enslave'}</b> · their strength ${Math.round(q.them)}${ext ? ' (they fight 10% harder for their lives)' : ''}<div>Chance to win: <b class="${q.chance >= 0.6 ? 'good' : q.chance >= 0.35 ? 'amber' : 'bad'}">${Math.round(q.chance * 100)}%</b> · expected losses if we win: about ${people(Math.round(q.troops * q.loss / 1000) * 1000 / 1e6)} troops. If we lose, every troop dies.</div></div>`;
+  const line = (q, ext) => `<div class="card small"><b>${ext ? 'Exterminate' : 'Enslave'}</b> · their strength ${Math.round(q.them)}${ext ? ' (they fight 10% harder for their lives)' : ''}<div>Chance to win: <b class="${q.chance >= 0.6 ? 'good' : q.chance >= 0.35 ? 'amber' : 'bad'}">${Math.round(q.chance * 100)}%</b> · expected losses if we win: about ${people(Math.round(q.troops * q.loss / 1000) * 1000 / 1e6)} troops. If we lose: about ${people(q.back / 1e6)} troops make it back.</div></div>`;
   modal({title: 'Assault on ' + esc(B(c.body).name), w: 560, body: `<div class="small">Our ${people(p.troops / 1e6)} troops: strength <b>${Math.round(p.us)}</b> (${perPod()} per pod${hp ? `, −${hp}% on a world harsh to us` : ''}). The ${R.name} (${CIV_STAGES[c.stage].toLowerCase()}): ground troops only.</div>
     ${line(p, false)}${line(px, true)}
     <div class="tiny dim" style="margin-top:6px">Enslaved: the world becomes our outpost, worked by them under guard. Garrisons cost upkeep, and too few guards invite uprisings. Exterminated: the world is free to settle, but the loss costs us 15 score.</div>`,
@@ -235,10 +236,21 @@ async function showMilestones() {
     const h = milestoneHTML(p);
     sfx('turn');
     const pr = modal({w: 600, kind: 'mile', body: h.body, foot: h.foot});
-    if (p.k === 'contact') startThumb(S.civs.find(x => x.id === p.civ).race);
+    if (p.k === 'contact') { const cv = S.civs.find(x => x.id === p.civ); startThumb(cv.race, civColor(cv)); }
     const r = await pr;
     if (r === 'go') { centerOn(p.star); if (p.k === 'colony') selectColony(p.body); else selectStar(p.star); addPulse(p.star); }
     if (r === 'diplo') { ACT.openDiplo(p.civ); return; }
   }
 }
 function addPulse(sid) { UI.pulses = (UI.pulses || []).filter(p => p.star !== sid); UI.pulses.push({star: sid, t: performance.now()}); UI.dirty = true; }
+
+// ----- Science Lab refit at a colony that can build ships -----
+const REFIT_COST = 20;
+function refitActions(f) {
+  if (f.dest != null || !f.ships.some(sh => sh.lost && sh.lost.includes('lab'))) return [];
+  if (f.task && f.task.type === 'refit') return [];
+  const yard = ST(f.star).bodies.map(B).some(b => b.owner === 0 && b.col && (b.col.proj.shipyard || b.col.proj.dock));
+  if (!yard) return [];
+  return [`<button class="btn sm" data-a="refitLab" data-v="${f.id}" ${S.bc < REFIT_COST ? 'disabled' : ''} title="Takes 1 year; the ship must stay in orbit">Refit Science Lab (${REFIT_COST} credits, 1 yr)</button>`];
+}
+ACT.refitLab = v => { const f = FL(v); if (S.bc < REFIT_COST) return; S.bc = r1(S.bc - REFIT_COST); f.task = {type: 'refit', star: f.star, paid: REFIT_COST}; f.auto = false; renderSide(); renderTop(); toast('Refitting the Science Lab'); };

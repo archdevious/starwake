@@ -99,7 +99,7 @@ function buildLine(b) {
 }
 function shipNotes(list) { const lost = list.filter(sh => sh.lost && sh.lost.length).length, pods = list.reduce((a, sh) => a + shipPods(sh), 0), tr = list.reduce((a, sh) => a + shipTroops(sh), 0); return (lost ? `<div class="tiny bad">Science Lab lost on ${lost === list.length ? (list.length > 1 ? 'all' : 'this ship') : lost}</div>` : '') + (pods ? `<div class="tiny ${tr ? 'good' : 'dim'}">Troops ${people(tr / 1e6)} of ${people(pods * TROOPS_PER_POD / 1e6)}${tr < pods * TROOPS_PER_POD ? ' (refill at a star with one of our colonies)' : ''}</div>` : ''); }
 function fleetName(f) { const cnt = {}; for (const sh of f.ships) { const n = design(sh.d).name; cnt[n] = (cnt[n] || 0) + 1; } return Object.entries(cnt).map(([n, c]) => (c > 1 ? c + '× ' : '') + esc(n)).join(', '); }
-function taskText(f) { const t = f.task; if (!t) return ''; if (t.type === 'survey') return (t.probe ? 'probe survey' : 'surveying') + ' (' + t.left + ' yr left)'; if (t.type === 'route') return 'trade route ' + esc(routeName(t)); if (t.type === 'study') { const c = civAt(f.star); return 'studying their language' + (c ? ' (' + Math.floor(c.lang) + '%)' : ''); } return ''; }
+function taskText(f) { const t = f.task; if (!t) return ''; if (t.type === 'survey') return (t.probe ? 'probe survey' : 'surveying') + ' (' + t.left + ' yr left)'; if (t.type === 'route') return 'trade route ' + esc(routeName(t)); if (t.type === 'refit') return 'refitting its Science Lab'; if (t.type === 'study') { const c = civAt(f.star); return 'studying their language' + (c ? ' (' + Math.floor(c.lang) + '%)' : ''); } return ''; }
 
 // ---------- colony ----------
 function outputHTML(b, o) {
@@ -218,7 +218,7 @@ function fleetPanel(f) {
     const scope = has('biosignatures') && fleetHas(f, 'tel_l') && !fleetHas(f, 'lab') && !S.surveyed[s.id] && !(f.task && f.task.type === 'survey');
     if (scope) acts.push(`<button class="btn sm primary" data-a="scopeSurvey" data-v="${f.id}" title="Uses the Large Telescope with Biosignature Spectroscopy. The ship is not used up.">Telescope survey (3 yr)</button>`);
     if (!scope && canProbeSurvey(f) && !fleetHas(f, 'lab')) acts.push(`<button class="btn sm" data-a="probeSurvey" data-v="${f.id}" title="The ship is used up when the survey finishes">Probe survey (5 yr, uses up the ship)</button>`);
-    acts.push(...civActions(f));
+    acts.push(...civActions(f), ...refitActions(f));
     if (canInvestigate(f)) acts.push(`<button class="btn sm amber" data-a="investigate" data-v="${f.id}">Investigate strange readings</button>`);
     if (fleetHas(f, 'colony') || fleetHas(f, 'outpost')) acts.push(`<button class="btn sm" data-a="star" data-v="${s.id}">Choose a world to settle ▸</button>`);
     if (acts.length) h += `<div class="sec">Actions</div><div class="row wrap" style="gap:5px">${acts.join('')}</div>`;

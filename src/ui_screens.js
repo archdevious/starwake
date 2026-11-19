@@ -245,7 +245,7 @@ function renderNewGame() {
     h += `<div class="era"><h2 style="text-align:center;font-size:24px;margin-top:10px">${START_YEAR}: First Light</h2><div class="card" style="margin-top:12px">${ERAS.map((e, i) => { const o = e.opts.find(x => x.id === NG.story['e' + i]); return `<div style="margin:4px 0"><span class="dim">${e.years}</span> · <b>${o.name}</b> <span class="small dim">${o.text}</span></div>`; }).join('')}</div>
       <div class="setrow" style="justify-content:center"><label>Name of your civilisation<input type="text" id="ngname" value="${esc(NG.name)}" maxlength="30" style="width:240px"></label>
         <label>Colour<div class="colors">${COLORS.map(c => `<i style="background:${c}" class="${NG.color === c ? 'sel' : ''}" data-a="ngColor" data-v="${c}"></i>`).join('')}</div></label>
-        <label>Game length<div class="row" style="gap:4px">${Object.keys(LENGTHS).map(k => `<button class="btn sm ${NG.len === k ? 'on' : ''}" data-a="ngLen" data-v="${k}">${LENGTHS[k].label} (${LENGTHS[k].turns} years)</button>`).join('')}</div></label></div>
+        </div>
       <p class="small dim" style="text-align:center">Everything else about the galaxy is for you to discover.</p>
       <div class="row" style="gap:10px;justify-content:center;margin-top:16px"><button class="btn" data-a="tBack">Back</button><button class="btn primary" style="padding:10px 30px;font-size:16px" data-a="tStart">Launch</button></div></div>`;
   }
@@ -255,7 +255,7 @@ function renderNewGame() {
 function ngKeepName() { const n = $('#ngname'); if (n) NG.name = n.value; }
 ACT.ngPick = v => { NG.story['e' + NG.step] = v; NG.step++; renderNewGame(); };
 ACT.ngColor = v => { ngKeepName(); NG.color = v; renderNewGame(); };
-ACT.ngLen = v => { ngKeepName(); NG.len = v; renderNewGame(); };
+ACT.ngLen = v => { ngKeepName(); NG.len = 'standard'; renderNewGame(); }; // long games disabled for now (old long saves still load)
 ACT.tStart = () => { ngKeepName(); newGame({len: NG.len, story: NG.story, name: NG.name.trim() || 'United Earth', color: NG.color}); FAR = null; startPlaying(true); };
 
 // ---------- settings ----------

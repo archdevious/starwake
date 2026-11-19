@@ -5,7 +5,7 @@ const STAGE_STR = [0.6, 0.9, 1.8, 3.2];        // multiplies a race's base groun
 const SPOT_BASE = [0.005, 0.01, 0.04, 0.12];   // yearly chance to spot a ship or colony in their system
 const TRADE_BC = [1, 2, 4, 6];                 // credits a year from trade, by their stage
 const SLAVE_PROD = [3, 5, 8, 12];              // production a year from an enslaved world, by their stage
-const HARSH_PEN = {mild: 0.1, moderate: 0.2, high: 0.3}; // ground strength lost on a world harsh to humans
+const HARSH_PEN = {mild: 0.1, moderate: 0.2, high: 0.3, extreme: 0.4}; // ground strength lost on a world harsh to humans
 const TROOPS_PER_POD = 10000, HUMAN_STR = 20;
 const CIV_COUNT = {standard: 8, long: 12};
 const RACES = {
@@ -13,10 +13,10 @@ const RACES = {
     home: 'Shallow-sea world with two large moons', body: 'Amphibious, 5 ft. Breathes air and water.',
     culture: ['Patient', 'Clan-loyal', 'Long memory', 'Hates captivity'], comm: 'Hums and clicks from a throat sac; works underwater.',
     feel: 'Value fair trade. Aid changes them slowly, but they never forget a kindness, or a wrong.'},
-  dusk: {name: 'Duskwalkers', one: 'Duskwalker', base: 18, stages: [0, 3], spot: 2.5, lang: 0.5, hostile: 0.25, instinct: false, revolt: 1, prod: 1, harsh: 'high', trust0: 40, give: 1, trustMul: 0.8, awe: false,
+  dusk: {name: 'Duskwalkers', one: 'Duskwalker', base: 18, stages: [0, 3], spot: 2.5, lang: 0.5, hostile: 0.18, instinct: false, revolt: 1, prod: 1, harsh: 'high', trust0: 40, give: 1, trustMul: 0.8, awe: false,
     home: 'Tide-locked world of a red dwarf', body: 'Four legs, upright torso, 6 ft 2 in. Huge eyes for dim light.',
-    culture: ['Proud', 'Strict about rank', 'Territorial', 'Sky-watchers'], comm: 'Pulsing patterns of light from spots in their skin.',
-    feel: 'Respect strength and despise weakness. Gifts look like a trap to them until they reach industry.'},
+    culture: ['Proud', 'Strict about rank', 'Defend their land fiercely', 'Sky-watchers'], comm: 'Pulsing patterns of light from spots in their skin.',
+    feel: 'Respect strength. They defend their land fiercely but rarely go looking for a fight. Gifts look like a trap to them until they reach industry.'},
   crag: {name: 'Cragwings', one: 'Cragwing', base: 20, stages: [0, 3], spot: 2.5, lang: 1.2, hostile: 0.35, instinct: true, revolt: 1.1, prod: 1, harsh: 'mild', trust0: 50, give: 1, trustMul: 1, awe: true,
     home: 'Thick-air mountain world', body: 'Eagle-like biped, 6 ft 6 in. Folded wings, talons, hands at the wing joint.',
     culture: ['Curious', 'Fiercely independent', 'Quick to anger', 'Sharp-eyed'], comm: 'Song and screech from a two-sided voice box; within human hearing.',
@@ -29,10 +29,10 @@ const RACES = {
     home: 'Humid forest world', body: 'Beetle-like, six legs and two hands, 4 ft 10 in.',
     culture: ['Industrious', 'Cautious', 'Clan nests (not a hive)', 'Master crafters'], comm: 'Chirps from rubbing leg ridges, plus scent-marks.',
     feel: 'Trust is built slowly, through work done together.'},
-  wire: {name: 'Wirebound', one: 'Wirebound', base: 26, stages: [3, 3], spot: 3, lang: 1.2, hostile: 0.1, instinct: false, revolt: 1.4, prod: 1.3, harsh: 'high', trust0: 45, give: 1, trustMul: 0.9, awe: false,
-    home: 'Industrial world with poisoned air', body: 'Humanoid, 6 ft 1 in, half machine: machine limbs and a visor.',
-    culture: ['Logical', 'Wary', 'Hate waste', 'Proud of what flesh remains'], comm: 'Radio between implants; a throat speaker for outsiders.',
-    feel: 'Value useful exchange. Wasteful gifts make them suspicious.'},
+  wire: {name: 'Wirebound', one: 'Wirebound', base: 26, stages: [3, 3], spot: 3, lang: 1.2, hostile: 0.3, instinct: true, revolt: 1.4, prod: 1.3, harsh: 'high', trust0: 45, give: 1, trustMul: 0.9, awe: false,
+    home: 'Industrial world with poisoned air', body: 'Humanoid, 6 ft 1 in, half machine. The implants began as war gear: machine limbs and a visor.',
+    culture: ['Militarized', 'Logical', 'Strike first', 'Proud of what flesh remains'], comm: 'Radio between implants; a throat speaker for outsiders.',
+    feel: 'Their logic says strike first. They respect strength and value useful exchange; wasteful gifts make them suspicious.'},
   cat: {name: 'Sandprowlers', one: 'Sandprowler', base: 22, stages: [0, 3], spot: 2, lang: 1, hostile: 0.25, instinct: false, revolt: 1.3, prod: 1, harsh: 'mild', trust0: 50, give: 1, trustMul: 1, awe: true,
     home: 'Desert world with cold nights', body: 'Cat-like biped, 6 ft. Long tail, tall ears, retractable claws.',
     culture: ['Curious', 'Individualistic', 'Settle disputes by duel', 'Night hunters'], comm: 'Growls, purrs and calls close to our range; ear and tail posture.',
@@ -41,7 +41,54 @@ const RACES = {
     home: 'Dense-air world', body: 'Floating see-through bell, 7 ft, with long tendrils. Domesticated grazers do their heavy work.',
     culture: ['Serene', 'Unreadable', 'Highly intelligent', 'Keep herds of grazers'], comm: 'Ripples of light and faint electric fields.',
     feel: 'Calm toward everyone. Hard to tell what they think of you.'},
+  glass: {name: 'Glasslings', one: 'Glassling', base: 28, stages: [0, 3], spot: 1, lang: 1.3, hostile: 0.35, instinct: true, revolt: 0.5, prod: 0.6, harsh: 'extreme', trust0: 40, give: 1, trustMul: 0.8, awe: false,
+    home: 'Scorching world', body: 'Crystal being, about 5 ft. No legs: slides on a broad crystal foot. Crystal spears shoot out and pull back anywhere on its body.',
+    culture: ['Logical', 'Patient', 'Expansionist', 'See soft life as unfinished'], comm: 'Colors flicker through their crystal bodies like a prism; they are deaf.',
+    feel: 'Cold conquerors. They judge us by consistency: one broken deal ruins trust for a long time.'},
+  root: {name: 'Rootwardens', one: 'Rootwarden', base: 16, stages: [0, 3], spot: 0.6, lang: 0.4, hostile: 0.08, instinct: false, revolt: 0.5, revoltGrow: 0.01, prod: 0.9, harsh: 'moderate', trust0: 50, give: 1, trustMul: 1.1, awe: true,
+    home: 'Sunny, wet world', body: 'An 8 ft column of knotted, braided fibers with no head, a crown of fronds and root-feet. They feed on sunlight.',
+    culture: ['Calm', 'Slow to decide', 'Protective of their land', 'Hate fire and machines'], comm: 'Scent bursts and slow waves of color through their fibers.',
+    feel: 'Help wins them over slowly. Harm to their world turns them against us for generations.'},
+  tri: {name: 'Trimarch', one: 'Trimarch', base: 26, stages: [0, 3], spot: 3, lang: 1, hostile: 0.35, instinct: true, revolt: 1.3, prod: 1, harsh: 'moderate', trust0: 40, give: 1, trustMul: 0.9, awe: false,
+    home: 'Swamp world', body: 'Built in threes: three arched legs, three arms, a ring of six eyes. About 5 ft 6 in.',
+    culture: ['Cunning', 'Suspicious', 'Clan-based', 'Prize the ambush'], comm: 'Drummed rhythms on bony plates along their sides.',
+    feel: 'Respect anyone who cannot be caught off guard. They test newcomers.'},
+  mantle: {name: 'Mantleborn', one: 'Mantleborn', base: 8, stages: [0, 3], spot: 0.3, lang: 0.35, metMul: 3, hostile: 0.03, instinct: false, revolt: 0.4, prod: 1, harsh: 'high', trust0: 55, give: 1, trustMul: 1.2, awe: true,
+    home: 'Deep ocean world', body: 'A domed disc 10 ft across that glides through deep water, with touch-fronds underneath.',
+    culture: ['Gentle', 'Curious', 'Communal', 'Never in a hurry'], comm: 'By touch: textures ripple across their skin and are read by fronds. Meeting them speeds learning 3x.',
+    path: 'Their technology is grown, not built: living reefs, engineered organisms and glowing signal networks. If they reach space, it will be in grown, water-filled living ships.',
+    feel: 'Warm to anyone who makes contact by touch. A meeting face to face means a great deal to them.'},
+  velari: {name: 'Velari', one: 'Velari', base: 10, stages: [0, 3], spot: 2, lang: 1.3, hostile: 0.03, instinct: false, revolt: 0.6, prod: 0.6, harsh: 'mild', trust0: 50, give: 1, trustMul: 1, tradeMul: 1.25, awe: false,
+    home: 'Temperate world with thin air', body: 'Slender and hunched, about 5 ft: reverse-jointed legs, a long tail, four arms, six small eyes and a swept-back crest.',
+    culture: ['Scholarly', 'Proud of their knowledge', 'Ambitious', 'A little condescending'], comm: 'Soft fluting voices; feathery crest frills sense the emotions of others.',
+    feel: 'Value an exchange of ideas: trade wins them over faster than gifts. They believe greater minds should lead.'},
 };
+// homeworld each species needs (fits its biology)
+const SOLID_HOME = b => ['rocky', 'superearth'].includes(b.cls);
+const HOME_FIT = {
+  tide: {fit: (b, s) => b.cls === 'ocean' && ['temperate', 'hot'].includes(b.temp), atm: 'breathable'},
+  dusk: {fit: (b, s) => SOLID_HOME(b) && starKind(s.sp).cls === 'M' && ['temperate', 'hot', 'cold'].includes(b.temp), atm: 'breathable'},
+  crag: {fit: (b, s) => SOLID_HOME(b) && ['temperate', 'cold'].includes(b.temp), atm: 'thick'},
+  stone: {fit: (b, s) => (b.cls === 'superearth' || (b.cls === 'rocky' && b.size >= 3)) && ['cold', 'temperate'].includes(b.temp), atm: 'breathable', temp: 'cold'},
+  shell: {fit: (b, s) => SOLID_HOME(b) && ['temperate', 'hot'].includes(b.temp), atm: 'thick'},
+  wire: {fit: (b, s) => SOLID_HOME(b) && ['temperate', 'hot', 'cold'].includes(b.temp), atm: 'toxic'},
+  cat: {fit: (b, s) => SOLID_HOME(b) && b.temp === 'hot', atm: 'thin'},
+  veil: {fit: (b, s) => (SOLID_HOME(b) || b.cls === 'ocean') && ['temperate', 'hot', 'cold'].includes(b.temp), atm: 'thick'},
+  glass: {fit: (b, s) => SOLID_HOME(b) && b.temp === 'scorching', atm: null},
+  root: {fit: (b, s) => (SOLID_HOME(b) || b.cls === 'ocean') && b.temp === 'temperate' && ['F', 'G', 'K'].includes(starKind(s.sp).cls), atm: 'breathable'},
+  tri: {fit: (b, s) => SOLID_HOME(b) && ['temperate', 'hot'].includes(b.temp), atm: 'thick'},
+  mantle: {fit: (b, s) => b.cls === 'ocean', atm: 'breathable'},
+  velari: {fit: (b, s) => SOLID_HOME(b) && b.temp === 'temperate', atm: 'thin'},
+};
+const ALIEN_COLORS = ['#2fbfa5', '#9b6bff', '#e8b13a', '#c07a3e', '#8fd14f', '#a9b4c2', '#f08c3a', '#d991e8', '#e8f4ff', '#3f9a4a', '#e0484a', '#6a6ff0', '#f2c6a0', '#ff6fb5', '#c9e85a', '#5ad1ff'];
+function hexRgb(h) { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+function colorDist(a, b) { const p = hexRgb(a), q = hexRgb(b); return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]); }
+function pickCivColor() {
+  const used = (S.civs || []).map(c => c.color).filter(Boolean), mine = (S.empire && S.empire.color) || '#4aa8ff';
+  const ok = ALIEN_COLORS.filter(c => colorDist(c, mine) > 110 && used.every(u => colorDist(c, u) > 60));
+  return ok.length ? pick(ok) : pick(ALIEN_COLORS.filter(c => !used.includes(c))) || '#cccccc';
+}
+function civColor(c) { return c.color || '#5EC8E8'; }
 function civAt(sid) { return (S.civs || []).find(c => c.star === sid && c.status !== 'dead'); }
 function civOfBody(b) { return b && b.civ != null ? (S.civs || []).find(c => c.id === b.civ) : null; }
 function civBlocks(b) { const c = civOfBody(b); return !!(c && c.status === 'free'); } // their homeworld or outposts: not ours to settle
@@ -52,26 +99,26 @@ function placeCivs(existing) {
   S.civs = S.civs || [];
   const want = CIV_COUNT[S.len] || 8;
   const ours = new Set(colonyStars());
-  let cand = shuffle(S.stars.filter(s => s.id !== 0 && !s.guard && d3(s, S.stars[0]) > 10 && !ours.has(s.id) && !S.surveyed[s.id] && !civAt(s.id) &&
-    s.bodies.some(id => civHomeOK(B(id)))));
-  const races = shuffle(Object.keys(RACES)); let ri0 = 0;
-  for (const s of cand) {
+  const stars = shuffle(S.stars.filter(s => s.id !== 0 && !s.guard && d3(s, S.stars[0]) > 10 && !ours.has(s.id) && !S.surveyed[s.id] && !civAt(s.id)));
+  const used = new Set(S.civs.map(c => c.race));
+  for (const race of shuffle(Object.keys(RACES))) {
     if (S.civs.length >= want) break;
-    const race = races[ri0 % races.length]; ri0++;
-    const R = RACES[race];
-    const homes = s.bodies.map(B).filter(civHomeOK).sort((a, b) => civHomeScore(b) - civHomeScore(a));
-    const hb = homes[0];
-    hb.temp = 'temperate'; if (hb.cls === 'ice') hb.cls = 'ocean'; hb.atm = race === 'wire' ? 'toxic' : race === 'veil' ? 'thick' : 'breathable'; hb.life = 'ecosystem'; hb.clouds = false;
-    if (race === 'tide') hb.cls = 'ocean';
+    if (used.has(race)) continue;
+    const R = RACES[race], H = HOME_FIT[race];
+    let hb = null;
+    for (const st of stars) { if (civAt(st.id)) continue; hb = shuffle(st.bodies.map(B).filter(b => civHomeOK(b) && H.fit(b, st)))[0]; if (hb) break; }
+    if (!hb) continue; // no world fits: another species takes the slot
+    if (H.atm) hb.atm = H.atm; if (H.temp) hb.temp = H.temp; hb.life = 'ecosystem'; hb.clouds = false;
     const stage = ri(R.stages[0], R.stages[1]);
-    const c = {id: S.civs.length + 1, race, star: s.id, body: hb.id, stage, tech: ri(5, 60), lang: 0, met: false, aware: false, known: false, trust: R.trust0,
+    const c = {id: S.civs.length + 1, race, star: hb.star, body: hb.id, stage, tech: ri(5, 60), lang: 0, met: false, aware: false, known: false, trust: R.trust0,
       mode: 'none', give: 20, status: 'free', garrison: 0, unrest: false, boost: 1, enslavedYear: 0, outs: []};
-    hb.civ = c.id;
+    c.color = pickCivColor();
+    hb.civ = c.id; used.add(race);
     if (stage === 3) civModernOutposts(c);
     S.civs.push(c);
   }
 }
-function civHomeOK(b) { const P = PCLASS[b.cls]; return b && P.solid && !P.belt && b.cls !== 'molten' && b.owner == null && b.civ == null && b.temp !== 'scorching'; }
+function civHomeOK(b) { const P = PCLASS[b.cls]; return b && P.solid && !P.belt && b.cls !== 'molten' && b.cls !== 'moon' && b.cls !== 'dwarf' && b.owner == null && b.civ == null; }
 function civHomeScore(b) { return (b.temp === 'temperate' ? 10 : 0) + (b.life === 'ecosystem' ? 5 : 0) + (['rocky', 'superearth', 'ocean'].includes(b.cls) ? 3 : 0) + b.size; }
 function civModernOutposts(c) {
   const s = ST(c.star); const n = ri(2, 3);
@@ -81,6 +128,7 @@ function ensureCivs() {
   if (!S.civs) { S.civs = []; placeCivs(true); } if (S.contact == null) S.contact = false;
   if (!S.mile) S.mile = {eco: S.bodies.some(b => b.star !== 0 && b.life === 'ecosystem' && S.surveyed[b.star]) ? 1 : 0, contact: S.contact ? 1 : 0, colony: colonies().some(b => b.star !== 0) ? 1 : 0};
   S.popq = S.popq || [];
+  for (const c of S.civs) if (!c.color) c.color = pickCivColor();
   for (const s of S.stars) if (s.short && !s.shortSince) s.shortSince = S.year;
 }
 // ----- discovery -----
@@ -98,7 +146,7 @@ function civDiscover(s, quiet) {
   }
 }
 // ----- yearly -----
-function civStudyRate(c, f) { const R = civRace(c); return 10 * R.lang * (c.met ? 2 : 1) * Math.min(2, f.ships.filter(sh => shipHas(sh, 'lab')).length); }
+function civStudyRate(c, f) { const R = civRace(c); return 10 * R.lang * (c.met ? (R.metMul || 2) : 1) * Math.min(2, f.ships.filter(sh => shipHas(sh, 'lab')).length); }
 function processCivs() {
   if (!S.civs) return;
   // empty Assault Pods refill at any star where we have a colony with people
@@ -125,7 +173,7 @@ function processCivs() {
       }
       // relations
       if (c.met && c.lang >= 100) {
-        if (c.mode === 'trade') { S.bc = r1(S.bc + TRADE_BC[c.stage]); civTech(c, 1.2); c.trust = Math.min(90, c.trust + 1); }
+        if (c.mode === 'trade') { S.bc = r1(S.bc + TRADE_BC[c.stage]); civTech(c, 1.2 * (R.tradeMul || 1)); c.trust = Math.min(90, c.trust + (R.tradeMul ? 2 : 1)); }
         if (c.mode === 'give') {
           const g = Math.min(c.give, Math.max(0, S.bc));
           if (g > 0) { const r = giveRate(c, g); S.bc = r1(S.bc - g); civTech(c, r.tech); c.trust = Math.min(100, c.trust + r.trust); }
@@ -133,6 +181,11 @@ function processCivs() {
       }
     }
     if (c.status === 'enslaved') civGarrisonYear(c);
+  }
+  // Science Lab refits finish after a year in orbit
+  for (const f of S.fleets) if (f.task && f.task.type === 'refit') {
+    if (f.dest == null && f.star === f.task.star) { for (const sh of f.ships) if (sh.lost) sh.lost = sh.lost.filter(m => m !== 'lab'); f.task = null; msg('A new Science Lab is fitted at ' + ST(f.star).name + '.', f.star, 'build'); }
+    else { S.bc = r1(S.bc + f.task.paid); f.task = null; }
   }
 }
 function giveRate(c, g) { const R = civRace(c), slow = c.race === 'dusk' && c.stage < 2; return {tech: g / 10 * (R.give || 1) * (slow ? 0.5 : 1), trust: g / 10 * (R.trustMul || 1) * (slow ? 0.3 : 1)}; }
@@ -173,15 +226,17 @@ function harshFactor(c) { let p = HARSH_PEN[civRace(c).harsh] || 0; if (has('sea
 function ourStrength(c, troops) { return troops / TROOPS_PER_POD * perPod() * harshFactor(c); }
 function theirStrength(c, ext) { return civRace(c).base * STAGE_STR[c.stage] * (c.boost || 1) * (ext ? 1.1 : 1); }
 function winChance(r) { return clamp((r - 0.5) / 0.7, 0.02, 0.98); }
-function assaultPreview(f, ext) { const c = civAt(f.star), t = fleetTroops(f), us = ourStrength(c, t), them = theirStrength(c, ext); return {c, troops: t, us, them, ratio: us / them, chance: winChance(us / them), loss: clamp(0.35 * them / Math.max(1, us), 0.05, 0.6)}; }
+function retreatShare() { return has('combat_exo') ? 0.5 : 0.25; }
+function assaultPreview(f, ext) { const c = civAt(f.star), t = fleetTroops(f), us = ourStrength(c, t), them = theirStrength(c, ext); return {c, troops: t, us, them, ratio: us / them, chance: winChance(us / them), loss: clamp(0.35 * them / Math.max(1, us), 0.05, 0.6), back: Math.floor(t * retreatShare() / 1000) * 1000}; }
 function assault(f, ext) {
   const p = assaultPreview(f, ext), c = p.c, R = civRace(c), wb = B(c.body);
   const won = rnd() < p.chance;
-  const lost = won ? Math.round(p.troops * p.loss / 1000) * 1000 : p.troops, left = p.troops - lost;
+  const lost = won ? Math.round(p.troops * p.loss / 1000) * 1000 : p.troops - p.back, left = p.troops - lost;
   for (const sh of f.ships) if (shipPods(sh)) sh.troops = 0;
   c.aware = true; c.trust = won ? 5 : 0;
   if (!won) {
-    msg('Our assault on ' + wb.name + ' failed. All ' + people(p.troops / 1e6) + ' troops were lost against the ' + R.name + '.', c.star, 'lost');
+    let back = p.back; for (const sh of f.ships) { const cap = shipPods(sh) * TROOPS_PER_POD; const n = Math.min(cap, back); sh.troops = n; back -= n; }
+    msg('Our assault on ' + wb.name + ' failed. ' + people(lost / 1e6) + ' troops were lost against the ' + R.name + '; ' + people(p.back / 1e6) + ' made it back to the pods.', c.star, 'lost');
     journal('An assault on the ' + R.name + ' failed.', c.star);
     return {won: false, lost};
   }

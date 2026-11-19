@@ -158,6 +158,7 @@ function movePos(f) {
   return {px, py, ang};
 }
 function drawMap() {
+  const civByStar = {}; for (const c of S.civs || []) if (c.known && c.status !== 'dead') civByStar[c.star] = c;
   const c = cv(); if (!c || !S) return;
   const dpr = window.devicePixelRatio || 1, {w, h} = mapSize();
   if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) { c.width = Math.round(w * dpr); c.height = Math.round(h * dpr); }
@@ -224,7 +225,7 @@ function drawMap() {
     x.font = vis ? '600 11.5px Segoe UI, sans-serif' : '10.5px Segoe UI, sans-serif';
     const wd = x.measureText(s.name).width + 6; const bx = {x: p[0] - wd / 2, y: p[1] + rr + 3, w: wd, h: 14};
     if (L.pri < 3 && boxes.some(o => bx.x < o.x + o.w && bx.x + bx.w > o.x && bx.y < o.y + o.h && bx.y + bx.h > o.y)) continue;
-    boxes.push(bx); x.fillStyle = s.bodies.some(bid => B(bid).owner === 0) ? '#8ccaff' : vis ? '#e8eef8' : '#626b80'; x.fillText(s.name, p[0], p[1] + rr + 13);
+    boxes.push(bx); const cv = civByStar[s.id]; x.fillStyle = s.bodies.some(bid => B(bid).owner === 0) ? '#8ccaff' : cv ? civColor(cv) : vis ? '#e8eef8' : '#626b80'; x.fillText(s.name, p[0], p[1] + rr + 13);
   }
   boxes.push(...dots);
   // fleets
@@ -263,6 +264,8 @@ function drawMap() {
     const list = byStar[sid], top = p[1] - (list.length - 1) * 13.5;
     list.forEach((f, i) => { const fx = p[0] + 42, fy = top + i * 27; drawShipIcon(x, fx, fy, f, 0, UI.selFleet === f.id); UI.fleetBoxes.push({x: fx - 16, y: fy - 13, w: 32, h: 26, f: f.id}); });
   }
+  // colored rings around known alien civilizations
+  for (const c of S.civs || []) { if (!c.known || c.status === 'dead') continue; const s = ST(c.star), q = proj(s.x, s.y, s.z); x.strokeStyle = civColor(c); x.globalAlpha = 0.85; x.lineWidth = 2; x.beginPath(); x.arc(q[0], q[1], 13, 0, TAU); x.stroke(); x.globalAlpha = 1; }
   // pulses on stars where life was just found
   const now = performance.now(); UI.pulses = (UI.pulses || []).filter(p => now - p.t < 4000);
   for (const p of UI.pulses) { const s = ST(p.star), q = proj(s.x, s.y, s.z); for (let k = 0; k < 2; k++) { const ph = ((now - p.t) / 1500 + k * 0.5) % 1; x.strokeStyle = `rgba(126,224,138,${((1 - ph) * 0.9).toFixed(2)})`; x.lineWidth = 2; x.beginPath(); x.arc(q[0], q[1], 8 + ph * 34, 0, TAU); x.stroke(); } }

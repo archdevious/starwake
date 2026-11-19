@@ -1,6 +1,6 @@
 'use strict';
 // ===================== STARWAKE v2 — STATIC DATA =====================
-const GAME_VERSION = 18;
+const GAME_VERSION = 19;
 const SAVE_FORMAT = 2;
 const START_YEAR = 2326;
 const LENGTHS = {
@@ -157,7 +157,7 @@ const TECHS = [
   {id: 'field_biosuits', f: 'gnd', cost: 700, req: ['ground_doctrine'], contact: true, name: 'Field Biosuits', desc: 'Troops lose 25% less strength on worlds harsh to humans.'},
   {id: 'occupation_logistics', f: 'gnd', cost: 1000, req: ['ground_doctrine'], contact: true, name: 'Occupation Logistics', desc: 'Uprisings are 25% less likely and garrisons cost 25% less upkeep.'},
   {id: 'plasma_rifles', f: 'gnd', cost: 1600, req: ['laser_rifles'], contact: true, name: 'Plasma Rifles', desc: '+15 strength per pod (replaces Laser Rifles\' +5).'},
-  {id: 'combat_exo', f: 'gnd', cost: 1800, req: ['powered_armor'], contact: true, name: 'Combat Exoskeletons', desc: '+15 strength per pod (replaces Powered Armor\'s +5).'},
+  {id: 'combat_exo', f: 'gnd', cost: 1800, req: ['powered_armor'], contact: true, name: 'Combat Exoskeletons', desc: '+15 strength per pod (replaces Powered Armor\'s +5). A failed assault saves half the troops instead of a quarter.'},
   {id: 'sealed_suits', f: 'gnd', cost: 1500, req: ['field_biosuits'], contact: true, name: 'Sealed Environment Suits', desc: 'Troops lose half as much strength on harsh worlds (instead of 25% less).'},
   {id: 'xenology', f: 'soc', cost: 1800, req: ['biosignatures'], name: 'Xenology', desc: 'Anomalies give 50% more research.'},
 ];
